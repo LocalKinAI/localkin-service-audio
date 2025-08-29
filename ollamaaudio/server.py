@@ -151,6 +151,25 @@ def load_tts_model(model_name: str):
                 "repo_id": repo_id
             }
 
+        elif "kokoro" in model_name.lower():
+            # Kokoro models use the kokoro library
+            try:
+                from kokoro import KPipeline
+                import soundfile as sf
+            except ImportError:
+                raise ImportError("kokoro package is required for Kokoro models. Install with: pip install kokoro>=0.9.2")
+
+            # Kokoro supports multiple languages - default to English ('a')
+            # You can extend this to support other languages
+            pipeline = KPipeline(lang_code='a')  # 'a' for American English
+
+            loaded_models[model_name] = {
+                "type": "kokoro",
+                "pipeline": pipeline,
+                "repo_id": repo_id,
+                "lang_code": 'a'  # Default language
+            }
+
         else:
             # Generic TTS pipeline
             device = 0 if torch.cuda.is_available() else -1
@@ -319,6 +338,56 @@ def create_app(model_name: str) -> FastAPI:
                         return TTSResponse(
                             audio_path=output_path,
                             duration=len(speech) / 16000.0
+                        )
+
+                    elif model_data["type"] == "kokoro":
+                        # Kokoro specific implementation
+                        from kokoro import KPipeline
+                        import soundfile as sf
+                        import numpy as np
+
+                        pipeline = model_data["pipeline"]
+                        voice = request.speaker or 'af_heart'  # Default voice
+
+                        # Generate speech using Kokoro
+                        generator = pipeline(
+                            request.text,
+                            voice=voice,
+                            speed=1.0,  # You can add speed control to TTSRequest if needed
+                        )
+
+                        # Collect all audio segments
+                        audio_segments = []
+                        for gs, ps, audio in generator:
+                            audio_segments.append(audio)
+
+                        # Concatenate all audio segments
+                        if audio_segments:
+                            final_audio = np.concatenate(audio_segments)
+                        else:
+                            final_audio = np.array([])
+
+                        # Save to WAV file
+                        sf.write(output_path, final_audio, 24000)  # Kokoro uses 24kHz
+
+                        # Clean up in background
+                        background_tasks.add_task(os.unlink, output_path)
+
+                        return TTSResponse(
+                            audio_path=output_path,
+                            duration=len(final_audio) / 24000.0 if len(final_audio) > 0 else 0.0
+                        )
+
+                    elif model_data["type"] == "bark":
+                        # Bark specific implementation
+                        processor = model_data["processor"]
+                        model = model_data["model"]
+
+                        # This is a placeholder - Bark implementation would be more complex
+                        # involving proper tokenization and generation
+                        raise HTTPException(
+                            status_code=501,
+                            detail="Bark TTS implementation not yet fully implemented"
                         )
 
                     else:
