@@ -1,0 +1,210 @@
+# OllamaAudio .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.venv*/
+venv*/
+ENV*/
+env*/
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
+
+# Project specific
+# OllamaAudio cache directory
+.ollamaaudio/
+cache/
+*.cache
+
+# Audio files (test files, generated output)
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.m4a
+*.aac
+test_audio.wav
+speech.wav
+
+# Model files (if downloaded locally)
+*.bin
+*.safetensors
+*.onnx
+*.pt
+*.pth
+models/
+checkpoints/
+
+# Logs
+*.log
+logs/
+ollamaaudio.log
+server.log
+
+# Configuration (keep template, ignore actual config)
+config.json
+models.json
+*.local.json
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Testing
+.coverage
+.pytest_cache/
+.tox/
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Sphinx documentation
+docs/_build/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# FastAPI
+fastapi.log
+
+# Uvicorn
+uvicorn.log
+
+# Server files
+server.pid
+server.sock
+
+# API documentation
+docs/build/
+docs/source/_build/
+
+# Development
+debug.log
+development.log
+production.log
+
+# Backup files
+*.orig
+*.rej
+
+# Local configuration
+.env
+.env.local
+.env.development
+.env.production
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Email
+*.eml
+
+# Screenshots
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+
+# Videos
+*.mp4
+*.avi
+*.mov
+*.mkv
