@@ -10,14 +10,14 @@ import time
 def demo_api_server():
     """Demo of how the OllamaAudio API server works"""
 
-    print("🎵 OllamaAudio API Server Demo")
+    print("🎵 LocalKin Service Audio API Server Demo")
     print("=" * 50)
 
     print("\n1. Start the server:")
-    print("   ollamaaudio run whisper-tiny-hf --port 8000")
+    print("   kin audio run whisper-tiny-hf --port 8000")
 
     print("\n2. Server startup output:")
-    print("   🚀 Starting OllamaAudio API server for whisper-tiny-hf")
+    print("   🚀 Starting LocalKin Service Audio API server for whisper-tiny-hf")
     print("   📍 Server will be available at: http://localhost:8000")
     print("   📖 API documentation: http://localhost:8000/docs")
     print("   🔧 Available API endpoints:")

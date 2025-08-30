@@ -8,7 +8,7 @@ import hashlib
 OLLAMA_API_URL = "http://localhost:11434"
 
 # Cache configuration
-CACHE_DIR = Path.home() / ".ollamaaudio" / "cache"
+CACHE_DIR = Path.home() / ".localkin-service-audio" / "cache"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 HF_CACHE_DIR = CACHE_DIR / "huggingface"
 HF_CACHE_DIR.mkdir(exist_ok=True)
@@ -114,12 +114,12 @@ def run_ollama_model(model_name, port=8000):
 
         if model_name not in local_models:
             print(f"❌ Model '{model_name}' not found locally. Pull it first:")
-            print(f"   ollamaaudio pull {model_name}")
+            print(f"   kin audio pull {model_name}")
             return False
 
         print(f"✅ Model '{model_name}' is ready!")
         print(f"🌐 Ollama API is available at: {OLLAMA_API_URL}")
-        print(f"📖 Use this model with: ollama run {model_name}")
+        print(f"📖 Use this model with: kin audio run {model_name}")
         print("💡 Or integrate with your applications using the Ollama API")
         return True
 

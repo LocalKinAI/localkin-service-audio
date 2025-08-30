@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 # Cache configuration (duplicated from models.py to avoid circular imports)
 from pathlib import Path
-HF_CACHE_DIR = Path.home() / ".ollamaaudio" / "cache" / "huggingface"
+HF_CACHE_DIR = Path.home() / ".localkin-service-audio" / "cache" / "huggingface"
 HF_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 def get_cache_info():

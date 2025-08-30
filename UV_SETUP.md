@@ -12,10 +12,10 @@ Your project has been successfully converted to use `uv` for fast, reliable Pyth
 # Make the script executable (already done)
 chmod +x ollamaaudio.sh
 
-# Use ollamaaudio
+# Use kin
 ./ollamaaudio.sh --help
-./ollamaaudio.sh list
-./ollamaaudio.sh stt audio.wav
+./ollamaaudio.sh audio models
+./ollamaaudio.sh audio transcribe audio.wav
 ```
 
 ### Option 2: Add to PATH (Recommended)
@@ -30,20 +30,20 @@ echo 'export PATH="$HOME/.pyenv/versions/3.10.0/bin:$PATH"' >> ~/.bashrc
 # Reload your shell
 source ~/.zshrc
 
-# Now use ollamaaudio directly
-ollamaaudio --version
-ollamaaudio list
+# Now use kin directly
+kin --version
+kin audio models
 ```
 
 ### Option 3: Create a symlink
 
 ```bash
-# Create symlink to ollamaaudio in your local bin
-ln -sf /Users/jackysun/.pyenv/versions/3.10.0/bin/ollamaaudio /usr/local/bin/ollamaaudio
+# Create symlink to kin in your local bin
+ln -sf /Users/jackysun/.pyenv/versions/3.10.0/bin/kin /usr/local/bin/kin
 
 # Or to your home bin
 mkdir -p ~/bin
-ln -sf /Users/jackysun/.pyenv/versions/3.10.0/bin/ollamaaudio ~/bin/ollamaaudio
+ln -sf /Users/jackysun/.pyenv/versions/3.10.0/bin/kin ~/bin/kin
 export PATH="$HOME/bin:$PATH"
 ```
 
@@ -76,19 +76,19 @@ uv sync                               # Sync dependencies
 
 # Development tools
 uv run pytest                         # Run tests
-uv run ruff check ollamaaudio/        # Lint code
-uv run ruff format ollamaaudio/       # Format code
-uv run mypy ollamaaudio/              # Type check
+uv run ruff check localkin_service_audio/        # Lint code
+uv run ruff format localkin_service_audio/       # Format code
+uv run mypy localkin_service_audio/              # Type check
 ```
 
 ## 📁 Project Structure
 
 ```
-ollamaaudio/
+localkin_service_audio_project/
 ├── pyproject.toml           # ✨ New: Modern package configuration
 ├── setup.py                 # Updated: Minimal compatibility layer
 ├── ollamaaudio.sh           # ✨ New: Launcher script
-├── ollamaaudio/
+├── localkin_service_audio/
 │   ├── cli.py              # Enhanced CLI
 │   ├── config.py           # Configuration management
 │   ├── models.py           # Ollama integration

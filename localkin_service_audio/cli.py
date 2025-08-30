@@ -3,7 +3,7 @@ import sys
 import os
 from pathlib import Path
 
-# Import from the ollamaaudio package
+# Import from the localkin_service_audio package
 try:
     from .config import get_models, find_model, save_models_config, get_config_metadata
     from .models import (
@@ -34,9 +34,9 @@ except ImportError:
 __version__ = "0.1.0"
 
 def print_header():
-    """Print the ollamaaudio header."""
-    print("🎵 OllamaAudio - Local STT & TTS Model Manager")
-    print("=" * 50)
+    """Print the localkin-service-audio header."""
+    print("🎵 LocalKin Service Audio - Local STT & TTS Model Manager")
+    print("=" * 60)
 
 def print_success(message):
     """Print success message with green checkmark."""
@@ -109,7 +109,7 @@ def handle_pull(args):
     model_info = find_model(model_name)
     if not model_info:
         print_error(f"Model '{model_name}' not found in configuration.")
-        print_info("Use 'ollamaaudio list' to see available models.")
+        print_info("Use 'kin audio models' to see available models.")
         return
 
     source = model_info.get("source")
@@ -121,12 +121,12 @@ def handle_pull(args):
     else:
         print_error(f"Failed to pull model: {model_name}")
 
-def handle_stt(args):
-    """Handles the 'stt' command."""
+def handle_transcribe(args):
+    """Handles the 'audio transcribe' command."""
     print_header()
 
     input_file = args.input_file
-    model_size = args.model_size
+    model_size = getattr(args, 'model_size', 'base')
 
     if not os.path.exists(input_file):
         print_error(f"Input file not found: {input_file}")
@@ -172,16 +172,148 @@ def handle_stt(args):
     except Exception as e:
         print_error(f"❌ Transcription failed: {e}")
 
+
+def handle_listen(args):
+    """Handles the 'audio listen' command - real-time STT/TTS loop."""
+    print_header()
+
+    model_size = getattr(args, 'model_size', 'base')
+    enable_tts = getattr(args, 'tts', False)
+
+    print_info("🎧 Starting real-time STT/TTS loop...")
+    print_info(f"🤖 Using Whisper model: {model_size}")
+
+    if enable_tts:
+        print_info("🔊 Text-to-speech output enabled")
+    else:
+        print_info("🔇 Text-to-speech output disabled (use --tts to enable)")
+
+    # Get model details
+    model_details = {
+        "tiny": {"size": "39MB", "speed": "32x", "quality": "Basic"},
+        "base": {"size": "74MB", "speed": "16x", "quality": "Good"},
+        "small": {"size": "244MB", "speed": "8x", "quality": "High"},
+        "medium": {"size": "769MB", "speed": "4x", "quality": "Very High"},
+        "large": {"size": "1550MB", "speed": "1x", "quality": "Excellent"}
+    }
+
+    if model_size in model_details:
+        details = model_details[model_size]
+        print_info(f"📊 Model details: {details['size']} | {details['speed']} speed | {details['quality']} quality")
+
+    print_info("🎤 Listening... (Press Ctrl+C to stop)")
+    print("-" * 60)
+
+    try:
+        import sounddevice as sd
+        import numpy as np
+        import scipy.io.wavfile as wavfile
+        import tempfile
+        import time
+
+        # Audio recording parameters
+        sample_rate = 16000
+        channels = 1
+        chunk_duration = 3  # seconds
+        chunk_size = sample_rate * chunk_duration
+
+        # Buffer to accumulate audio
+        audio_buffer = []
+
+        def audio_callback(indata, frames, time_info, status):
+            """Callback function to process audio chunks."""
+            if status:
+                print_warning(f"Audio status: {status}")
+
+            # Add audio data to buffer
+            audio_buffer.extend(indata[:, 0])
+
+            # Process when we have enough audio
+            if len(audio_buffer) >= chunk_size:
+                # Extract chunk
+                chunk = np.array(audio_buffer[:chunk_size], dtype=np.float32)
+                audio_buffer[:] = audio_buffer[chunk_size:]  # Remove processed chunk
+
+                # Save chunk to temporary file
+                with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
+                    temp_filename = temp_file.name
+                    wavfile.write(temp_filename, sample_rate, chunk)
+
+                try:
+                    # Transcribe the chunk
+                    transcription = transcribe_audio(model_size, temp_filename)
+
+                    if not transcription.startswith("Error:") and transcription.strip():
+                        print(f"🎵 You said: {transcription}")
+
+                        # Generate TTS if enabled
+                        if enable_tts and transcription.strip():
+                            try:
+                                # Use a simple TTS response
+                                response_text = f"I heard: {transcription}"
+                                success = synthesize_speech(response_text)
+                                if success:
+                                    print(f"🔊 TTS: {response_text}")
+                            except Exception as tts_e:
+                                print_warning(f"TTS failed: {tts_e}")
+
+                except Exception as e:
+                    print_warning(f"Transcription failed: {e}")
+                finally:
+                    # Clean up temp file
+                    try:
+                        os.unlink(temp_filename)
+                    except:
+                        pass
+
+        # Start audio stream
+        with sd.InputStream(callback=audio_callback,
+                           channels=channels,
+                           samplerate=sample_rate,
+                           blocksize=int(sample_rate * 0.1)):  # 100ms blocks
+            print_info("🎤 Real-time listening active. Speak into your microphone...")
+            print_info("💡 Say something and the system will transcribe it in real-time")
+
+            while True:
+                time.sleep(0.1)  # Keep the main thread alive
+
+    except KeyboardInterrupt:
+        print("\n\n⚠️  Real-time listening stopped by user.")
+    except ImportError as e:
+        print_error(f"Missing required audio libraries: {e}")
+        print_info("Install with: pip install sounddevice scipy")
+    except Exception as e:
+        print_error(f"❌ Real-time listening failed: {e}")
+
 def handle_tts(args):
     """Handles the 'tts' command."""
     print_header()
 
     text = args.text
     output = args.output
+    model_name = getattr(args, 'model', 'native')
 
     # Show detailed model information
     print_info("🔊 Synthesizing speech...")
-    print_info("🤖 Using TTS engine: pyttsx3 (native OS TTS)")
+
+    # Get model information
+    model_info = find_model(model_name)
+    if not model_info:
+        print_error(f"Model '{model_name}' not found in configuration.")
+        print_info("Use 'kin audio models' to see available models.")
+        print_info("For TTS, available models include: native, kokoro-82m, speecht5-tts, bark-small")
+        return
+
+    source = model_info.get('source', 'unknown')
+    model_type = model_info.get('type', 'unknown')
+
+    # Show model information
+    print_info(f"🤖 Using TTS model: {model_name}")
+    print_info(f"🔗 Source: {source}")
+    if source == 'huggingface':
+        repo = model_info.get('huggingface_repo', 'Unknown')
+        print_info(f"📦 Repository: {repo}")
+    print_info(f"📏 Size: {model_info.get('size_mb', 'Unknown')}MB")
 
     # Show text preview
     text_preview = text[:100] + "..." if len(text) > 100 else text
@@ -207,22 +339,283 @@ def handle_tts(args):
     print_info("🔄 Processing text...")
 
     try:
-        success = synthesize_speech(text, output)
-        if success:
-            if output:
-                print_success(f"✅ Speech synthesized and saved to: {output}")
-                # Show file size if possible
-                try:
-                    file_size = os.path.getsize(output) / (1024 * 1024)  # MB
-                    print_info(".2f")
-                except:
-                    pass
+        # Route to appropriate TTS implementation based on source
+        if source == 'pyttsx3' or model_name == 'native':
+            # Use native OS TTS
+            success = synthesize_speech(text, output)
+            if success:
+                if output:
+                    print_success(f"✅ Speech synthesized and saved to: {output}")
+                    # Show file size if possible
+                    try:
+                        file_size = os.path.getsize(output) / (1024 * 1024)  # MB
+                        print_info(".2f")
+                    except:
+                        pass
+                else:
+                    print_success("✅ Speech synthesized and played successfully!")
             else:
-                print_success("✅ Speech synthesized and played successfully!")
+                print_error("❌ Speech synthesis failed.")
+
+        elif source == 'huggingface':
+            # Use Hugging Face TTS models
+            success = synthesize_huggingface_tts(model_name, text, output)
+            if success:
+                if output:
+                    print_success(f"✅ Speech synthesized and saved to: {output}")
+                else:
+                    print_success("✅ Speech synthesized successfully!")
+            else:
+                print_error("❌ Speech synthesis failed.")
+
+        elif source == 'ollama':
+            # Use Ollama TTS models (future implementation)
+            print_warning("Ollama TTS models not yet implemented in CLI.")
+            print_info("Use 'kin audio run <model_name> --port 8000' to start an API server instead.")
+            return
+
         else:
-            print_error("❌ Speech synthesis failed.")
+            print_error(f"Unsupported TTS source: {source}")
+            return
+
     except Exception as e:
         print_error(f"❌ Speech synthesis failed: {e}")
+        print_info("Make sure you have the required dependencies installed:")
+        if model_name == 'kokoro-82m':
+            print_info("  pip install kokoro>=0.9.2 soundfile")
+        elif 'speecht5' in model_name:
+            print_info("  pip install transformers torch torchaudio")
+        elif 'bark' in model_name:
+            print_info("  pip install transformers torch")
+
+def synthesize_huggingface_tts(model_name: str, text: str, output_path: str = None) -> bool:
+    """Synthesize speech using Hugging Face TTS models."""
+    try:
+        from .config import find_model
+
+        model_info = find_model(model_name)
+        if not model_info or model_info.get("source") != "huggingface":
+            print_error(f"Model {model_name} not found or not a Hugging Face model")
+            return False
+
+        repo_id = model_info.get("huggingface_repo")
+        if not repo_id:
+            print_error(f"No Hugging Face repo specified for {model_name}")
+            return False
+
+        # Handle different TTS model types
+        if "kokoro" in model_name.lower():
+            # Kokoro TTS implementation
+            print_info("🔧 Initializing Kokoro TTS...")
+            try:
+                print_info("📚 Importing kokoro modules...")
+                from kokoro import KPipeline
+                import soundfile as sf
+                import numpy as np
+                print_success("✅ Kokoro modules imported successfully")
+            except ImportError as e:
+                print_error("kokoro package is required for Kokoro models.")
+                print_info("Install with: pip install kokoro>=0.9.2 soundfile")
+                print_warning(f"Import error: {e}")
+                return False
+            except Exception as e:
+                print_error("Failed to import kokoro dependencies.")
+                print_warning(f"This may be due to missing system libraries (_lzma). Error: {e}")
+                print_info("Try reinstalling Python with lzma support:")
+                print_info("  pyenv install 3.10.0  # with proper system dependencies")
+                print_info("Or use alternative TTS models: native, speecht5-tts")
+                return False
+
+            try:
+                print_info("🎯 Creating Kokoro pipeline...")
+                # Kokoro supports multiple languages - default to English ('a')
+                import time
+                import threading
+
+                # Create a timeout mechanism for pipeline creation
+                pipeline_created = [False]
+                pipeline_instance = [None]
+                creation_error = [None]
+
+                def create_pipeline():
+                    try:
+                        pipeline_instance[0] = KPipeline(lang_code='a')
+                        pipeline_created[0] = True
+                    except Exception as e:
+                        creation_error[0] = e
+                        pipeline_created[0] = False
+
+                # Start pipeline creation in a separate thread
+                pipeline_thread = threading.Thread(target=create_pipeline)
+                pipeline_thread.daemon = True
+                pipeline_thread.start()
+
+                # Wait for pipeline creation with timeout
+                start_time = time.time()
+                timeout_seconds = 60  # 60 second timeout
+
+                while not pipeline_created[0] and (time.time() - start_time) < timeout_seconds:
+                    if creation_error[0]:
+                        raise creation_error[0]
+                    time.sleep(0.1)
+
+                if not pipeline_created[0]:
+                    if creation_error[0]:
+                        raise creation_error[0]
+                    else:
+                        raise TimeoutError("Pipeline creation timed out")
+
+                pipeline = pipeline_instance[0]
+                creation_time = time.time() - start_time
+                print_success(f"✅ Kokoro pipeline created successfully in {creation_time:.1f} seconds")
+
+            except TimeoutError:
+                print_error("❌ Kokoro pipeline creation timed out")
+                print_warning("The model download may be taking too long")
+                print_info("Try using a different TTS model:")
+                print_info("  uv run kin audio tts 'text' --model native")
+                return False
+            except Exception as e:
+                print_error(f"❌ Failed to create Kokoro pipeline: {e}")
+                print_warning("This might be due to network issues or model download problems")
+                print_info("Try using a different TTS model:")
+                print_info("  uv run kin audio tts 'text' --model native")
+                return False
+
+                # Default voice for Kokoro
+                voice = 'af_heart'  # You can make this configurable later
+
+                # Generate speech using Kokoro
+                print_info(f"🎤 Using voice: {voice}")
+                print_info("🎵 Generating audio segments...")
+
+                generator = pipeline(
+                    text,
+                    voice=voice,
+                    speed=1.0,
+                )
+
+                # Collect all audio segments
+                audio_segments = []
+                segment_count = 0
+
+                for gs, ps, audio in generator:
+                    audio_segments.append(audio)
+                    segment_count += 1
+                    print_info(f"📊 Generated segment {segment_count} (shape: {audio.shape})")
+
+                print_info(f"📈 Total segments generated: {len(audio_segments)}")
+
+                # Concatenate all audio segments
+                if audio_segments:
+                    final_audio = np.concatenate(audio_segments)
+                    print_info(f"🔗 Concatenated audio shape: {final_audio.shape}")
+                    print_info(f"🎵 Audio duration: {len(final_audio) / 24000:.2f} seconds")
+                else:
+                    print_error("❌ No audio segments were generated")
+                    final_audio = np.array([])
+                    return False
+
+                if output_path:
+                    # Save to specified file
+                    print_info(f"💾 Saving to: {output_path}")
+                    sf.write(output_path, final_audio, 24000)  # Kokoro uses 24kHz
+                    print_success(f"✅ Audio saved successfully!")
+                else:
+                    # Play audio directly (this would require additional audio playback libraries)
+                    print_warning("Direct audio playback not implemented for Kokoro models.")
+                    print_info("Please specify an output file with --output")
+                    return False
+
+                return True
+
+            except Exception as e:
+                print_error(f"Kokoro TTS synthesis failed: {e}")
+                return False
+
+        elif "speecht5" in model_name.lower():
+            # SpeechT5 TTS implementation
+            try:
+                from transformers import SpeechT5Processor, SpeechT5ForTextToSpeech, SpeechT5HifiGan
+                import torch
+                import torchaudio
+                import numpy as np
+            except ImportError:
+                print_error("transformers, torch, and torchaudio are required for SpeechT5 models.")
+                print_info("Install with: pip install transformers torch torchaudio")
+                return False
+
+            try:
+                processor = SpeechT5Processor.from_pretrained(repo_id)
+                model = SpeechT5ForTextToSpeech.from_pretrained(repo_id)
+                vocoder = SpeechT5HifiGan.from_pretrained("microsoft/speecht5_hifigan")
+
+                inputs = processor(text=text, return_tensors="pt")
+
+                # Generate speech
+                with torch.no_grad():
+                    speech = model.generate_speech(
+                        inputs["input_ids"],
+                        speaker_embeddings=None,  # Use default speaker
+                        vocoder=vocoder
+                    )
+
+                if output_path:
+                    # Save to specified file
+                    torchaudio.save(output_path, speech, 16000)
+                else:
+                    # Play audio directly (would need audio playback library)
+                    print_warning("Direct audio playback not implemented for SpeechT5 models.")
+                    print_info("Please specify an output file with --output")
+                    return False
+
+                return True
+
+            except Exception as e:
+                print_error(f"SpeechT5 TTS synthesis failed: {e}")
+                return False
+
+        elif "bark" in model_name.lower():
+            # Bark TTS implementation (placeholder for now)
+            print_warning("Bark TTS implementation not yet fully implemented in CLI.")
+            print_info("Use 'kin audio run bark-small --port 8000' to start an API server instead.")
+            return False
+
+        else:
+            # Generic TTS pipeline (fallback)
+            try:
+                from transformers import pipeline
+                import torch
+
+                device = 0 if torch.cuda.is_available() else -1
+                pipe = pipeline(
+                    "text-to-speech",
+                    model=repo_id,
+                    device=device,
+                )
+
+                result = pipe(text)
+
+                # Handle the result (implementation depends on specific model)
+                print_warning(f"Generic TTS pipeline used for {model_name}. Results may vary.")
+                print_info("For best results, use model-specific implementations.")
+
+                if output_path:
+                    # Try to save the result (this is a placeholder implementation)
+                    # The actual implementation would depend on the model's output format
+                    print_error(f"Generic TTS saving not implemented for {model_name}")
+                    return False
+                else:
+                    print_warning("Direct audio playback not available for generic TTS models.")
+                    return False
+
+            except Exception as e:
+                print_error(f"Generic TTS synthesis failed: {e}")
+                return False
+
+    except Exception as e:
+        print_error(f"❌ Hugging Face TTS synthesis failed: {e}")
+        return False
 
 def handle_run(args):
     """Handles the 'run' command - runs a model server."""
@@ -256,9 +649,9 @@ def handle_run(args):
             print_error(f"Failed to start API server for: {model_name}")
     elif source in ['openai-whisper', 'pyttsx3']:
         if model_type == 'stt':
-            print_info("Local STT models don't require a server - use 'ollamaaudio stt' command instead.")
+            print_info("Local STT models don't require a server - use 'kin audio transcribe' command instead.")
         elif model_type == 'tts':
-            print_info("Local TTS models don't require a server - use 'ollamaaudio tts' command instead.")
+            print_info("Local TTS models don't require a server - use 'kin audio tts' command instead.")
     else:
         print_warning(f"Server mode not yet implemented for {source} models.")
         print_info("This feature will be available in future versions.")
@@ -434,7 +827,7 @@ def handle_ps(args):
         print(f"\n💡 Tip: Access interactive API docs at http://localhost:<PORT>/docs")
     else:
         print_info("No running OllamaAudio servers found.")
-        print("💡 Start a server with: ollamaaudio run <model_name> --port <port>")
+        print("💡 Start a server with: kin audio run <model_name> --port <port>")
 
 def handle_add_model(args):
     """Handles the 'add-model' command."""
@@ -547,8 +940,8 @@ def handle_add_model(args):
 
         # Suggest next steps
         print("\n💡 Next steps:")
-        print(f"  1. Test with: ollamaaudio list")
-        print(f"  2. Run server: ollamaaudio run {model['name']} --port 8000")
+        print(f"  1. Test with: kin audio models")
+        print(f"  2. Run server: kin audio run {model['name']} --port 8000")
         if model["type"] == "stt":
             print(f"  3. Test API: curl -X POST 'http://localhost:8000/transcribe' -F 'file=@audio.wav'")
         else:
@@ -589,78 +982,87 @@ def handle_list_templates(args):
         print()
 
     print("💡 Usage examples:")
-    print("  ollamaaudio add-model --template whisper_stt --name my-whisper")
-    print("  ollamaaudio add-model --repo openai/whisper-medium --name whisper-med --type stt")
+    print("  kin audio add-model --template whisper_stt --name my-whisper")
+    print("  kin audio add-model --repo openai/whisper-medium --name whisper-med --type stt")
 
 def handle_version(args):
     """Handles the 'version' command."""
     print_header()
-    print(f"🎵 OllamaAudio version {__version__}")
+    print(f"🎵 LocalKin Service Audio version {__version__}")
     print(f"📍 Location: {Path(__file__).parent.absolute()}")
 
 def main():
     parser = argparse.ArgumentParser(
-        description="🎵 OllamaAudio - Local STT & TTS Model Manager",
+        description="🎵 LocalKin Service Audio - Local STT & TTS Model Manager",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  ollamaaudio list                    # List all available models
-  ollamaaudio pull whisper-large-v3   # Pull an Ollama model
-  ollamaaudio pull whisper-tiny-hf    # Pull from Hugging Face
-  ollamaaudio run whisper-tiny-hf     # Run Hugging Face model server
-  ollamaaudio ps                      # Show running servers
-  ollamaaudio stt audio.wav           # Transcribe audio file (shows model details)
-  ollamaaudio tts "Hello world"       # Generate speech (shows engine info)
-  ollamaaudio cache info              # Check cache status
-  ollamaaudio status                  # Check system status
+  kin audio listen                    # Start real-time STT/TTS loop
+  kin audio transcribe audio.wav      # Transcribe a single audio file
+  kin audio transcribe audio.wav --model_size large  # Use specific model size
 
 Model Management:
-  ollamaaudio list-templates          # See available model templates
-  ollamaaudio add-model --template whisper_stt --name my-whisper
-  ollamaaudio add-model --repo openai/whisper-medium --name whisper-med --type stt
+  kin audio models                    # List all available models
+  kin audio pull whisper-large-v3     # Pull an Ollama model
+  kin audio pull whisper-tiny-hf      # Pull from Hugging Face
+  kin audio run whisper-tiny-hf       # Run Hugging Face model server
+  kin audio status                    # Check system status
+  kin audio cache info                # Check cache status
         """
     )
 
-    parser.add_argument('-v', '--version', action='version', version=f'OllamaAudio {__version__}')
+    parser.add_argument('-v', '--version', action='version', version=f'LocalKin Service Audio {__version__}')
 
+    # Create main subparsers
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    # List command
-    parser_list = subparsers.add_parser("list", help="List all supported and locally available models.")
-    parser_list.add_argument("--verbose", "-v", action="store_true", help="Show detailed model information.")
-    parser_list.set_defaults(func=handle_list)
+    # Audio command (main functionality)
+    parser_audio = subparsers.add_parser("audio", help="Audio processing commands")
+    audio_subparsers = parser_audio.add_subparsers(dest="audio_command", help="Audio subcommands")
+
+    # Listen command (real-time STT/TTS loop)
+    parser_listen = audio_subparsers.add_parser("listen", help="Start real-time STT/TTS loop")
+    parser_listen.add_argument("--model", "-m", default="whisper", help="The STT model to use.")
+    parser_listen.add_argument("--model_size", default="base", help="The size of the Whisper model to use.")
+    parser_listen.add_argument("--tts", action="store_true", help="Enable text-to-speech output.")
+    parser_listen.set_defaults(func=handle_listen)
+
+    # Transcribe command
+    parser_transcribe = audio_subparsers.add_parser("transcribe", help="Transcribe a single audio file")
+    parser_transcribe.add_argument("input_file", help="Path to the audio file to transcribe.")
+    parser_transcribe.add_argument("--model", "-m", default="whisper", help="The STT model to use.")
+    parser_transcribe.add_argument("--model_size", default="base", help="The size of the Whisper model to use.")
+    parser_transcribe.set_defaults(func=handle_transcribe)
+
+    # Models command
+    parser_models = audio_subparsers.add_parser("models", help="List all available models")
+    parser_models.add_argument("--verbose", "-v", action="store_true", help="Show detailed model information.")
+    parser_models.set_defaults(func=handle_list)
 
     # Pull command
-    parser_pull = subparsers.add_parser("pull", help="Pull a model from Ollama or Hugging Face.")
+    parser_pull = audio_subparsers.add_parser("pull", help="Pull a model from Ollama or Hugging Face.")
     parser_pull.add_argument("model_name", help="The name of the model to pull.")
     parser_pull.set_defaults(func=handle_pull)
 
     # Run command
-    parser_run = subparsers.add_parser("run", help="Run a model server.")
+    parser_run = audio_subparsers.add_parser("run", help="Run a model server.")
     parser_run.add_argument("model_name", help="The name of the model to run.")
     parser_run.add_argument("--port", "-p", type=int, default=8000, help="Port for the model server.")
     parser_run.set_defaults(func=handle_run)
 
-    # STT command
-    parser_stt = subparsers.add_parser("stt", help="Perform Speech-to-Text using local models.")
-    parser_stt.add_argument("input_file", help="Path to the audio file to transcribe.")
-    parser_stt.add_argument("--model", "-m", default="whisper", help="The STT model to use.")
-    parser_stt.add_argument("--model_size", default="base", help="The size of the Whisper model to use.")
-    parser_stt.set_defaults(func=handle_stt)
-
     # TTS command
-    parser_tts = subparsers.add_parser("tts", help="Perform Text-to-Speech using local models.")
+    parser_tts = audio_subparsers.add_parser("tts", help="Perform Text-to-Speech using local models.")
     parser_tts.add_argument("text", help="The text to synthesize.")
     parser_tts.add_argument("--output", "-o", help="Path to save the output audio file.")
     parser_tts.add_argument("--model", "-m", default="native", help="The TTS model to use.")
     parser_tts.set_defaults(func=handle_tts)
 
     # Status command
-    parser_status = subparsers.add_parser("status", help="Check system and model status.")
+    parser_status = audio_subparsers.add_parser("status", help="Check system and model status.")
     parser_status.set_defaults(func=handle_status)
 
     # Cache command
-    parser_cache = subparsers.add_parser("cache", help="Manage model cache.")
+    parser_cache = audio_subparsers.add_parser("cache", help="Manage model cache.")
     cache_subparsers = parser_cache.add_subparsers(dest="subcommand", help="Cache subcommands")
 
     # Cache info
@@ -676,11 +1078,11 @@ Model Management:
     parser_cache.set_defaults(func=handle_cache, subcommand="info")
 
     # PS command
-    parser_ps = subparsers.add_parser("ps", help="Show running OllamaAudio processes and servers.")
+    parser_ps = audio_subparsers.add_parser("ps", help="Show running LocalKin Service Audio processes and servers.")
     parser_ps.set_defaults(func=handle_ps)
 
     # Add model command
-    parser_add_model = subparsers.add_parser("add-model", help="Add a new model to OllamaAudio.")
+    parser_add_model = audio_subparsers.add_parser("add-model", help="Add a new model to LocalKin Service Audio.")
     add_model_group = parser_add_model.add_mutually_exclusive_group(required=True)
     add_model_group.add_argument("--template", help="Use a model template.")
     add_model_group.add_argument("--repo", help="Hugging Face repository (org/model).")
@@ -693,12 +1095,15 @@ Model Management:
     parser_add_model.set_defaults(func=handle_add_model)
 
     # List templates command
-    parser_list_templates = subparsers.add_parser("list-templates", help="List available model templates.")
+    parser_list_templates = audio_subparsers.add_parser("list-templates", help="List available model templates.")
     parser_list_templates.set_defaults(func=handle_list_templates)
 
     # Version command
-    parser_version = subparsers.add_parser("version", help="Show version information.")
+    parser_version = audio_subparsers.add_parser("version", help="Show version information.")
     parser_version.set_defaults(func=handle_version)
+
+    # Set default audio command
+    parser_audio.set_defaults(audio_command="transcribe")
 
     # If no command provided, show help
     if len(sys.argv) == 1:
@@ -706,6 +1111,8 @@ Model Management:
         return
 
     args = parser.parse_args()
+
+    # Handle nested command structure
     if hasattr(args, 'func'):
         try:
             args.func(args)
@@ -715,6 +1122,11 @@ Model Management:
         except Exception as e:
             print_error(f"An unexpected error occurred: {e}")
             sys.exit(1)
+    else:
+        # Handle case where audio command is provided but no subcommand
+        if args.command == "audio" and not hasattr(args, 'audio_command'):
+            parser_audio.print_help()
+            return
 
 if __name__ == "__main__":
     main()

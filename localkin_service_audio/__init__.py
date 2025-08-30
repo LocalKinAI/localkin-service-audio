@@ -1,12 +1,12 @@
 """
-OllamaAudio - Local Speech-to-Text and Text-to-Speech Model Manager
+LocalKin Service Audio - Local Speech-to-Text and Text-to-Speech Model Manager
 
 A CLI tool for managing and running local STT and TTS models,
 inspired by Ollama's simplicity for local AI model management.
 """
 
 __version__ = "0.1.0"
-__author__ = "OllamaAudio Team"
+__author__ = "LocalKin Team"
 __description__ = "Local STT & TTS Model Manager"
 
 from .cli import main

@@ -1,7 +1,7 @@
 """
-Model Templates and Helper Functions for OllamaAudio
+Model Templates and Helper Functions for LocalKin Service Audio
 
-This module provides templates and utilities for easily adding new models to OllamaAudio.
+This module provides templates and utilities for easily adding new models to LocalKin Service Audio.
 """
 
 import json
@@ -220,7 +220,7 @@ def get_popular_models() -> List[Dict[str, Any]]:
 
 def print_template_info():
     """Print information about available templates."""
-    print("🎯 Available OllamaAudio Model Templates:")
+    print("🎯 Available LocalKin Service Audio Model Templates:")
     print("=" * 50)
 
     for name, template in MODEL_TEMPLATES.items():

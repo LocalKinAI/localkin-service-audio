@@ -1,11 +1,11 @@
-# OllamaAudio 🎵
+# LocalKin Service Audio 🎵
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Local Speech-to-Text and Text-to-Speech with OllamaAudio
+## Local Speech-to-Text and Text-to-Speech with LocalKin Service Audio
 
-**OllamaAudio** simplifies local deployment of **Speech-to-Text (STT)** and **Text-to-Speech (TTS)** models. An intuitive **local audio** tool inspired by **Ollama's** simplicity - perfect for **local audio processing** workflows with CLI support.
+**LocalKin Service Audio** simplifies local deployment of **Speech-to-Text (STT)** and **Text-to-Speech (TTS)** models. An intuitive **local audio** tool inspired by **Ollama's** simplicity - perfect for **local audio processing** workflows with CLI support.
 
 ---
 
@@ -19,7 +19,7 @@
 - **💾 Persistent Cache**: Local model storage with size tracking and cleanup
 - **🔄 Auto-Pull**: Models automatically download when running if not cached
 - **📊 Real-Time Status**: Live model status tracking with emoji indicators
-- **🔍 Process Monitoring**: `ollamaaudio ps` shows all running servers and their status
+- **🔍 Process Monitoring**: `kin audio ps` shows all running servers and their status
 - **📈 Model Transparency**: STT/TTS commands display detailed model information and statistics
 - **⚡ Performance Optimized**: Memory-efficient with GPU acceleration support
 - **🎨 Professional Results**: High-quality audio processing with fine-tuned control
@@ -34,14 +34,14 @@
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Clone the repository
-git clone https://github.com/yourusername/ollamaaudio.git
-cd ollamaaudio
+git clone https://github.com/LocalKinAI/localkin-service-audio.git
+cd localkin-service-audio
 
 # Install with uv (fast and reliable)
 uv pip install -e .
 
-# Now you can use ollamaaudio directly
-ollamaaudio --help
+# Now you can use kin directly
+kin --help
 ```
 
 ### Option 2: Install with uv venv (Isolated Environment)
@@ -51,73 +51,76 @@ ollamaaudio --help
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Clone the repository
-git clone https://github.com/yourusername/ollamaaudio.git
-cd ollamaaudio
+git clone https://github.com/LocalKinAI/localkin-service-audio.git
+cd localkin-service-audio
 
 # Create virtual environment and install
 uv venv
 source .venv/bin/activate  # Linux/macOS
 # On Windows: .venv\Scripts\activate
 
-# Install ollamaaudio
+# Install LocalKin Service Audio
 uv pip install -e .
 
-# Use ollamaaudio
-ollamaaudio --help
+# Use kin
+kin --help
 ```
 
 ### Option 3: Traditional pip Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/ollamaaudio.git
-cd ollamaaudio
+git clone https://github.com/LocalKinAI/localkin-service-audio.git
+cd localkin-service-audio
 
 # Install dependencies (slower than uv)
-pip install -r ollamaaudio/requirements.txt
+pip install -r localkin_service_audio/requirements.txt
 pip install -e .
 
 # Run commands using the module
-python -m ollamaaudio.cli --help
+python -m localkin_service_audio.cli --help
 ```
 
 ### Basic Usage
 
 ```bash
 # Check version and help
-ollamaaudio --version
-ollamaaudio --help
+kin --version
+kin --help
 
 # List all available models with status
-ollamaaudio list
+kin audio models
 
 # Speech-to-Text with local Whisper
-ollamaaudio stt audio.wav
+kin audio transcribe audio.wav
+
+# Real-time STT/TTS loop
+kin audio listen
 
 # Text-to-Speech with native engine
-ollamaaudio tts "Hello, world!"
+kin audio tts "Hello, world!"
 
 # 🚀 NEW: Run models as API servers (auto-pulls if needed)
-ollamaaudio run whisper-tiny-hf --port 8000
-ollamaaudio run speecht5-tts --port 8001
+kin audio run whisper-tiny-hf --port 8000
+kin audio run speecht5-tts --port 8001
 
 # 🚀 NEW: Monitor running servers and processes
-ollamaaudio ps                      # Show all running API servers
+kin audio ps                      # Show all running API servers
 
 # Check system status and cache
-ollamaaudio status
-ollamaaudio cache info
+kin audio status
+kin audio cache info
 
 # Manage model cache
-ollamaaudio cache clear whisper-tiny-hf  # Clear specific model
-ollamaaudio cache clear                   # Clear all cached models
+kin audio cache clear whisper-tiny-hf  # Clear specific model
+kin audio cache clear                   # Clear all cached models
 ```
 
 ### 🚀 API Server Quick Start
 
 ```bash
 # Start a Whisper STT server (auto-pulls if needed)
-ollamaaudio run whisper-tiny-hf --port 8000
+kin audio run whisper-tiny-hf --port 8000
 
 # Server starts at http://localhost:8000
 # API docs: http://localhost:8000/docs
@@ -140,7 +143,7 @@ curl -X POST "http://localhost:8000/transcribe" \
 
 #### STT with Detailed Model Information
 ```bash
-$ ollamaaudio stt audio.wav --model_size large
+$ kin audio transcribe audio.wav --model_size large
 
 🎵 OllamaAudio - Local STT & TTS Model Manager
 ==================================================
@@ -159,7 +162,7 @@ $ ollamaaudio stt audio.wav --model_size large
 
 #### TTS with Engine Information
 ```bash
-$ ollamaaudio tts "Hello, this is a test" --output test.wav
+$ kin audio tts "Hello, this is a test" --output test.wav
 
 🎵 OllamaAudio - Local STT & TTS Model Manager
 ==================================================
@@ -177,7 +180,7 @@ $ ollamaaudio tts "Hello, this is a test" --output test.wav
 
 #### Monitor Running Servers
 ```bash
-$ ollamaaudio ps
+$ kin audio ps
 
 🎵 OllamaAudio - Local STT & TTS Model Manager
 ==================================================
@@ -203,7 +206,7 @@ Choose from **12 state-of-the-art audio processing models** covering the latest 
 ### 📊 Model Status Overview
 
 ```bash
-$ ollamaaudio list
+$ kin audio models
 MODEL                     TYPE   STATUS             SOURCE          DESCRIPTION
 ------------------------------------------------------------------------------------------
 whisper                   stt    📦 Local Library    openai-whisper  Local transcription
@@ -242,9 +245,9 @@ mistral:7b-instruct-q4_0  tts    ⬇️ Not Pulled      ollama          Mistral 
 #### 🚀 Hugging Face Models (API Server - Recommended)
 ```bash
 # Start API server (auto-pulls if needed)
-ollamaaudio run whisper-tiny-hf --port 8000    # Fastest, 39MB
-ollamaaudio run whisper-base-hf --port 8001    # Balanced, 290MB
-ollamaaudio run whisper-large-v2-hf --port 8002 # Best quality, 2.87GB
+kin audio run whisper-tiny-hf --port 8000    # Fastest, 39MB
+kin audio run whisper-base-hf --port 8001    # Balanced, 290MB
+kin audio run whisper-large-v2-hf --port 8002 # Best quality, 2.87GB
 
 # Use the API
 curl -X POST "http://localhost:8000/transcribe" \
@@ -257,11 +260,11 @@ curl -X POST "http://localhost:8000/transcribe" \
 #### Local Whisper Models (Direct CLI - No API Key Required)
 ```bash
 # Use different Whisper model sizes (shows detailed model info)
-ollamaaudio stt audio.wav --model_size tiny    # 39MB, 32x speed, Basic quality
-ollamaaudio stt audio.wav --model_size base    # 74MB, 16x speed, Good quality
-ollamaaudio stt audio.wav --model_size small   # 244MB, 8x speed, High quality
-ollamaaudio stt audio.wav --model_size medium  # 769MB, 4x speed, Very High quality
-ollamaaudio stt audio.wav --model_size large   # 1550MB, 1x speed, Excellent quality
+kin audio transcribe audio.wav --model_size tiny    # 39MB, 32x speed, Basic quality
+kin audio transcribe audio.wav --model_size base    # 74MB, 16x speed, Good quality
+kin audio transcribe audio.wav --model_size small   # 244MB, 8x speed, High quality
+kin audio transcribe audio.wav --model_size medium  # 769MB, 4x speed, Very High quality
+kin audio transcribe audio.wav --model_size large   # 1550MB, 1x speed, Excellent quality
 
 # Each command displays:
 # - Model size, speed, and quality details
@@ -272,11 +275,11 @@ ollamaaudio stt audio.wav --model_size large   # 1550MB, 1x speed, Excellent qua
 #### Ollama Whisper Models (Requires Ollama)
 ```bash
 # Pull models first
-ollamaaudio pull whisper-large-v3
-ollamaaudio pull whisper-base
+kin audio pull whisper-large-v3
+kin audio pull whisper-base
 
 # Use them (future feature)
-ollamaaudio stt audio.wav --model whisper-large-v3
+kin audio transcribe audio.wav --model whisper-large-v3
 ```
 
 ### TTS Models - Text-to-Speech
@@ -284,8 +287,8 @@ ollamaaudio stt audio.wav --model whisper-large-v3
 #### 🚀 Hugging Face Models (API Server - Recommended)
 ```bash
 # Start TTS API server (auto-pulls if needed)
-ollamaaudio run speecht5-tts --port 8001    # Microsoft SpeechT5, 250MB
-ollamaaudio run bark-small --port 8002      # Suno Bark, 1.7GB
+kin audio run speecht5-tts --port 8001    # Microsoft SpeechT5, 250MB
+kin audio run bark-small --port 8002      # Suno Bark, 1.7GB
 
 # Use the API for speech synthesis
 curl -X POST "http://localhost:8001/synthesize" \
@@ -302,11 +305,11 @@ curl -X POST "http://localhost:8001/synthesize" \
 #### Native OS TTS (Works Immediately)
 ```bash
 # Basic usage (shows engine and text details)
-ollamaaudio tts "Hello, world!"
+kin audio tts "Hello, world!"
 
 # Save to file (shows format and file size info)
-ollamaaudio tts "This is a test" --output hello.wav
-ollamaaudio tts "Long text here..." --output speech.mp3
+kin audio tts "This is a test" --output hello.wav
+kin audio tts "Long text here..." --output speech.mp3
 
 # Each command displays:
 # - TTS engine information (pyttsx3/native OS)
@@ -319,11 +322,11 @@ ollamaaudio tts "Long text here..." --output speech.mp3
 #### Ollama Conversational Models (Future Feature)
 ```bash
 # Pull conversational models for TTS
-ollamaaudio pull llama3.2:3b-instruct-q4_0
-ollamaaudio pull qwen2.5:3b-instruct-q4_0
+kin audio pull llama3.2:3b-instruct-q4_0
+kin audio pull qwen2.5:3b-instruct-q4_0
 
 # Use them for conversational TTS (future feature)
-ollamaaudio tts "Tell me a story" --model llama3.2:3b-instruct-q4_0
+kin audio tts "Tell me a story" --model llama3.2:3b-instruct-q4_0
 ```
 
 ---
@@ -344,8 +347,8 @@ ollamaaudio tts "Tell me a story" --model llama3.2:3b-instruct-q4_0
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Clone and install
-git clone https://github.com/yourusername/ollamaaudio.git
-cd ollamaaudio
+git clone https://github.com/LocalKinAI/localkin-service-audio.git
+cd localkin-service-audio
 
 # Install with uv (fast and reliable)
 uv pip install -e .
@@ -386,30 +389,30 @@ uv pip install librosa soundfile
 
 ```bash
 # Display help
-ollamaaudio --help
+kin --help
 
 # Show version
-ollamaaudio --version
+kin --version
 
 # List all available models with status
-ollamaaudio list
+kin audio models
 
 # Check system status
-ollamaaudio status
+kin audio status
 
 # 🚀 NEW: Monitor running servers and processes
-ollamaaudio ps
+kin audio ps
 ```
 
 ### 🚀 Model Server Commands
 
 ```bash
 # Run model as API server (auto-pulls if needed)
-ollamaaudio run whisper-tiny-hf --port 8000     # STT server
-ollamaaudio run speecht5-tts --port 8001       # TTS server
+kin audio run whisper-tiny-hf --port 8000     # STT server
+kin audio run speecht5-tts --port 8001       # TTS server
 
 # Monitor running servers
-ollamaaudio ps                                 # Show all active servers
+kin audio ps                                 # Show all active servers
 
 # Server endpoints:
 # - http://localhost:8000/           # API info
@@ -423,30 +426,30 @@ ollamaaudio ps                                 # Show all active servers
 
 ```bash
 # Pull models (Ollama or Hugging Face)
-ollamaaudio pull whisper-large-v3              # Ollama model
-ollamaaudio pull whisper-tiny-hf               # Hugging Face model
+kin audio pull whisper-large-v3              # Ollama model
+kin audio pull whisper-tiny-hf               # Hugging Face model
 
 # Cache management
-ollamaaudio cache info                         # Show cache status
-ollamaaudio cache clear whisper-tiny-hf       # Clear specific model
-ollamaaudio cache clear                       # Clear all cached models
+kin audio cache info                         # Show cache status
+kin audio cache clear whisper-tiny-hf       # Clear specific model
+kin audio cache clear                       # Clear all cached models
 ```
 
 ### Speech-to-Text
 
 ```bash
 # Basic transcription (shows detailed model info)
-ollamaaudio stt audio.wav
+kin audio transcribe audio.wav
 
 # Specify model size for Whisper (shows size/speed/quality details)
-ollamaaudio stt audio.wav --model_size tiny     # 39MB, 32x speed, Basic quality
-ollamaaudio stt audio.wav --model_size base     # 74MB, 16x speed, Good quality
-ollamaaudio stt audio.wav --model_size small    # 244MB, 8x speed, High quality
-ollamaaudio stt audio.wav --model_size medium   # 769MB, 4x speed, Very High quality
-ollamaaudio stt audio.wav --model_size large    # 1550MB, 1x speed, Excellent quality
+kin audio transcribe audio.wav --model_size tiny     # 39MB, 32x speed, Basic quality
+kin audio transcribe audio.wav --model_size base     # 74MB, 16x speed, Good quality
+kin audio transcribe audio.wav --model_size small    # 244MB, 8x speed, High quality
+kin audio transcribe audio.wav --model_size medium   # 769MB, 4x speed, Very High quality
+kin audio transcribe audio.wav --model_size large    # 1550MB, 1x speed, Excellent quality
 
 # Save transcription to file
-ollamaaudio stt audio.wav > transcription.txt
+kin audio transcribe audio.wav > transcription.txt
 
 # Output includes:
 # - Model details (size, speed, quality)
@@ -458,14 +461,14 @@ ollamaaudio stt audio.wav > transcription.txt
 
 ```bash
 # Basic speech synthesis (shows engine details)
-ollamaaudio tts "Hello, world!"
+kin audio tts "Hello, world!"
 
 # Save to audio file (shows format and file size)
-ollamaaudio tts "This is a test message" --output test.wav
-ollamaaudio tts "Hello" --output greeting.mp3
+kin audio tts "This is a test message" --output test.wav
+kin audio tts "Hello" --output greeting.mp3
 
 # Read from file
-ollamaaudio tts "$(cat script.txt)" --output narration.wav
+kin audio tts "$(cat script.txt)" --output narration.wav
 
 # Output includes:
 # - TTS engine information (pyttsx3/native OS)
@@ -483,13 +486,13 @@ OllamaAudio uses intelligent caching to store downloaded models locally for fast
 
 ### Cache Location
 
-Models are cached in: `~/.ollamaaudio/cache/huggingface/`
+Models are cached in: `~/.localkin_service_audio/cache/huggingface/`
 
 ### Cache Commands
 
 ```bash
 # View cache status
-ollamaaudio cache info
+kin audio cache info
 
 # Output:
 # 📦 Cached Models (2):
@@ -497,13 +500,13 @@ ollamaaudio cache info
 #   • whisper-base-hf (1112.27MB)
 
 # Clear specific model from cache
-ollamaaudio cache clear whisper-tiny-hf
+kin audio cache clear whisper-tiny-hf
 
 # Clear all cached models
-ollamaaudio cache clear
+kin audio cache clear
 
 # Check cache directory size
-du -sh ~/.ollamaaudio/cache/
+du -sh ~/.localkin_service_audio/cache/
 ```
 
 ### Auto-Pull Behavior
@@ -511,7 +514,7 @@ du -sh ~/.ollamaaudio/cache/
 When you run a model that isn't cached:
 
 ```bash
-ollamaaudio run whisper-large-v2-hf --port 8000
+kin audio run whisper-large-v2-hf --port 8000
 # Output:
 # 📥 Model 'whisper-large-v2-hf' not found in cache. Pulling it first...
 # 📥 Downloading model from Hugging Face: openai/whisper-large-v2
@@ -533,7 +536,7 @@ ollamaaudio run whisper-large-v2-hf --port 8000
 
 ### Model Configuration
 
-Models are configured in `ollamaaudio/models.json`. The system supports:
+Models are configured in `localkin_service_audio/models.json`. The system supports:
 
 - **Local models**: OpenAI Whisper, pyttsx3 (native TTS)
 - **Hugging Face models**: Transformers-based STT/TTS models
@@ -583,7 +586,7 @@ OllamaAudio makes adding new models incredibly simple! Here's how:
 
 ```bash
 # For Hugging Face models - just add to models.json!
-# Edit ollamaaudio/models.json and add your model:
+# Edit localkin_service_audio/models.json and add your model:
 
 {
   "name": "your-new-model",
@@ -604,16 +607,16 @@ OllamaAudio makes adding new models incredibly simple! Here's how:
 
 ```bash
 # List available templates
-ollamaaudio list-templates
+kin audio list-templates
 
 # Add model using template (easiest!)
-ollamaaudio add-model --template whisper_stt --name my-whisper-model
+kin audio add-model --template whisper_stt --name my-whisper-model
 
 # Add custom Hugging Face model
-ollamaaudio add-model --repo openai/whisper-medium --name whisper-medium --type stt
+kin audio add-model --repo openai/whisper-medium --name whisper-medium --type stt
 
 # Add with custom description and size
-ollamaaudio add-model --repo microsoft/speecht5_tts --name speecht5 --type tts \
+kin audio add-model --repo microsoft/speecht5_tts --name speecht5 --type tts \
                      --description "Microsoft's advanced neural TTS" \
                      --size-mb 1300
 ```
@@ -674,7 +677,7 @@ OllamaAudio comes with pre-built templates for popular models:
 
 #### **View All Templates:**
 ```bash
-ollamaaudio list-templates
+kin audio list-templates
 ```
 
 ### 📚 **Examples of Easy Additions**
@@ -713,10 +716,10 @@ ollamaaudio list-templates
 
 ```bash
 # 1. Check if it appears in the list
-ollamaaudio list
+kin audio models
 
 # 2. Run it as a server (auto-pulls if needed)
-ollamaaudio run your-new-model --port 8000
+kin audio run your-new-model --port 8000
 
 # 3. Test the API
 curl -X POST "http://localhost:8000/transcribe" \
@@ -726,7 +729,7 @@ curl -X POST "http://localhost:8000/transcribe" \
 ### 🎯 **Why It's So Easy**
 
 1. **📝 JSON Configuration**: No code changes needed for most models
-2. **🎯 One-Command Addition**: `ollamaaudio add-model` does everything automatically
+2. **🎯 One-Command Addition**: `kin audio add-model` does everything automatically
 3. **📚 Pre-built Templates**: 7 ready-to-use templates for popular models
 4. **🔍 Auto-Discovery**: System automatically detects Hugging Face repos
 5. **📦 Auto-Pull**: Models download automatically when first used
@@ -738,13 +741,13 @@ curl -X POST "http://localhost:8000/transcribe" \
 
 #### **Method 1: Template (Easiest)**
 ```bash
-ollamaaudio add-model --template whisper_stt --name my-whisper
+kin audio add-model --template whisper_stt --name my-whisper
 # ✅ Done! Model added, validated, and ready to use
 ```
 
 #### **Method 2: Direct Repo**
 ```bash
-ollamaaudio add-model --repo openai/whisper-medium --name whisper-med --type stt
+kin audio add-model --repo openai/whisper-medium --name whisper-med --type stt
 # ✅ Done! Custom model added with auto-detection
 ```
 
@@ -779,7 +782,7 @@ ollamaaudio add-model --repo openai/whisper-medium --name whisper-med --type stt
 ```bash
 # Process multiple audio files
 for file in *.wav; do
-  ollamaaudio stt "$file" > "${file%.wav}.txt"
+  kin audio transcribe "$file" > "${file%.wav}.txt"
 done
 
 # Batch TTS generation
@@ -788,7 +791,7 @@ echo "Second message" >> messages.txt
 echo "Third message" >> messages.txt
 
 while IFS= read -r message; do
-  ollamaaudio tts "$message" --output "tts_$(echo "$message" | head -c 10).wav"
+  kin audio tts "$message" --output "tts_$(echo "$message" | head -c 10).wav"
 done < messages.txt
 ```
 
@@ -856,13 +859,13 @@ OllamaAudio supports various audio formats through Whisper:
 #### "Model not found" Error
 ```bash
 # Check available models
-ollamaaudio list
+kin audio models
 
 # For Ollama models, ensure Ollama is running
 ollama serve
 
 # Pull the model first
-ollamaaudio pull whisper-base
+kin audio pull whisper-base
 ```
 
 #### Audio File Issues
@@ -872,13 +875,13 @@ ls -la audio.wav
 
 # Try converting audio format
 ffmpeg -i input.mp3 output.wav
-ollamaaudio stt output.wav
+kin audio transcribe output.wav
 ```
 
 #### Memory Issues
 ```bash
 # Use smaller models
-ollamaaudio stt audio.wav --model_size tiny
+kin audio transcribe audio.wav --model_size tiny
 
 # Close other applications
 # Use CPU-only mode if GPU memory is limited
@@ -887,9 +890,9 @@ ollamaaudio stt audio.wav --model_size tiny
 #### Permission Issues
 ```bash
 # Ensure proper permissions
-chmod +x ollamaaudio
+chmod +x kin
 # or
-python -m ollamaaudio.cli
+python -m localkin_service_audio.cli
 ```
 
 ### Debug Mode
@@ -897,7 +900,7 @@ python -m ollamaaudio.cli
 ```bash
 # Enable verbose output
 python -c "import logging; logging.basicConfig(level=logging.DEBUG)"
-ollamaaudio stt audio.wav
+kin audio transcribe audio.wav
 ```
 
 ---
@@ -910,7 +913,7 @@ OllamaAudio provides complete REST APIs for both STT and TTS models when running
 
 ```bash
 # Start an API server
-ollamaaudio run whisper-tiny-hf --port 8000
+kin audio run whisper-tiny-hf --port 8000
 
 # Interactive API documentation
 open http://localhost:8000/docs
@@ -979,10 +982,10 @@ Run multiple models on different ports:
 
 ```bash
 # Terminal 1: STT Server
-ollamaaudio run whisper-tiny-hf --port 8000
+kin audio run whisper-tiny-hf --port 8000
 
 # Terminal 2: TTS Server
-ollamaaudio run speecht5-tts --port 8001
+kin audio run speecht5-tts --port 8001
 
 # Terminal 3: Use both APIs
 curl -X POST "http://localhost:8000/transcribe" \
@@ -997,7 +1000,7 @@ curl -X POST "http://localhost:8001/synthesize" \
 ### 🔧 Python API (Future Feature)
 
 ```python
-from ollamaaudio.core import OllamaAudio
+from localkin_service_audio.core import OllamaAudio
 
 # Initialize
 audio = OllamaAudio()
@@ -1015,7 +1018,7 @@ models = audio.list_models()
 ### ⚙️ Configuration API
 
 ```python
-from ollamaaudio.config import get_models, find_model
+from localkin_service_audio.config import get_models, find_model
 
 # Get all models
 models = get_models()
@@ -1037,8 +1040,8 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ```bash
 # Clone and setup
-git clone https://github.com/yourusername/ollamaaudio.git
-cd ollamaaudio
+git clone https://github.com/LocalKinAI/localkin-service-audio.git
+cd localkin-service-audio
 
 # Install uv if not already installed
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -1055,8 +1058,8 @@ uv pip install -e ".[dev]"
 pytest
 
 # Run linting (uv handles the tools automatically)
-ruff check ollamaaudio/
-ruff format ollamaaudio/
+ruff check localkin_service_audio/
+ruff format localkin_service_audio/
 ```
 
 ### Adding New Models
@@ -1087,8 +1090,8 @@ This project is licensed under the MIT License - see the [LICENSE](../LICENSE) f
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/ollamaaudio/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/ollamaaudio/discussions)
+- **Issues**: [GitHub Issues](https://github.com/LocalKinAI/localkin-service-audio/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/LocalKinAI/localkin-service-audio/discussions)
 
 ---
 
@@ -1099,13 +1102,13 @@ This project is licensed under the MIT License - see the [LICENSE](../LICENSE) f
 ```bash
 # Install with uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
-git clone https://github.com/yourusername/ollamaaudio.git
-cd ollamaaudio
+git clone https://github.com/LocalKinAI/localkin-service-audio.git
+cd localkin-service-audio
 uv venv && source .venv/bin/activate
 uv pip install -e .
 
 # Start a Whisper STT server (auto-pulls if needed)
-ollamaaudio run whisper-tiny-hf --port 8000
+kin audio run whisper-tiny-hf --port 8000
 
 # In another terminal, transcribe audio
 curl -X POST "http://localhost:8000/transcribe" \
@@ -1119,10 +1122,10 @@ open http://localhost:8000/docs
 
 ```bash
 # Terminal 1: STT Server
-ollamaaudio run whisper-base-hf --port 8000
+kin audio run whisper-base-hf --port 8000
 
 # Terminal 2: TTS Server
-ollamaaudio run speecht5-tts --port 8001
+kin audio run speecht5-tts --port 8001
 
 # Terminal 3: Use both
 # Transcribe audio to text
@@ -1141,13 +1144,13 @@ curl -X POST "http://localhost:8001/synthesize" \
 
 ```bash
 # See all models with status
-ollamaaudio list
+kin audio models
 
 # Check cache usage
-ollamaaudio cache info
+kin audio cache info
 
 # System status
-ollamaaudio status
+kin audio status
 ```
 
 ---
@@ -1161,9 +1164,9 @@ ollamaaudio status
 - ✅ **Multiple Model Support**: STT + TTS in parallel servers
 - ✅ **Interactive Documentation**: Auto-generated API docs
 - ✅ **Status Indicators**: Real-time model status with emojis
-- ✅ **Process Monitoring**: `ollamaaudio ps` command shows running servers
+- ✅ **Process Monitoring**: `kin audio ps` command shows running servers
 - ✅ **Model Transparency**: STT/TTS commands show detailed model info and statistics
-- ✅ **Easy Model Addition**: `ollamaaudio add-model` command with templates
+- ✅ **Easy Model Addition**: `kin audio add-model` command with templates
 - ✅ **Model Templates**: 7 pre-built templates for popular models
 - ✅ **One-Command Setup**: Add any Hugging Face model in seconds
 - ✅ **Enhanced CLI**: Comprehensive model details, file size tracking, progress indicators
@@ -1176,7 +1179,7 @@ ollamaaudio status
 OllamaAudio v1.0 provides a complete audio AI ecosystem:
 
 ### ✅ **Fully Functional Features**
-- **🔍 Process Monitoring**: `ollamaaudio ps` - See all running servers
+- **🔍 Process Monitoring**: `kin audio ps` - See all running servers
 - **🎯 Model Transparency**: STT/TTS commands show detailed model info
 - **🚀 REST API Servers**: Run any model as a web service
 - **📦 Smart Caching**: Automatic model downloads and storage
@@ -1193,19 +1196,19 @@ OllamaAudio v1.0 provides a complete audio AI ecosystem:
 ### ✅ **Multiple Usage Patterns**
 ```bash
 # Quick transcription
-ollamaaudio stt audio.wav
+kin audio transcribe audio.wav
 
 # API server mode
-ollamaaudio run whisper-base-hf --port 8000
+kin audio run whisper-base-hf --port 8000
 curl -X POST "http://localhost:8000/transcribe" -F "file=@audio.wav"
 
 # Voice synthesis
-ollamaaudio tts "Hello world" --output greeting.wav
+kin audio tts "Hello world" --output greeting.wav
 
 # Monitor everything
-ollamaaudio ps
-ollamaaudio list
-ollamaaudio cache info
+kin audio ps
+kin audio models
+kin audio cache info
 ```
 
 ### ✅ **Enterprise-Ready Features**
@@ -1218,6 +1221,6 @@ ollamaaudio cache info
 **🎉 Ready to get started with local audio AI?** Install OllamaAudio and run your first API server in minutes! 🎵✨
 
 ```bash
-ollamaaudio run whisper-tiny-hf --port 8000
+kin audio run whisper-tiny-hf --port 8000
 # 🚀 API server ready at http://localhost:8000
 ```

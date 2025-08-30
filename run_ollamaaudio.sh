@@ -1,6 +1,6 @@
 #!/bin/bash
-# OllamaAudio Runner Script with Virtual Environment
-# This script automatically activates the virtual environment and runs ollamaaudio
+# LocalKin Service Audio Runner Script with Virtual Environment
+# This script automatically activates the virtual environment and runs kin
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_PATH="$SCRIPT_DIR/.venv"
@@ -15,5 +15,5 @@ fi
 # Activate virtual environment
 source "$VENV_PATH/bin/activate"
 
-# Run ollamaaudio with all arguments
-exec ollamaaudio "$@"
+# Run kin with all arguments
+exec kin "$@"
