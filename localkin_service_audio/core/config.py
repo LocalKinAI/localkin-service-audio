@@ -72,7 +72,7 @@ def validate_model_config(model: Dict[str, Any]) -> bool:
         return False
 
     # Validate source
-    valid_sources = ['ollama', 'openai-whisper', 'pyttsx3', 'coqui-tts', 'bark-tts', 'huggingface']
+    valid_sources = ['ollama', 'openai-whisper', 'pyttsx3', 'coqui-tts', 'bark-tts', 'huggingface', 'faster-whisper']
     if model['source'] not in valid_sources:
         print(f"Validation warning: Unknown source '{model['source']}' for model '{model['name']}'")
 

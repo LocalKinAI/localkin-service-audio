@@ -1,0 +1,14 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include pyproject.toml
+include requirements.txt
+include .python-version
+recursive-include assets *
+recursive-include examples *
+exclude .git
+exclude .venv
+exclude __pycache__
+exclude *.pyc
+exclude .pytest_cache
+exclude cache

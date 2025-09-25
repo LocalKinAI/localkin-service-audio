@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}LocalKin Service Audio - Generate Speech{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="fas fa-volume-up text-success me-2"></i>
+                        Text-to-Speech Synthesis
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- Text Input -->
+                    <div class="mb-4">
+                        <label for="textInput" class="form-label">
+                            <strong>Enter Text to Synthesize</strong>
+                        </label>
+                        <textarea class="form-control" id="textInput" rows="4"
+                                  placeholder="Enter the text you want to convert to speech..."
+                                  maxlength="5000" required></textarea>
+                        <div class="form-text">
+                            Maximum 5000 characters. The generated speech will be saved as a WAV file.
+                        </div>
+                    </div>
+
+                    <!-- Model Selection -->
+                    <div class="mb-4">
+                        <label for="modelSelect" class="form-label">
+                            <strong>Select TTS Model</strong>
+                        </label>
+                        <select class="form-select" id="modelSelect">
+                            {% for model in models %}
+                            <option value="{{ model.name }}" {% if loop.first %}selected{% endif %}>
+                                {{ model.name }} - {{ model.description }}
+                                {% if model.size_mb %}({{ model.size_mb }}MB){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">
+                            Choose a model for speech synthesis quality and characteristics
+                        </div>
+                    </div>
+
+                    <!-- Voice Options (if available) -->
+                    <div class="mb-4" id="voiceOptions" style="display: none;">
+                        <label class="form-label">
+                            <strong>Voice Options</strong>
+                        </label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="voiceGender" class="form-label small">Gender</label>
+                                <select class="form-select form-select-sm" id="voiceGender">
+                                    <option value="male">Male</option>
+                                    <option value="female" selected>Female</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="voiceStyle" class="form-label small">Style</label>
+                                <select class="form-select form-select-sm" id="voiceStyle">
+                                    <option value="neutral" selected>Neutral</option>
+                                    <option value="excited">Excited</option>
+                                    <option value="calm">Calm</option>
+                                    <option value="professional">Professional</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Generate Button -->
+                    <div class="d-grid mb-4">
+                        <button type="button" class="btn btn-success btn-lg" id="synthesizeBtn" disabled>
+                            <i class="fas fa-magic me-2"></i>
+                            Generate Speech
+                        </button>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="mb-4" id="progressContainer" style="display: none;">
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                                 role="progressbar" style="width: 0%" id="progressBar"></div>
+                        </div>
+                        <div class="text-center mt-2">
+                            <small class="text-muted" id="progressText">Initializing...</small>
+                        </div>
+                    </div>
+
+                    <!-- Results -->
+                    <div id="resultsContainer" style="display: none;">
+                        <div class="card border-success">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    Speech Generated Successfully
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <small class="text-muted">Model Used</small>
+                                        <div id="resultModel">-</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <small class="text-muted">Text Length</small>
+                                        <div id="resultTextLength">-</div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <small class="text-muted">File Size</small>
+                                    <div id="resultFileSize">-</div>
+                                </div>
+
+                                <!-- Audio Player -->
+                                <div class="mb-3">
+                                    <small class="text-muted">Generated Audio</small>
+                                    <div class="border rounded p-3 bg-light">
+                                        <audio controls class="w-100" id="audioPlayer">
+                                            <source id="audioSource" type="audio/wav">
+                                            Your browser does not support the audio element.
+                                        </audio>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-outline-success btn-sm" onclick="playAudio()">
+                                        <i class="fas fa-play me-1"></i>Play
+                                    </button>
+                                    <button class="btn btn-outline-primary btn-sm" onclick="downloadAudio()">
+                                        <i class="fas fa-download me-1"></i>Download WAV
+                                    </button>
+                                    <button class="btn btn-outline-secondary btn-sm" onclick="copyUrl()">
+                                        <i class="fas fa-link me-1"></i>Copy Link
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Error Alert -->
+                    <div class="alert alert-danger" id="errorAlert" style="display: none;" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <span id="errorMessage"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Examples -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-lightbulb text-info me-2"></i>
+                        Example Texts
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="small mb-2"><strong>Simple:</strong></p>
+                            <button class="btn btn-outline-secondary btn-sm w-100 text-start mb-2"
+                                    onclick="setExampleText('Hello, this is a test of the text-to-speech system.')">
+                                "Hello, this is a test..."
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="small mb-2"><strong>Longer:</strong></p>
+                            <button class="btn btn-outline-secondary btn-sm w-100 text-start mb-2"
+                                    onclick="setExampleText('The quick brown fox jumps over the lazy dog. This sentence contains every letter of the alphabet and is often used for testing purposes.')">
+                                "The quick brown fox..."
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/ui/static/js/synthesize.js"></script>
+{% endblock %}

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Demo script showing how to use OllamaAudio API server
+Demo script showing how to use LocalKin Service Audio API server
 """
 
 import requests
@@ -8,7 +8,7 @@ import json
 import time
 
 def demo_api_server():
-    """Demo of how the OllamaAudio API server works"""
+    """Demo of how the LocalKin Service Audio API server works"""
 
     print("🎵 LocalKin Service Audio API Server Demo")
     print("=" * 50)
@@ -34,7 +34,7 @@ def demo_api_server():
 
     print(f"\n   📡 GET {base_url}/")
     api_info = {
-        "name": "OllamaAudio API Server",
+        "name": "LocalKin Service Audio API Server",
         "model": "whisper-tiny-hf",
         "type": "stt",
         "status": "running",

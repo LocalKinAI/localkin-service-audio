@@ -1,4 +1,4 @@
-# OllamaAudio .gitignore
+git # LocalKin Service Audio .gitignore
 
 # Python
 __pycache__/
@@ -45,8 +45,8 @@ Thumbs.db
 *.bak
 
 # Project specific
-# OllamaAudio cache directory
-.ollamaaudio/
+# LocalKin Service Audio cache directory
+.cache/
 cache/
 *.cache
 
@@ -72,13 +72,14 @@ checkpoints/
 # Logs
 *.log
 logs/
-ollamaaudio.log
 server.log
 
 # Configuration (keep template, ignore actual config)
 config.json
-models.json
 *.local.json
+
+# Model definitions (keep in version control)
+# models.json - intentionally NOT ignored as it defines core app functionality
 
 # Temporary files
 *.tmp

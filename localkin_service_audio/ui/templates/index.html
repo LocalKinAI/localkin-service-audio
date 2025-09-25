@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}LocalKin Service Audio - Home{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <!-- Hero Section -->
+    <div class="row mb-5">
+        <div class="col-lg-8 mx-auto text-center">
+            <h1 class="display-4 mb-3">
+                <i class="fas fa-music text-primary me-3"></i>
+                Welcome to LocalKin Service Audio
+            </h1>
+            <p class="lead text-muted mb-4">
+                Local speech-to-text and text-to-speech processing powered by AI.
+                Process audio files with complete privacy and control.
+            </p>
+            <div class="d-flex justify-content-center gap-3 mb-4">
+                <a href="/transcribe" class="btn btn-primary btn-lg">
+                    <i class="fas fa-microphone me-2"></i>Start Transcribing
+                </a>
+                <a href="/synthesize" class="btn btn-success btn-lg">
+                    <i class="fas fa-volume-up me-2"></i>Create Speech
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row mb-5">
+        <div class="col-md-6 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-microphone fa-3x text-primary mb-3"></i>
+                    <h5 class="card-title">Speech-to-Text</h5>
+                    <p class="card-text text-muted">
+                        Convert audio files to text with high accuracy using advanced AI models.
+                        Supports multiple languages and formats.
+                    </p>
+                    <a href="/transcribe" class="btn btn-primary">
+                        <i class="fas fa-arrow-right me-1"></i>Transcribe Audio
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-volume-up fa-3x text-success mb-3"></i>
+                    <h5 class="card-title">Text-to-Speech</h5>
+                    <p class="card-text text-muted">
+                        Generate natural-sounding speech from text using neural TTS models.
+                        Create audio content with different voices and styles.
+                    </p>
+                    <a href="/synthesize" class="btn btn-success">
+                        <i class="fas fa-arrow-right me-1"></i>Generate Speech
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Status -->
+    <div class="row mb-5">
+        <div class="col-lg-10 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-server me-2"></i>System Status
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="status-item">
+                                <div class="h3 text-primary">{{ models|length }}</div>
+                                <small class="text-muted">Available Models</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="status-item">
+                                <div class="h3 text-success">{{ cache_info.cached_models|length }}</div>
+                                <small class="text-muted">Cached Models</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="status-item">
+                                <div class="h3 text-info">{{ templates|length }}</div>
+                                <small class="text-muted">Templates</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="status-item">
+                                <div class="h3 text-warning">1.0.0</div>
+                                <small class="text-muted">Version</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Features -->
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <div class="row">
+                <div class="col-md-4 mb-4">
+                    <div class="text-center">
+                        <i class="fas fa-shield-alt fa-2x text-primary mb-2"></i>
+                        <h6>Privacy First</h6>
+                        <p class="small text-muted">All processing happens locally. Your audio never leaves your device.</p>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-4">
+                    <div class="text-center">
+                        <i class="fas fa-bolt fa-2x text-warning mb-2"></i>
+                        <h6>Fast Processing</h6>
+                        <p class="small text-muted">Optimized models with GPU acceleration for quick results.</p>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-4">
+                    <div class="text-center">
+                        <i class="fas fa-cogs fa-2x text-info mb-2"></i>
+                        <h6>Multiple Models</h6>
+                        <p class="small text-muted">Choose from various AI models for different quality/speed trade-offs.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Auto-refresh status every 30 seconds
+setInterval(checkStatus, 30000);
+</script>
+{% endblock %}

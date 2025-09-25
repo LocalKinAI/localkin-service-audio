@@ -1,20 +1,23 @@
 # LocalKin Service Audio 🎵
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![uv](https://img.shields.io/badge/⚡-uv-4c1d95)](https://github.com/astral-sh/uv)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Local Speech-to-Text and Text-to-Speech with LocalKin Service Audio
 
-**LocalKin Service Audio** simplifies local deployment of **Speech-to-Text (STT)** and **Text-to-Speech (TTS)** models. An intuitive **local audio** tool inspired by **Ollama's** simplicity - perfect for **local audio processing** workflows with CLI support.
+**LocalKin Service Audio** simplifies local deployment of **Speech-to-Text (STT)** and **Text-to-Speech (TTS)** models. An intuitive **local audio** tool inspired by **Ollama's** simplicity - perfect for **local audio processing** workflows with both CLI and modern web interface support.
 
 ---
 
 ## ✨ Features
 
 - **🚀 Fast Startup**: Instant application launch with lazy loading architecture
-- **🎯 Multiple STT Engines**: OpenAI Whisper, Ollama-based whisper, and Hugging Face models
+- **⚡ Faster-Whisper Integration**: Up to 4x faster transcription with CTranslate2 optimization
+- **🎯 Multiple STT Engines**: OpenAI Whisper, faster-whisper, Ollama-based models, and Hugging Face models
 - **🔊 Multiple TTS Engines**: Native OS TTS, Ollama-based conversational models, and SpeechT5/Bark
 - **🌐 REST API Server**: Run models as API servers with automatic endpoints
+- **💻 Modern Web Interface**: Beautiful, responsive web UI for easy audio processing
 - **📦 Smart Model Management**: Auto-pull models when needed, intelligent caching
 - **💾 Persistent Cache**: Local model storage with size tracking and cleanup
 - **🔄 Auto-Pull**: Models automatically download when running if not cached
@@ -23,7 +26,8 @@
 - **📈 Model Transparency**: STT/TTS commands display detailed model information and statistics
 - **⚡ Performance Optimized**: Memory-efficient with GPU acceleration support
 - **🎨 Professional Results**: High-quality audio processing with fine-tuned control
-- **🌐 CLI-First**: Simple command-line interface inspired by Ollama
+- **🌐 CLI & Web**: Both command-line interface and modern web interface
+- **🔧 Modular Architecture**: Clean, maintainable codebase with separated concerns
 
 ## 🚀 Quick Start
 
@@ -38,7 +42,7 @@ git clone https://github.com/LocalKinAI/localkin-service-audio.git
 cd localkin-service-audio
 
 # Install with uv (fast and reliable)
-uv pip install -e .
+uv sync
 
 # Now you can use kin directly
 kin --help
@@ -60,7 +64,7 @@ source .venv/bin/activate  # Linux/macOS
 # On Windows: .venv\Scripts\activate
 
 # Install LocalKin Service Audio
-uv pip install -e .
+uv sync
 
 # Use kin
 kin --help
@@ -74,11 +78,10 @@ git clone https://github.com/LocalKinAI/localkin-service-audio.git
 cd localkin-service-audio
 
 # Install dependencies (slower than uv)
-pip install -r localkin_service_audio/requirements.txt
 pip install -e .
 
 # Run commands using the module
-python -m localkin_service_audio.cli --help
+kin --help
 ```
 
 ### Basic Usage
@@ -101,8 +104,9 @@ kin audio listen
 kin audio tts "Hello, world!"
 
 # 🚀 NEW: Run models as API servers (auto-pulls if needed)
-kin audio run whisper-tiny-hf --port 8000
-kin audio run speecht5-tts --port 8001
+kin audio run faster-whisper-tiny --port 8000   # Fast STT
+kin audio run kokoro-82m --port 8001            # High-quality TTS
+kin audio run speecht5-tts --port 8002          # Fast TTS
 
 # 🚀 NEW: Monitor running servers and processes
 kin audio ps                      # Show all running API servers
@@ -115,6 +119,65 @@ kin audio cache info
 kin audio cache clear whisper-tiny-hf  # Clear specific model
 kin audio cache clear                   # Clear all cached models
 ```
+
+### ⚡ Faster-Whisper Performance
+
+LocalKin Service Audio includes **faster-whisper** integration for significantly improved transcription speed:
+
+```bash
+# Automatic engine selection (recommended)
+kin audio transcribe audio.wav
+
+# Force faster-whisper engine
+kin audio transcribe audio.wav --engine faster
+
+# Force OpenAI Whisper engine
+kin audio transcribe audio.wav --engine openai
+
+# Check available engines
+kin audio status
+```
+
+**Performance Comparison:**
+- **faster-whisper**: Up to **4x faster** than OpenAI Whisper
+- **Automatic VAD filtering**: Removes silence for cleaner results
+- **GPU acceleration**: CUDA/MPS support for even better performance
+- **Language detection**: Auto-detects spoken language
+- **Batch processing**: Optimized for multiple files
+
+**Available faster-whisper models:**
+- `faster-whisper-tiny` - Tiny model (39MB)
+- `faster-whisper-base` - Base model (74MB)
+- `faster-whisper-small` - Small model (244MB)
+- `faster-whisper-medium` - Medium model (769MB)
+- `faster-whisper-large-v2` - Large v2 model (3GB)
+- `faster-whisper-large-v3` - Large v3 model (3GB)
+- `faster-whisper-turbo` - Turbo optimized model (1.5GB)
+- `faster-whisper-distil-large-v3` - Distilled Large v3 (1.5GB)
+
+### 💻 Web Interface Quick Start
+
+```bash
+# Launch the modern web interface
+kin web
+
+# Launch on specific port
+kin web --port 8080
+
+# Launch and bind to all interfaces
+kin web --host 0.0.0.0 --port 8080
+
+# Open http://localhost:8080 in your browser
+```
+
+**Features:**
+- 🎨 Modern, responsive web interface
+- 📤 Drag & drop file upload for transcription
+- 🔊 Real-time audio playback for generated speech
+- 📊 Live progress tracking and status updates
+- 💾 Automatic file downloads
+- 🎯 Model selection and configuration
+- 🌐 Works on any device with a browser
 
 ### 🚀 API Server Quick Start
 
@@ -145,7 +208,7 @@ curl -X POST "http://localhost:8000/transcribe" \
 ```bash
 $ kin audio transcribe audio.wav --model_size large
 
-🎵 OllamaAudio - Local STT & TTS Model Manager
+🎵 LocalKin Service Audio - Local STT & TTS Model Manager
 ==================================================
 ℹ️  🎵 Transcribing audio file: audio.wav
 ℹ️  🤖 Using Whisper model: large
@@ -164,7 +227,7 @@ $ kin audio transcribe audio.wav --model_size large
 ```bash
 $ kin audio tts "Hello, this is a test" --output test.wav
 
-🎵 OllamaAudio - Local STT & TTS Model Manager
+🎵 LocalKin Service Audio - Local STT & TTS Model Manager
 ==================================================
 ℹ️  🔊 Synthesizing speech...
 ℹ️  🤖 Using TTS engine: pyttsx3 (native OS TTS)
@@ -182,10 +245,10 @@ $ kin audio tts "Hello, this is a test" --output test.wav
 ```bash
 $ kin audio ps
 
-🎵 OllamaAudio - Local STT & TTS Model Manager
+🎵 LocalKin Service Audio - Local STT & TTS Model Manager
 ==================================================
-ℹ️  Checking for running OllamaAudio processes...
-✅ Found 2 running OllamaAudio server(s):
+ℹ️  Checking for running LocalKin Service Audio processes...
+✅ Found 2 running LocalKin Service Audio server(s):
 
 ================================================================================
 PORT     MODEL                     TYPE     URL                       STATUS
@@ -201,26 +264,42 @@ PORT     MODEL                     TYPE     URL                       STATUS
 
 ## 🎯 Supported Models
 
-Choose from **12 state-of-the-art audio processing models** covering the latest in speech technology:
+Choose from **20 state-of-the-art audio processing models** covering the latest in speech technology:
 
 ### 📊 Model Status Overview
 
 ```bash
 $ kin audio models
-MODEL                     TYPE   STATUS             SOURCE          DESCRIPTION
+MODEL                          TYPE   STATUS             SOURCE          DESCRIPTION
 ------------------------------------------------------------------------------------------
-whisper                   stt    📦 Local Library    openai-whisper  Local transcription
-whisper-tiny-hf           stt    ✅ Pulled           huggingface     OpenAI Whisper Tiny
-whisper-base-hf           stt    ✅ Pulled           huggingface     OpenAI Whisper Base
-whisper-large-v2-hf       stt    ⬇️ Not Pulled      huggingface     OpenAI Whisper Large v2
-speecht5-tts              tts    ⬇️ Not Pulled      huggingface     Microsoft SpeechT5 TTS
-bark-small                tts    ⬇️ Not Pulled      huggingface     Suno Bark small TTS
-native                    tts    📦 Local Library    pyttsx3         Uses macOS native TTS
-whisper-large-v3          stt    ⬇️ Not Pulled      ollama          Advanced Whisper Large v3
-whisper-base              stt    ⬇️ Not Pulled      ollama          Whisper Base model
-llama3.2:3b-instruct-q4_0 tts    ⬇️ Not Pulled      ollama          Llama 3.2 3B model
-qwen2.5:3b-instruct-q4_0  tts    ⬇️ Not Pulled      ollama          Qwen 2.5 3B model
-mistral:7b-instruct-q4_0  tts    ⬇️ Not Pulled      ollama          Mistral 7B model
+whisper                        stt    📦 Local Library    openai-whisper  OpenAI Whisper with auto faster-whisper
+faster-whisper-tiny            stt    📦 Local Library    faster-whisper  Fast Whisper Tiny - 4x faster, smallest size
+faster-whisper-base            stt    📦 Local Library    faster-whisper  Fast Whisper Base - 4x faster, good balance
+faster-whisper-small           stt    📦 Local Library    faster-whisper  Fast Whisper Small - 4x faster, high quality
+faster-whisper-medium          stt    📦 Local Library    faster-whisper  Fast Whisper Medium - 4x faster, very high quality
+faster-whisper-large-v3        stt    📦 Local Library    faster-whisper  Fast Whisper Large v3 - 4x faster, best quality
+faster-whisper-turbo           stt    📦 Local Library    faster-whisper  Fast Whisper Turbo - fastest, optimized for speed
+whisper-tiny-hf                stt    ✅ Pulled           huggingface     Whisper Tiny from Hugging Face
+whisper-base-hf                stt    ✅ Pulled           huggingface     Whisper Base from Hugging Face
+whisper-large-v2-hf            stt    ⬇️ Not Pulled      huggingface     Whisper Large v2 from Hugging Face
+------------------------------------------------------------------------------------------
+native                         tts    📦 Local Library    pyttsx3         Native macOS TTS via pyttsx3
+speecht5-tts                   tts    ⬇️ Not Pulled      huggingface     Microsoft SpeechT5 TTS from Hugging Face
+bark-small                     tts    ⬇️ Not Pulled      huggingface     Suno Bark Small TTS from Hugging Face
+kokoro-82m                     tts    ✅ Pulled           huggingface     HexGrad Kokoro-82M - high-quality neural TTS
+xtts-v2                        tts    ⬇️ Not Pulled      huggingface     Coqui XTTS v2 - multilingual voice cloning TTS
+mms-tts-eng                    tts    ⬇️ Not Pulled      huggingface     Meta MMS TTS English - multilingual
+tortoise-tts                   tts    ⬇️ Not Pulled      huggingface     Tortoise TTS - high-quality multi-speaker
+
+### 📊 Model Status Indicators
+
+| Status | Meaning | Ready to Use? | Speed |
+|--------|---------|---------------|-------|
+| **📦 Local Library** | Model is part of installed Python packages, downloads on first use | ✅ **Yes** - Instant | ⚡ Fastest |
+| **✅ Pulled** | Model downloaded and cached locally | ✅ **Yes** - Instant | ⚡ Fast |
+| **⬇️ Not Pulled** | Model available but needs downloading first | ❌ **No** - Downloads first | 🐌 Slower first time |
+
+**💡 Tip:** Models with "Local Library" status (like faster-whisper) are your fastest options!
 ```
 
 ### 📋 Model Specifications
@@ -287,19 +366,31 @@ kin audio transcribe audio.wav --model whisper-large-v3
 #### 🚀 Hugging Face Models (API Server - Recommended)
 ```bash
 # Start TTS API server (auto-pulls if needed)
-kin audio run speecht5-tts --port 8001    # Microsoft SpeechT5, 250MB
-kin audio run bark-small --port 8002      # Suno Bark, 1.7GB
+kin audio run kokoro-82m --port 8001      # HexGrad Kokoro, 320MB (best quality)
+kin audio run xtts-v2 --port 8002         # Coqui XTTS v2, 1.8GB (voice cloning)
+kin audio run speecht5-tts --port 8003    # Microsoft SpeechT5, 250MB
+kin audio run bark-small --port 8004      # Suno Bark, 1.7GB
 
 # Use the API for speech synthesis
-curl -X POST "http://localhost:8001/synthesize" \
+curl -X POST "http://localhost:8003/synthesize" \
      -H "Content-Type: application/json" \
      -d '{
        "text": "Hello, this is generated speech!",
-       "speaker": "male"
+       "voice": "af_sarah"
      }' \
      --output speech.wav
 
 # Interactive API docs: http://localhost:8001/docs
+```
+
+#### ⚠️ Direct CLI TTS Models (Limited)
+```bash
+# Native TTS (works immediately)
+kin audio tts "Hello world" --model native
+
+# Advanced TTS (⚠️ CLI may timeout - use API server instead)
+# kin audio tts "Hello world" --model kokoro-82m  # May timeout - use API server below
+# kin audio tts "Hello world" --model xtts-v2     # May timeout - use API server below
 ```
 
 #### Native OS TTS (Works Immediately)
@@ -335,8 +426,8 @@ kin audio tts "Tell me a story" --model llama3.2:3b-instruct-q4_0
 
 ### Prerequisites
 
-- **Python 3.8+**
-- **uv** (fast Python package installer)
+- **Python 3.10+** (required for optimal performance)
+- **uv** (fast Python package installer - highly recommended)
 - **Ollama** (optional, for Ollama-based models)
 - **FFmpeg** (for audio processing)
 
@@ -351,7 +442,7 @@ git clone https://github.com/LocalKinAI/localkin-service-audio.git
 cd localkin-service-audio
 
 # Install with uv (fast and reliable)
-uv pip install -e .
+uv sync
 ```
 
 ### Ollama Setup (Optional)
@@ -381,6 +472,41 @@ uv pip install librosa soundfile
 # All necessary dependencies are included in pyproject.toml
 ```
 
+### Optional Dependencies
+
+LocalKin Service Audio supports optional features that can be installed separately:
+
+```bash
+# Install with web interface support
+uv sync --extra web
+
+# Install with advanced TTS models (XTTS, etc.)
+uv sync --extra tts
+
+# Install with GPU acceleration support
+uv sync --extra gpu
+
+# Install with all optional features
+uv sync --extra web --extra tts --extra gpu
+```
+
+**Web Interface (`--extra web`):**
+- Modern web-based UI for audio processing
+- Responsive design that works on all devices
+- Real-time progress tracking and file downloads
+- Requires: `jinja2` for templating
+
+**Advanced TTS (`--extra tts`):**
+- Coqui XTTS v2 for high-quality voice cloning
+- Multilingual speech synthesis capabilities
+- Voice cloning and customization features
+- Requires: `TTS` package from Coqui
+
+**GPU Support (`--extra gpu`):**
+- CUDA acceleration for faster model inference
+- Automatic GPU detection and optimization
+- Requires compatible NVIDIA GPU and drivers
+
 ---
 
 ## 🎛️ Command Reference
@@ -402,6 +528,10 @@ kin audio status
 
 # 🚀 NEW: Monitor running servers and processes
 kin audio ps
+
+# 💻 NEW: Launch web interface
+kin web                              # Launch on default port 8080
+kin web --port 3000                  # Launch on custom port
 ```
 
 ### 🚀 Model Server Commands
@@ -448,11 +578,24 @@ kin audio transcribe audio.wav --model_size small    # 244MB, 8x speed, High qua
 kin audio transcribe audio.wav --model_size medium   # 769MB, 4x speed, Very High quality
 kin audio transcribe audio.wav --model_size large    # 1550MB, 1x speed, Excellent quality
 
+# Choose transcription engine (auto-selects faster-whisper when available)
+kin audio transcribe audio.wav --engine auto         # Auto-select best engine (default)
+kin audio transcribe audio.wav --engine faster       # Force faster-whisper (4x faster)
+kin audio transcribe audio.wav --engine openai       # Force OpenAI Whisper (compatible)
+
+# Use specific faster-whisper models (recommended for best performance)
+kin audio transcribe audio.wav --model faster-whisper-tiny      # Fastest, lowest quality
+kin audio transcribe audio.wav --model faster-whisper-base      # Good balance
+kin audio transcribe audio.wav --model faster-whisper-small     # High quality
+kin audio transcribe audio.wav --model faster-whisper-large-v3  # Best quality, slower
+
 # Save transcription to file
 kin audio transcribe audio.wav > transcription.txt
 
 # Output includes:
+# - Engine selection (OpenAI Whisper vs faster-whisper)
 # - Model details (size, speed, quality)
+# - Language detection (faster-whisper only)
 # - Processing progress
 # - Transcription statistics (word/char count)
 ```
@@ -482,7 +625,7 @@ kin audio tts "$(cat script.txt)" --output narration.wav
 
 ## 💾 Cache Management
 
-OllamaAudio uses intelligent caching to store downloaded models locally for faster subsequent loads.
+LocalKin Service Audio uses intelligent caching to store downloaded models locally for faster subsequent loads.
 
 ### Cache Location
 
@@ -520,7 +663,7 @@ kin audio run whisper-large-v2-hf --port 8000
 # 📥 Downloading model from Hugging Face: openai/whisper-large-v2
 # ✅ Model downloaded to: /Users/.../whisper-large-v2-hf
 # ✅ Model pulled successfully!
-# 🚀 Starting OllamaAudio API server for whisper-large-v2-hf
+# 🚀 Starting LocalKin Service Audio API server for whisper-large-v2-hf
 ```
 
 ### Cache Benefits
@@ -580,7 +723,7 @@ Models are configured in `localkin_service_audio/models.json`. The system suppor
 
 ### 🚀 Adding New Models (Super Easy!)
 
-OllamaAudio makes adding new models incredibly simple! Here's how:
+LocalKin Service Audio makes adding new models incredibly simple! Here's how:
 
 #### **Method 1: Quick Add (Most Common)**
 
@@ -662,7 +805,7 @@ For models needing special handling, you can:
 
 ### 🎯 **Available Templates**
 
-OllamaAudio comes with pre-built templates for popular models:
+LocalKin Service Audio comes with pre-built templates for popular models:
 
 #### **STT Templates:**
 - `whisper_stt` - OpenAI Whisper models (tiny, base, small, medium, large)
@@ -763,7 +906,7 @@ kin audio add-model --repo openai/whisper-medium --name whisper-med --type stt
 }
 ```
 
-**Adding a new model to OllamaAudio takes less than 30 seconds!** ⚡🎉
+**Adding a new model to LocalKin Service Audio takes less than 30 seconds!** ⚡🎉
 
 ### 📊 **Model Addition Statistics**
 
@@ -797,7 +940,7 @@ done < messages.txt
 
 ### Audio Format Support
 
-OllamaAudio supports various audio formats through Whisper:
+LocalKin Service Audio supports various audio formats through Whisper:
 
 - **WAV**: Native support
 - **MP3**: Requires FFmpeg
@@ -868,6 +1011,24 @@ ollama serve
 kin audio pull whisper-base
 ```
 
+#### Kokoro TTS Timeout
+```bash
+# Kokoro CLI loading may timeout even with cached models
+kin audio tts "Hello" --model kokoro-82m
+# ❌ "Kokoro CLI loading timed out"
+
+# ✅ Recommended solution: Use API server mode
+kin audio run kokoro-82m --port 8003
+curl -X POST "http://localhost:8003/synthesize" \
+     -H "Content-Type: application/json" \
+     -d '{"text": "Hello world", "voice": "af_sarah"}' \
+     --output speech.wav
+# Returns: Binary WAV file (playable audio!)
+
+# Alternative: Use native TTS immediately
+kin audio tts "Hello" --model native
+```
+
 #### Audio File Issues
 ```bash
 # Check if file exists and is readable
@@ -907,7 +1068,7 @@ kin audio transcribe audio.wav
 
 ## 🌐 REST API Reference
 
-OllamaAudio provides complete REST APIs for both STT and TTS models when running in server mode.
+LocalKin Service Audio provides complete REST APIs for both STT and TTS models when running in server mode.
 
 ### 🚀 Getting Started with API
 
@@ -962,19 +1123,24 @@ curl -X POST "http://localhost:8000/transcribe" \
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/synthesize` | Generate speech from text |
+| `POST` | `/synthesize` | Generate speech from text (returns WAV audio file) |
 
 **Synthesis Request:**
 ```bash
 curl -X POST "http://localhost:8001/synthesize" \
-     -H "accept: application/json" \
      -H "Content-Type: application/json" \
      -d '{
        "text": "Hello, this is generated speech!",
-       "speaker": "male"
+       "voice": "af_sarah"
      }' \
      --output speech.wav
 ```
+
+**Response:** Binary WAV audio file (16-bit PCM, 24kHz for Kokoro, 16kHz for SpeechT5)
+
+**Kokoro Voices:** `af_sarah` (American Female), `am_adam` (American Male), `bf_emma` (British Female), `bm_george` (British Male), `jf_alpha` (Japanese Female), `jm_levi` (Japanese Male), `pf_dora` (Portuguese Female), `pm_alex` (Portuguese Male), `ff_siwis` (French Female)
+
+**✅ Long Text Support:** Kokoro handles paragraphs and long documents perfectly with consistent quality!
 
 ### 📊 Multiple Servers
 
@@ -982,28 +1148,45 @@ Run multiple models on different ports:
 
 ```bash
 # Terminal 1: STT Server
-kin audio run whisper-tiny-hf --port 8000
+kin audio run faster-whisper-tiny --port 8000
 
-# Terminal 2: TTS Server
-kin audio run speecht5-tts --port 8001
+# Terminal 2: Kokoro TTS Server (High Quality)
+kin audio run kokoro-82m --port 8001
 
-# Terminal 3: Use both APIs
+# Terminal 3: SpeechT5 TTS Server (Fast)
+kin audio run speecht5-tts --port 8002
+
+# Use the APIs
+# Transcribe audio
 curl -X POST "http://localhost:8000/transcribe" \
      -F "file=@input.wav" > transcription.json
 
+# Generate speech with Kokoro (best quality)
 curl -X POST "http://localhost:8001/synthesize" \
      -H "Content-Type: application/json" \
-     -d '{"text": "Hello from OllamaAudio!"}' \
-     --output output.wav
+     -d '{"text": "Hello from LocalKin Service Audio!", "voice": "af_sarah"}' \
+     --output kokoro_speech.wav
+
+# Long text example (handles paragraphs perfectly)
+curl -X POST "http://localhost:8001/synthesize" \
+     -H "Content-Type: application/json" \
+     -d '{"text": "This is a much longer text to demonstrate the kokoro text-to-speech capabilities. It can handle multiple sentences and paragraphs without any issues. The quality remains excellent throughout longer content.", "voice": "am_adam"}' \
+     --output long_speech.wav
+
+# Generate speech with SpeechT5 (faster)
+curl -X POST "http://localhost:8002/synthesize" \
+     -H "Content-Type: application/json" \
+     -d '{"text": "Hello from LocalKin Service Audio!"}' \
+     --output speecht5_speech.wav
 ```
 
 ### 🔧 Python API (Future Feature)
 
 ```python
-from localkin_service_audio.core import OllamaAudio
+from localkin_service_audio.core import LocalKinServiceAudio
 
 # Initialize
-audio = OllamaAudio()
+audio = LocalKinServiceAudio()
 
 # Speech-to-Text
 transcription = audio.transcribe("audio.wav", model="whisper-base")
@@ -1079,12 +1262,15 @@ This project is licensed under the MIT License - see the [LICENSE](../LICENSE) f
 ## 🙏 Acknowledgments
 
 - **OpenAI**: For Whisper models and the transformers library
+- **SYSTRAN**: For faster-whisper and CTranslate2 optimization
 - **Ollama**: For the inspiration and Ollama models
 - **Hugging Face**: For the model hub and transformers ecosystem
 - **Microsoft**: For SpeechT5 and other TTS models
 - **Suno**: For Bark TTS models
 - **PyTorch**: For the deep learning framework
 - **FastAPI**: For the REST API framework
+- **Jinja2**: For web interface templating
+- **Bootstrap**: For responsive web UI components
 - **uv**: For fast Python package management
 - **Community**: For feedback and contributions
 
@@ -1092,6 +1278,7 @@ This project is licensed under the MIT License - see the [LICENSE](../LICENSE) f
 
 - **Issues**: [GitHub Issues](https://github.com/LocalKinAI/localkin-service-audio/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/LocalKinAI/localkin-service-audio/discussions)
+- **Web Interface**: Access via `kin web` for interactive usage
 
 ---
 
@@ -1157,7 +1344,11 @@ kin audio status
 
 ## 🎯 What's New in v1.0
 
+- ✅ **Faster-Whisper Integration**: Up to 4x faster transcription with CTranslate2 optimization
+- ✅ **Dual STT Engines**: OpenAI Whisper + faster-whisper with automatic engine selection
+- ✅ **8 Faster-Whisper Models**: Individual model entries for all faster-whisper variants
 - ✅ **REST API Servers**: Run models as complete API services
+- ✅ **Modern Web Interface**: Beautiful, responsive web UI for audio processing
 - ✅ **Auto-Pull**: Models download automatically when needed
 - ✅ **Smart Caching**: Persistent local storage with status tracking
 - ✅ **Hugging Face Integration**: Direct integration with HF Hub
@@ -1171,20 +1362,24 @@ kin audio status
 - ✅ **One-Command Setup**: Add any Hugging Face model in seconds
 - ✅ **Enhanced CLI**: Comprehensive model details, file size tracking, progress indicators
 - ✅ **Fast Package Management**: uv integration for quick installs
+- ✅ **Modular Architecture**: Clean, maintainable codebase with separated concerns
+- ✅ **Cross-Platform Compatibility**: Works on macOS, Linux, and Windows
 
 ---
 
 ## 🎯 Current Capabilities
 
-OllamaAudio v1.0 provides a complete audio AI ecosystem:
+LocalKin Service Audio v1.0 provides a complete audio AI ecosystem:
 
 ### ✅ **Fully Functional Features**
+- **💻 Modern Web Interface**: `kin web` - Beautiful web UI for audio processing
 - **🔍 Process Monitoring**: `kin audio ps` - See all running servers
 - **🎯 Model Transparency**: STT/TTS commands show detailed model info
 - **🚀 REST API Servers**: Run any model as a web service
 - **📦 Smart Caching**: Automatic model downloads and storage
 - **🛠️ Easy Model Addition**: Add new models in seconds
 - **📚 Model Templates**: 7 pre-built templates for popular models
+- **🔧 Modular Architecture**: Clean separation of core, API, CLI, and UI components
 
 ### ✅ **12 Production-Ready Models**
 - **4 Hugging Face STT Models**: whisper-tiny, whisper-base, whisper-large-v2, speecht5
@@ -1197,6 +1392,10 @@ OllamaAudio v1.0 provides a complete audio AI ecosystem:
 ```bash
 # Quick transcription
 kin audio transcribe audio.wav
+
+# Web interface (recommended for beginners)
+kin web
+# Open http://localhost:8080 in your browser
 
 # API server mode
 kin audio run whisper-base-hf --port 8000
@@ -1218,9 +1417,663 @@ kin audio cache info
 - **🛡️ Error Handling**: Robust error recovery and validation
 - **📈 Scalability**: Multiple servers, multiple models simultaneously
 
-**🎉 Ready to get started with local audio AI?** Install OllamaAudio and run your first API server in minutes! 🎵✨
+---
+
+## 🎵 Audio Processing Guide
+
+### Supported Audio Formats
+
+LocalKin Service Audio supports various audio formats through FFmpeg integration:
+
+#### Native Support (No FFmpeg Required)
+- **WAV**: Uncompressed PCM audio (recommended)
+- **FLAC**: Free Lossless Audio Codec
+
+#### FFmpeg-Required Formats
+- **MP3**: MPEG-1 Audio Layer III
+- **M4A/AAC**: Advanced Audio Coding
+- **OGG**: Ogg Vorbis
+- **WMA**: Windows Media Audio
+
+### Audio Quality Guidelines
+
+#### STT (Speech-to-Text) Recommendations
+- **Sample Rate**: 16kHz (optimal for Whisper models)
+- **Channels**: Mono (stereo files are automatically converted)
+- **Bit Depth**: 16-bit PCM
+- **Format**: WAV or FLAC
+
+#### TTS (Text-to-Speech) Output
+- **Sample Rate**: 22.05kHz (default) or 44.1kHz
+- **Channels**: Mono
+- **Format**: WAV (uncompressed) or MP3 (compressed)
+
+### Audio Preprocessing
+
+#### Automatic Processing
+LocalKin Service Audio automatically handles:
+- Sample rate conversion
+- Channel mixing (stereo → mono)
+- Format conversion
+- Normalization
+
+#### Manual Preprocessing (Optional)
 
 ```bash
+# Convert to optimal format for STT
+ffmpeg -i input.mp3 -ac 1 -ar 16000 -c:a pcm_s16le output.wav
+
+# Normalize audio levels
+ffmpeg -i input.wav -af "loudnorm" output_normalized.wav
+```
+
+### Performance Optimization
+
+#### Hardware Acceleration
+- **CPU**: Works on all systems
+- **GPU**: NVIDIA CUDA, Apple MPS, AMD ROCm
+- **Memory**: 4GB+ RAM recommended
+
+#### Model Selection by Hardware
+
+| Hardware | Recommended Models | Memory Usage |
+|----------|-------------------|--------------|
+| CPU Only | whisper-tiny, whisper-base | 4GB RAM |
+| 4GB GPU | whisper-base, whisper-small | 8GB RAM |
+| 8GB+ GPU | whisper-medium, whisper-large | 16GB+ RAM |
+
+### Batch Processing
+
+#### Processing Multiple Files
+
+```bash
+# Process all WAV files in directory
+for file in *.wav; do
+  kin audio transcribe "$file" > "${file%.wav}.txt"
+done
+
+# Batch TTS generation
+while IFS= read -r line; do
+  kin audio tts "$line" --output "tts_$(echo "$line" | head -c 20 | tr ' ' '_').wav"
+done < text_lines.txt
+```
+
+#### Parallel Processing
+
+```bash
+# Run multiple servers simultaneously
+kin audio run whisper-tiny-hf --port 8000 &
+kin audio run whisper-base-hf --port 8001 &
+kin audio run speecht5-tts --port 8002 &
+
+# Use servers in parallel
+curl -X POST "http://localhost:8000/transcribe" -F "file=@file1.wav" &
+curl -X POST "http://localhost:8001/transcribe" -F "file=@file2.wav" &
+```
+
+### Audio Quality Enhancement
+
+#### Noise Reduction
+```python
+# Using scipy for noise reduction
+from scipy.io import wavfile
+import noisereduce as nr
+
+rate, data = wavfile.read('noisy_audio.wav')
+reduced_noise = nr.reduce_noise(y=data, sr=rate)
+wavfile.write('clean_audio.wav', rate, reduced_noise)
+```
+
+#### Voice Activity Detection
+```python
+# Using webrtcvad for VAD
+import webrtcvad
+
+vad = webrtcvad.Vad()
+vad.set_mode(3)  # Most aggressive filtering
+
+# Process audio frames
+# ... VAD implementation ...
+```
+
+### Troubleshooting Audio Issues
+
+#### Common Problems
+
+##### "No audio detected" Error
+- Check file format and encoding
+- Ensure audio file is not corrupted
+- Verify sample rate (must be > 8kHz)
+
+##### Poor Transcription Quality
+- Use higher quality Whisper models
+- Ensure clean audio (minimal background noise)
+- Check microphone quality for recordings
+
+##### TTS Audio Issues
+- Verify output format compatibility
+- Check speaker configuration
+- Ensure sufficient disk space
+
+#### Audio Format Conversion
+
+```bash
+# Convert any audio to WAV
+ffmpeg -i input.any -acodec pcm_s16le -ar 16000 output.wav
+
+# Convert with specific parameters
+ffmpeg -i input.mp3 -ac 1 -ar 22050 -ab 128k output.wav
+```
+
+### Advanced Audio Processing
+
+#### Real-time Audio Processing
+```python
+import pyaudio
+import numpy as np
+
+# Real-time audio capture and processing
+p = pyaudio.PyAudio()
+stream = p.open(format=pyaudio.paInt16,
+                channels=1,
+                rate=16000,
+                input=True,
+                frames_per_buffer=1024)
+
+# Process audio chunks
+while True:
+    data = stream.read(1024)
+    # Process audio data...
+```
+
+#### Audio Segmentation
+```python
+# Split long audio files
+from pydub import AudioSegment
+
+audio = AudioSegment.from_wav("long_file.wav")
+segments = audio[::30000]  # 30 second chunks
+
+for i, segment in enumerate(segments):
+    segment.export(f"segment_{i}.wav", format="wav")
+```
+
+### Performance Benchmarks
+
+#### STT Performance (Whisper Models)
+
+| Model | Size | Speed | Quality | Memory |
+|-------|------|-------|---------|--------|
+| tiny | 39MB | 32x | Basic | 1GB |
+| base | 74MB | 16x | Good | 1GB |
+| small | 244MB | 8x | High | 2GB |
+| medium | 769MB | 4x | Very High | 5GB |
+| large | 1550MB | 1x | Excellent | 10GB |
+
+#### TTS Performance (Various Models)
+
+| Model | Speed | Quality | Memory |
+|-------|-------|---------|--------|
+| pyttsx3 | Instant | Good | Minimal |
+| SpeechT5 | Medium | High | 250MB |
+| Bark | Slow | Very High | 1.7GB |
+| XTTS v2 | Medium | Excellent | 1.8GB |
+
+---
+
+## 🛠️ Model Management Guide
+
+### Model Architecture
+
+LocalKin Service Audio supports multiple model sources and types:
+
+#### Supported Model Sources
+- **Hugging Face Hub**: Direct integration with HF models
+- **Ollama Models**: Local Ollama instances
+- **Local Models**: Built-in OpenAI Whisper and pyttsx3
+
+#### Model Types
+- **STT (Speech-to-Text)**: Whisper variants, Wav2Vec2, HuBERT
+- **TTS (Text-to-Speech)**: SpeechT5, Bark, Tacotron2, FastSpeech2
+
+### Model Caching System
+
+#### Cache Location
+```
+~/.localkin_service_audio/cache/
+├── huggingface/     # Hugging Face models
+└── ollama/         # Ollama models
+```
+
+#### Cache Management
+
+```bash
+# View cache status
+kin audio cache info
+
+# Clear specific model
+kin audio cache clear whisper-tiny-hf
+
+# Clear all cached models
+kin audio cache clear
+
+# Check cache size
+du -sh ~/.localkin_service_audio/cache/
+```
+
+#### Auto-Pull Behavior
+
+Models are automatically downloaded when first used:
+
+```bash
+kin audio run whisper-large-v2-hf --port 8000
+# Output:
+# 📥 Model 'whisper-large-v2-hf' not found in cache. Pulling it first...
+# 📥 Downloading model from Hugging Face: openai/whisper-large-v2
+# ✅ Model downloaded to: /path/to/cache/whisper-large-v2-hf
+# ✅ Model pulled successfully!
+# 🚀 Starting LocalKin Service Audio API server for whisper-large-v2-hf
+```
+
+### Adding New Models
+
+#### Method 1: Quick Add (Hugging Face)
+
+```bash
+# Add model using template
+kin audio add-model --template whisper_stt --name my-whisper
+
+# Add custom Hugging Face model
+kin audio add-model --repo openai/whisper-medium --name whisper-med --type stt
+
+# Add with full configuration
+kin audio add-model \
+  --repo microsoft/speecht5_tts \
+  --name speecht5 \
+  --type tts \
+  --description "Microsoft's advanced neural TTS" \
+  --size-mb 1300
+```
+
+#### Method 2: Manual JSON Configuration
+
+Edit `localkin_service_audio/core/models.json`:
+
+```json
+{
+  "name": "custom-whisper-model",
+  "type": "stt",
+  "description": "Custom Whisper model from Hugging Face",
+  "source": "huggingface",
+  "huggingface_repo": "organization/model-name",
+  "license": "MIT",
+  "size_mb": 500,
+  "requirements": ["transformers", "torch"],
+  "tags": ["custom", "whisper"]
+}
+```
+
+#### Method 3: Template-Based Addition
+
+Available templates:
+
+```bash
+# List all templates
+kin audio list-templates
+
+# STT Templates
+kin audio add-model --template whisper_stt --name my-whisper
+kin audio add-model --template wav2vec2_stt --name my-wav2vec
+kin audio add-model --template hubert_stt --name my-hubert
+
+# TTS Templates
+kin audio add-model --template speecht5_tts --name my-speecht5
+kin audio add-model --template bark_tts --name my-bark
+kin audio add-model --template tacotron2_tts --name my-tacotron
+```
+
+### Model Configuration
+
+#### Model JSON Schema
+
+```json
+{
+  "models": [
+    {
+      "name": "model-name",
+      "type": "stt|tts",
+      "description": "Human-readable description",
+      "source": "huggingface|ollama|openai-whisper|pyttsx3",
+      "huggingface_repo": "org/model-name",  // For HF models
+      "ollama_model": "model:tag",           // For Ollama models
+      "license": "MIT|Apache-2.0|etc",
+      "size_mb": 500,
+      "requirements": ["package1", "package2"],
+      "tags": ["tag1", "tag2"],
+      "model_config": {                      // Optional custom config
+        "custom_param": "value"
+      }
+    }
+  ]
+}
+```
+
+#### Validation Rules
+
+- **name**: Required, unique, lowercase with hyphens
+- **type**: Required, must be "stt" or "tts"
+- **source**: Required, must be valid source type
+- **size_mb**: Optional, approximate model size
+- **requirements**: Optional, Python packages needed
+
+### Model Server Deployment
+
+#### Single Model Server
+
+```bash
+# Start STT server
+kin audio run whisper-tiny-hf --port 8000
+
+# Start TTS server
+kin audio run speecht5-tts --port 8001
+
+# Check server status
+kin audio ps
+```
+
+#### Multiple Model Servers
+
+```bash
+# Start multiple servers
+kin audio run whisper-tiny-hf --port 8000 &
+kin audio run whisper-base-hf --port 8001 &
+kin audio run speecht5-tts --port 8002 &
+
+# Monitor all servers
+kin audio ps
+```
+
+#### Production Deployment
+
+```bash
+# Use production settings
+export LOCALKIN_AUDIO_ENV=production
+
+# Start with custom host
+kin audio run whisper-base-hf --host 0.0.0.0 --port 8000
+
+# Use with reverse proxy (nginx)
+# Configure nginx to proxy to localhost:8000
+```
+
+### Model Performance Tuning
+
+#### Memory Optimization
+
+```python
+# Enable memory optimizations
+import torch
+torch.cuda.empty_cache()  # Clear GPU memory
+
+# Use gradient checkpointing for large models
+# (automatically enabled for models > 1GB)
+```
+
+#### GPU Acceleration
+
+```bash
+# Force CPU usage
+export CUDA_VISIBLE_DEVICES=""
+
+# Use specific GPU
+export CUDA_VISIBLE_DEVICES="0"
+
+# Check GPU memory usage
+nvidia-smi
+```
+
+#### Batch Processing Optimization
+
+```python
+# Process multiple audio files efficiently
+batch_size = 4  # Adjust based on available memory
+# Implementation handles batching automatically
+```
+
+### Monitoring and Maintenance
+
+#### Server Monitoring
+
+```bash
+# Check running processes
+kin audio ps
+
+# View detailed server info
+curl http://localhost:8000/
+
+# Health check
+curl http://localhost:8000/health
+```
+
+#### Log Management
+
+```bash
+# Enable verbose logging
+kin audio run model-name --verbose
+
+# View logs
+tail -f ~/.localkin_service_audio/logs/server.log
+```
+
+#### Performance Metrics
+
+```python
+# Get model performance stats
+response = requests.get("http://localhost:8000/metrics")
+print(response.json())
+# Output: {"requests_per_second": 10.5, "avg_response_time": 0.8}
+```
+
+### Troubleshooting Model Issues
+
+#### Common Problems
+
+##### Model Download Failures
+```bash
+# Check internet connection
+ping huggingface.co
+
+# Clear cache and retry
+kin audio cache clear model-name
+kin audio run model-name --port 8000
+
+# Manual download
+git lfs clone https://huggingface.co/org/model-name
+```
+
+##### Out of Memory Errors
+```bash
+# Use smaller model
+kin audio run whisper-tiny-hf --port 8000
+
+# Increase system memory
+# Or use CPU-only mode
+export CUDA_VISIBLE_DEVICES=""
+```
+
+##### Model Loading Errors
+```bash
+# Check model configuration
+kin audio models
+
+# Validate model file
+python -c "from transformers import pipeline; pipeline('automatic-speech-recognition', model='org/model-name')"
+
+# Reinstall dependencies
+pip install --upgrade transformers torch
+```
+
+#### Model Validation
+
+```bash
+# Test model functionality
+curl -X POST "http://localhost:8000/transcribe" \
+  -F "file=@test.wav"
+
+# Expected response:
+# {"text": "Hello, this is a test", "language": "en", "confidence": 0.95}
+```
+
+### Advanced Configuration
+
+#### Custom Model Loading
+
+```python
+# For models needing special handling
+from localkin_service_audio.core.model_loader import CustomModelLoader
+
+class MyModelLoader(CustomModelLoader):
+    def load_model(self, model_config):
+        # Custom loading logic
+        pass
+
+    def preprocess_audio(self, audio_data):
+        # Custom preprocessing
+        pass
+```
+
+#### Model Registry
+
+```python
+# Access model registry
+from localkin_service_audio.config import get_models, find_model
+
+models = get_models()
+whisper_model = find_model("whisper")
+```
+
+### Best Practices
+
+1. **Cache frequently used models** to reduce startup time
+2. **Use appropriate model sizes** for your hardware constraints
+3. **Monitor memory usage** when deploying multiple models
+4. **Implement proper error handling** for production deployments
+5. **Regularly update models** to benefit from improvements
+6. **Use model validation** before deploying to production
+7. **Implement logging and monitoring** for production systems
+
+---
+
+## ⚡ uv Setup Guide
+
+### Performance Benefits
+- **10-100x faster** than pip for dependency resolution
+- **Parallel downloads** for faster installations
+- **Smart caching** - dependencies only downloaded once
+
+### Reliability
+- **Reproducible builds** with lock files
+- **Better dependency resolution** avoids conflicts
+- **Atomic operations** - no partial installs
+
+### Modern Python Packaging
+- **pyproject.toml** as the single source of truth
+- **Built-in tools** for linting, formatting, testing
+- **Virtual environment management** built-in
+
+### Available Commands
+
+```bash
+# Package management
+uv pip install -e .                    # Install in development mode
+uv pip install -e ".[dev]"            # Install with dev dependencies
+uv pip install -e ".[web]"            # Install with web UI support
+uv pip install -e ".[tts]"            # Install with advanced TTS support
+uv pip install -e ".[gpu]"            # Install with GPU support
+uv venv                               # Create virtual environment
+uv sync                               # Sync dependencies
+
+# Development tools
+uv run pytest                         # Run tests
+uv run ruff check localkin_service_audio/        # Lint code
+uv run ruff format localkin_service_audio/       # Format code
+uv run mypy localkin_service_audio/              # Type check
+```
+
+### Why uv?
+
+#### Before (pip):
+```bash
+pip install -r requirements.txt  # Slow, potential conflicts
+pip install -e .                # Manual dependency management
+```
+
+#### After (uv):
+```bash
+uv pip install -e .             # Fast, reliable, conflict-free
+uv sync                        # Perfect dependency resolution
+```
+
+#### Performance Comparison:
+- **Installation**: 10-100x faster
+- **Dependency resolution**: Much more reliable
+- **Caching**: Only download once, reuse everywhere
+
+---
+
+## 📋 Changelog
+
+### [1.0.0] - 2024-12-XX
+
+#### Added
+- 🚀 **REST API Servers**: Run models as complete API services with auto-generated documentation
+- 📦 **Smart Caching**: Automatic model downloads and persistent local storage
+- 🔍 **Process Monitoring**: `kin audio ps` command to monitor running servers
+- 🎯 **Model Transparency**: Detailed model information and statistics in STT/TTS commands
+- 🛠️ **Easy Model Addition**: `kin audio add-model` command with 7 pre-built templates
+- 🎨 **Multiple Model Support**: Run STT and TTS models simultaneously on different ports
+- 📊 **Status Indicators**: Real-time model status with emoji indicators
+- ⚡ **Fast Package Management**: uv integration for quick installs
+- 🌐 **Hugging Face Integration**: Direct integration with HF Hub for model management
+- 🎵 **XTTS v2 Support**: High-quality multilingual voice cloning TTS
+- 🌐 **Modern Web Interface**: Beautiful, responsive web UI for easy audio processing
+
+#### Supported Models
+- **STT Models**: OpenAI Whisper (multiple sizes), faster-whisper, Hugging Face transformers
+- **TTS Models**: Microsoft SpeechT5, Suno Bark, HexGrad Kokoro, Coqui XTTS v2, native OS TTS
+- **API Server Support**: All Hugging Face models can be run as REST APIs
+
+#### Features
+- **Auto-Pull**: Models download automatically when needed
+- **Interactive Documentation**: Auto-generated API docs at `/docs`
+- **Batch Processing**: Process multiple audio files
+- **Audio Format Support**: WAV, MP3, M4A, FLAC, OGG
+- **GPU Acceleration**: CUDA, MPS, and CPU support
+- **Cross-Platform**: macOS, Linux, Windows
+- **Voice Cloning**: XTTS v2 with multilingual support
+
+### [0.1.0] - 2024-01-XX
+
+#### Added
+- Initial release with basic STT and TTS functionality
+- Local Whisper model support
+- Native OS TTS integration
+- Basic CLI interface
+
+---
+
+**🎉 Ready to get started with local audio AI?** Install LocalKin Service Audio and choose your preferred interface! 🎵✨
+
+```bash
+# Option 1: Web Interface (Recommended for beginners)
+kin web
+# 🌐 Open http://localhost:8080 in your browser
+
+# Option 2: API Server
 kin audio run whisper-tiny-hf --port 8000
 # 🚀 API server ready at http://localhost:8000
+
+# Option 3: CLI Commands
+kin audio transcribe audio.wav
+# 📝 Direct transcription to terminal
 ```

@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}LocalKin Service Audio - Transcribe Audio{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="fas fa-microphone text-primary me-2"></i>
+                        Speech-to-Text Transcription
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- File Upload -->
+                    <div class="mb-4">
+                        <label for="audioFile" class="form-label">
+                            <strong>Choose Audio File</strong>
+                        </label>
+                        <input type="file" class="form-control" id="audioFile" accept="audio/*" required>
+                        <div class="form-text">
+                            Supported formats: WAV, MP3, M4A, FLAC, OGG (max 50MB)
+                        </div>
+                    </div>
+
+                    <!-- Model Selection -->
+                    <div class="mb-4">
+                        <label for="modelSelect" class="form-label">
+                            <strong>Select Model</strong>
+                        </label>
+                        <select class="form-select" id="modelSelect">
+                            {% for model in models %}
+                            <option value="{{ model.name }}" {% if loop.first %}selected{% endif %}>
+                                {{ model.name }} - {{ model.description }}
+                                {% if model.size_mb %}({{ model.size_mb }}MB){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">
+                            Choose a model based on speed vs. accuracy trade-off
+                        </div>
+                    </div>
+
+                    <!-- Transcribe Button -->
+                    <div class="d-grid mb-4">
+                        <button type="button" class="btn btn-primary btn-lg" id="transcribeBtn" disabled>
+                            <i class="fas fa-play me-2"></i>
+                            Start Transcription
+                        </button>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="mb-4" id="progressContainer" style="display: none;">
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                 role="progressbar" style="width: 0%" id="progressBar"></div>
+                        </div>
+                        <div class="text-center mt-2">
+                            <small class="text-muted" id="progressText">Preparing...</small>
+                        </div>
+                    </div>
+
+                    <!-- Results -->
+                    <div id="resultsContainer" style="display: none;">
+                        <div class="card border-success">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    Transcription Complete
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <small class="text-muted">Model Used</small>
+                                        <div id="resultModel">-</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <small class="text-muted">Detected Language</small>
+                                        <div id="resultLanguage">-</div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <small class="text-muted">Confidence</small>
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar bg-info" role="progressbar"
+                                             style="width: 0%" id="confidenceBar"></div>
+                                    </div>
+                                    <small class="text-muted" id="confidenceText">-</small>
+                                </div>
+
+                                <div class="mb-3">
+                                    <small class="text-muted">Transcription Result</small>
+                                    <div class="border rounded p-3 bg-light">
+                                        <div id="transcriptionText" class="mb-0">-</div>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-outline-secondary btn-sm" onclick="copyToClipboard()">
+                                        <i class="fas fa-copy me-1"></i>Copy Text
+                                    </button>
+                                    <button class="btn btn-outline-primary btn-sm" onclick="downloadText()">
+                                        <i class="fas fa-download me-1"></i>Download TXT
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Error Alert -->
+                    <div class="alert alert-danger" id="errorAlert" style="display: none;" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <span id="errorMessage"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tips -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-lightbulb text-warning me-2"></i>
+                        Tips for Better Results
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ul class="small mb-0">
+                        <li>Use clear, high-quality audio recordings</li>
+                        <li>Speak clearly and at a normal pace</li>
+                        <li>Reduce background noise when possible</li>
+                        <li>Larger models provide better accuracy but are slower</li>
+                        <li>WAV format generally gives the best results</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/ui/static/js/transcribe.js"></script>
+{% endblock %}

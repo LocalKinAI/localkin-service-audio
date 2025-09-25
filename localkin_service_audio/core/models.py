@@ -130,7 +130,7 @@ def run_ollama_model(model_name, port=8000):
 def run_huggingface_model(model_name: str, port: int = 8000):
     """Runs a Hugging Face model as an API server."""
     try:
-        from .server import run_server
+        from ..api.server import run_server
         from .config import find_model
 
         model_info = find_model(model_name)
@@ -149,7 +149,7 @@ def run_huggingface_model(model_name: str, port: int = 8000):
                 return False
             print("✅ Model pulled successfully!")
 
-        print(f"🚀 Starting OllamaAudio API server for {model_name}")
+        print(f"🚀 Starting LocalKin Service Audio API server for {model_name}")
         print(f"📍 Server will be available at: http://localhost:{port}")
         print(f"📖 API documentation: http://localhost:{port}/docs")
         print("🛑 Press Ctrl+C to stop the server")

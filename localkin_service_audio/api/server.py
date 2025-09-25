@@ -1,5 +1,5 @@
 """
-OllamaAudio API Server for Hugging Face models
+LocalKin Service Audio API Server for Hugging Face models
 """
 
 import os
@@ -10,11 +10,14 @@ from typing import Optional, List, Dict, Any
 import json
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import Response, JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 import uvicorn
 
-from .config import find_model
+from ..core import find_model
+from ..ui import create_ui_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -161,13 +164,73 @@ def load_tts_model(model_name: str):
 
             # Kokoro supports multiple languages - default to English ('a')
             # You can extend this to support other languages
-            pipeline = KPipeline(lang_code='a')  # 'a' for American English
+            # Ensure spaCy model is available
+            import os
+            import sys
+            system_site_packages = '/Users/jackysun/.pyenv/versions/3.10.0/lib/python3.10/site-packages'
+            if system_site_packages not in sys.path:
+                sys.path.insert(0, system_site_packages)
+
+            try:
+                pipeline = KPipeline(lang_code='a')  # 'a' for American English
+            except SystemExit as e:
+                # Handle spaCy download failures (kokoro tries to download en_core_web_sm)
+                if "pip" in str(e).lower() or "spacy" in str(e).lower():
+                    raise RuntimeError(
+                        "Kokoro TTS requires spaCy English model (en_core_web_sm) but it failed to download. "
+                        "Try installing it manually: "
+                        "python -m spacy download en_core_web_sm"
+                    )
+                else:
+                    raise e
+            except Exception as e:
+                if "spacy" in str(e).lower() or "en_core_web_sm" in str(e).lower():
+                    raise RuntimeError(
+                        "Kokoro TTS requires spaCy English model. "
+                        "Install it with: python -m spacy download en_core_web_sm"
+                    )
+                else:
+                    raise e
 
             loaded_models[model_name] = {
                 "type": "kokoro",
                 "pipeline": pipeline,
                 "repo_id": repo_id,
                 "lang_code": 'a'  # Default language
+            }
+
+        elif model_name == "xtts-v2":
+            # XTTS specific loading
+            try:
+                from TTS.api import TTS
+                import os
+                import torch
+            except ImportError:
+                raise ImportError("TTS package is required for XTTS models. Install with: pip install TTS")
+
+            # Set environment variable to auto-accept license
+            os.environ["COQUI_TOS_AGREED"] = "1"
+
+            # Temporarily monkey patch torch.load to disable weights_only for XTTS loading
+            original_load = torch.load
+            def patched_load(*args, **kwargs):
+                kwargs['weights_only'] = False
+                return original_load(*args, **kwargs)
+
+            torch.load = patched_load
+            try:
+                # Initialize XTTS model
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+                model_path = f"tts_models/multilingual/multi-dataset/xtts_v2"
+                tts = TTS(model_path).to(device)
+            finally:
+                # Restore original torch.load
+                torch.load = original_load
+
+            loaded_models[model_name] = {
+                "type": "xtts",
+                "tts": tts,
+                "repo_id": repo_id
             }
 
         else:
@@ -195,7 +258,7 @@ def load_tts_model(model_name: str):
 def create_app(model_name: str) -> FastAPI:
     """Create FastAPI application for the specified model."""
     app = FastAPI(
-        title=f"OllamaAudio - {model_name} API",
+        title=f"LocalKin Service Audio - {model_name} API",
         description=f"API server for {model_name} model",
         version="1.0.0"
     )
@@ -210,7 +273,7 @@ def create_app(model_name: str) -> FastAPI:
     async def root():
         """Root endpoint with API information."""
         return {
-            "name": "OllamaAudio API Server",
+            "name": "LocalKin Service Audio API Server",
             "model": model_name,
             "type": model_type,
             "status": "running",
@@ -332,12 +395,18 @@ def create_app(model_name: str) -> FastAPI:
                         # Save to file
                         torchaudio.save(output_path, speech, 16000)
 
-                        # Clean up in background
-                        background_tasks.add_task(os.unlink, output_path)
+                        # Read the audio file and return it directly
+                        with open(output_path, 'rb') as f:
+                            audio_data = f.read()
 
-                        return TTSResponse(
-                            audio_path=output_path,
-                            duration=len(speech) / 16000.0
+                        # Clean up the temp file
+                        os.unlink(output_path)
+
+                        # Return audio file directly
+                        return Response(
+                            content=audio_data,
+                            media_type="audio/wav",
+                            headers={"Content-Disposition": "attachment; filename=speech.wav"}
                         )
 
                     elif model_data["type"] == "kokoro":
@@ -370,12 +439,76 @@ def create_app(model_name: str) -> FastAPI:
                         # Save to WAV file
                         sf.write(output_path, final_audio, 24000)  # Kokoro uses 24kHz
 
-                        # Clean up in background
-                        background_tasks.add_task(os.unlink, output_path)
+                        # Read the audio file and return it directly
+                        with open(output_path, 'rb') as f:
+                            audio_data = f.read()
 
-                        return TTSResponse(
-                            audio_path=output_path,
-                            duration=len(final_audio) / 24000.0 if len(final_audio) > 0 else 0.0
+                        # Clean up the temp file
+                        os.unlink(output_path)
+
+                        # Return audio file directly
+                        return Response(
+                            content=audio_data,
+                            media_type="audio/wav",
+                            headers={"Content-Disposition": "attachment; filename=speech.wav"}
+                        )
+
+                    elif model_data["type"] == "xtts":
+                        # XTTS specific implementation
+                        tts = model_data["tts"]
+
+                        # Generate speech
+                        output_path_temp = tempfile.mktemp(suffix=".wav")
+                        # Use default speaker and language for XTTS v2
+                        # XTTS v2 uses specific speaker names - try different ones
+                        try:
+                            # Try with a common XTTS speaker name
+                            tts.tts_to_file(
+                                text=request.text,
+                                file_path=output_path_temp,
+                                speaker="Claribel Dervla",  # Known XTTS speaker
+                                language="en"
+                            )
+                        except Exception as e:
+                            if "speaker" in str(e).lower():
+                                # If speaker fails, try without speaker (may use default)
+                                try:
+                                    tts.tts_to_file(
+                                        text=request.text,
+                                        file_path=output_path_temp,
+                                        language="en"
+                                    )
+                                except Exception as e2:
+                                    # Last resort - check available speakers
+                                    try:
+                                        speakers = getattr(tts, 'speakers', None) or getattr(tts.tts_model, 'speakers', None)
+                                        if speakers:
+                                            speaker_name = list(speakers.keys())[0] if speakers else "en_0"
+                                        else:
+                                            speaker_name = "en_0"
+                                        tts.tts_to_file(
+                                            text=request.text,
+                                            file_path=output_path_temp,
+                                            speaker=speaker_name,
+                                            language="en"
+                                        )
+                                    except Exception as e3:
+                                        raise RuntimeError(f"All XTTS speaker combinations failed. Last error: {str(e3)}")
+                            else:
+                                raise e
+
+                        # Read the audio file and return it directly
+                        with open(output_path_temp, 'rb') as f:
+                            audio_data = f.read()
+
+                        # Clean up the temp file
+                        os.unlink(output_path_temp)
+
+                        # Return audio file directly
+                        return Response(
+                            content=audio_data,
+                            media_type="audio/wav",
+                            headers={"Content-Disposition": "attachment; filename=speech.wav"}
                         )
 
                     elif model_data["type"] == "bark":
@@ -420,12 +553,26 @@ def create_app(model_name: str) -> FastAPI:
             "type": model_type
         }
 
+    # Include UI routes if available
+    try:
+        ui_router = create_ui_router()
+        app.include_router(ui_router, prefix="", tags=["ui"])
+
+        # Mount static files for UI
+        ui_static_path = Path(__file__).parent.parent / "ui" / "static"
+        if ui_static_path.exists():
+            app.mount("/ui/static", StaticFiles(directory=str(ui_static_path)), name="ui-static")
+
+        logger.info("🌐 Web UI routes enabled")
+    except ImportError:
+        logger.info("ℹ️  Web UI not available (ui module not found)")
+
     return app
 
 def run_server(model_name: str, host: str = "0.0.0.0", port: int = 8000):
     """Run the API server for the specified model."""
     try:
-        logger.info(f"🚀 Starting OllamaAudio API server for {model_name}")
+        logger.info(f"🚀 Starting LocalKin Service Audio API server for {model_name}")
         logger.info(f"📍 Server will be available at: http://{host}:{port}")
         logger.info(f"📖 API documentation: http://{host}:{port}/docs")
 

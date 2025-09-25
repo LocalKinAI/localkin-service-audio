@@ -1,0 +1,379 @@
+{
+  "models": [
+    {
+      "name": "whisper",
+      "type": "stt",
+      "description": "OpenAI Whisper with auto faster-whisper. Size: tiny/base/small/medium/large",
+      "source": "openai-whisper",
+      "sizes": [
+        "tiny",
+        "base",
+        "small",
+        "medium",
+        "large"
+      ],
+      "default_size": "base",
+      "license": "MIT",
+      "requirements": [
+        "openai-whisper",
+        "faster-whisper"
+      ],
+      "engines": ["openai", "faster"],
+      "tags": [
+        "auto-select",
+        "backward-compatible"
+      ]
+    },
+    {
+      "name": "faster-whisper-tiny",
+      "type": "stt",
+      "description": "Fast Whisper Tiny - 4x faster, smallest size",
+      "source": "faster-whisper",
+      "license": "MIT",
+      "size_mb": 39,
+      "requirements": [
+        "faster-whisper",
+        "ctranslate2"
+      ],
+      "engines": ["faster"],
+      "tags": [
+        "fast",
+        "tiny",
+        "optimized",
+        "gpu-support"
+      ]
+    },
+    {
+      "name": "faster-whisper-base",
+      "type": "stt",
+      "description": "Fast Whisper Base - 4x faster, good balance",
+      "source": "faster-whisper",
+      "license": "MIT",
+      "size_mb": 74,
+      "requirements": [
+        "faster-whisper",
+        "ctranslate2"
+      ],
+      "engines": ["faster"],
+      "tags": [
+        "fast",
+        "base",
+        "optimized",
+        "gpu-support"
+      ]
+    },
+    {
+      "name": "faster-whisper-small",
+      "type": "stt",
+      "description": "Fast Whisper Small - 4x faster, high quality",
+      "source": "faster-whisper",
+      "license": "MIT",
+      "size_mb": 244,
+      "requirements": [
+        "faster-whisper",
+        "ctranslate2"
+      ],
+      "engines": ["faster"],
+      "tags": [
+        "fast",
+        "small",
+        "optimized",
+        "gpu-support"
+      ]
+    },
+    {
+      "name": "faster-whisper-medium",
+      "type": "stt",
+      "description": "Fast Whisper Medium - 4x faster, very high quality",
+      "source": "faster-whisper",
+      "license": "MIT",
+      "size_mb": 769,
+      "requirements": [
+        "faster-whisper",
+        "ctranslate2"
+      ],
+      "engines": ["faster"],
+      "tags": [
+        "fast",
+        "medium",
+        "optimized",
+        "gpu-support"
+      ]
+    },
+    {
+      "name": "faster-whisper-large-v2",
+      "type": "stt",
+      "description": "Fast Whisper Large v2 - 4x faster, excellent quality",
+      "source": "faster-whisper",
+      "license": "MIT",
+      "size_mb": 3000,
+      "requirements": [
+        "faster-whisper",
+        "ctranslate2"
+      ],
+      "engines": ["faster"],
+      "tags": [
+        "fast",
+        "large",
+        "high-quality",
+        "optimized",
+        "gpu-support"
+      ]
+    },
+    {
+      "name": "faster-whisper-large-v3",
+      "type": "stt",
+      "description": "Fast Whisper Large v3 - 4x faster, best quality",
+      "source": "faster-whisper",
+      "license": "MIT",
+      "size_mb": 3000,
+      "requirements": [
+        "faster-whisper",
+        "ctranslate2"
+      ],
+      "engines": ["faster"],
+      "tags": [
+        "fast",
+        "large",
+        "high-quality",
+        "latest",
+        "optimized",
+        "gpu-support"
+      ]
+    },
+    {
+      "name": "faster-whisper-turbo",
+      "type": "stt",
+      "description": "Fast Whisper Turbo - fastest, optimized for speed",
+      "source": "faster-whisper",
+      "license": "MIT",
+      "size_mb": 1500,
+      "requirements": [
+        "faster-whisper",
+        "ctranslate2"
+      ],
+      "engines": ["faster"],
+      "tags": [
+        "fastest",
+        "turbo",
+        "optimized",
+        "gpu-support"
+      ]
+    },
+    {
+      "name": "faster-whisper-distil-large-v3",
+      "type": "stt",
+      "description": "Distil-Whisper Large v3 - balanced speed and quality",
+      "source": "faster-whisper",
+      "license": "MIT",
+      "size_mb": 1500,
+      "requirements": [
+        "faster-whisper",
+        "ctranslate2"
+      ],
+      "engines": ["faster"],
+      "tags": [
+        "distilled",
+        "balanced",
+        "high-quality",
+        "optimized",
+        "gpu-support"
+      ]
+    },
+    {
+      "name": "native",
+      "type": "tts",
+      "description": "Native macOS TTS via pyttsx3",
+      "source": "pyttsx3",
+      "license": "MIT",
+      "requirements": [
+        "pyttsx3"
+      ]
+    },
+    {
+      "name": "whisper-tiny-hf",
+      "type": "stt",
+      "description": "Whisper Tiny from Hugging Face",
+      "source": "huggingface",
+      "huggingface_repo": "openai/whisper-tiny",
+      "license": "MIT",
+      "size_mb": 150,
+      "requirements": [
+        "huggingface_hub",
+        "transformers"
+      ],
+      "tags": [
+        "fast",
+        "lightweight",
+        "huggingface"
+      ]
+    },
+    {
+      "name": "whisper-base-hf",
+      "type": "stt",
+      "description": "Whisper Base from Hugging Face",
+      "source": "huggingface",
+      "huggingface_repo": "openai/whisper-base",
+      "license": "MIT",
+      "size_mb": 290,
+      "requirements": [
+        "huggingface_hub",
+        "transformers"
+      ],
+      "tags": [
+        "balanced",
+        "huggingface"
+      ]
+    },
+    {
+      "name": "whisper-large-v2-hf",
+      "type": "stt",
+      "description": "Whisper Large v2 from Hugging Face",
+      "source": "huggingface",
+      "huggingface_repo": "openai/whisper-large-v2",
+      "license": "MIT",
+      "size_mb": 3000,
+      "requirements": [
+        "huggingface_hub",
+        "transformers"
+      ],
+      "tags": [
+        "high-quality",
+        "large",
+        "huggingface"
+      ]
+    },
+    {
+      "name": "speecht5-tts",
+      "type": "tts",
+      "description": "Microsoft SpeechT5 TTS from Hugging Face",
+      "source": "huggingface",
+      "huggingface_repo": "microsoft/speecht5_tts",
+      "license": "MIT",
+      "size_mb": 1300,
+      "requirements": [
+        "huggingface_hub",
+        "transformers",
+        "torch"
+      ],
+      "tags": [
+        "neural",
+        "microsoft",
+        "huggingface"
+      ]
+    },
+    {
+      "name": "bark-small",
+      "type": "tts",
+      "description": "Suno Bark Small TTS from Hugging Face",
+      "source": "huggingface",
+      "huggingface_repo": "suno/bark-small",
+      "license": "MIT",
+      "size_mb": 1600,
+      "requirements": [
+        "huggingface_hub",
+        "transformers",
+        "torch"
+      ],
+      "tags": [
+        "bark",
+        "suno",
+        "neural",
+        "huggingface"
+      ]
+    },
+    {
+      "name": "kokoro-82m",
+      "type": "tts",
+      "description": "HexGrad Kokoro-82M - high-quality neural TTS",
+      "source": "huggingface",
+      "huggingface_repo": "hexgrad/Kokoro-82M",
+      "license": "Apache-2.0",
+      "size_mb": 320,
+      "requirements": [
+        "huggingface_hub",
+        "transformers",
+        "torch",
+        "kokoro"
+      ],
+      "tags": [
+        "kokoro",
+        "hexgrad",
+        "lightweight",
+        "high-quality",
+        "apache",
+        "huggingface"
+      ]
+    },
+    {
+      "name": "mms-tts-eng",
+      "type": "tts",
+      "description": "Meta MMS TTS English - multilingual speech synthesis",
+      "source": "huggingface",
+      "huggingface_repo": "facebook/mms-tts-eng",
+      "license": "MIT",
+      "size_mb": 1200,
+      "requirements": [
+        "huggingface_hub",
+        "transformers",
+        "torch"
+      ],
+      "tags": [
+        "mms",
+        "meta",
+        "multilingual",
+        "huggingface"
+      ]
+    },
+    {
+      "name": "tortoise-tts",
+      "type": "tts",
+      "description": "Tortoise TTS - high-quality multi-speaker synthesis",
+      "source": "huggingface",
+      "huggingface_repo": "JamesKM/tortoise-tts-v2",
+      "license": "Apache-2.0",
+      "size_mb": 4500,
+      "requirements": [
+        "huggingface_hub",
+        "transformers",
+        "torch",
+        "scipy"
+      ],
+      "tags": [
+        "tortoise",
+        "multi-speaker",
+        "high-quality",
+        "huggingface"
+      ]
+    },
+    {
+      "name": "xtts-v2",
+      "type": "tts",
+      "description": "Coqui XTTS v2 - high-quality multilingual voice cloning TTS",
+      "source": "huggingface",
+      "huggingface_repo": "coqui/xtts-v2",
+      "license": "Apache-2.0",
+      "size_mb": 1800,
+      "requirements": [
+        "huggingface_hub",
+        "transformers",
+        "torch",
+        "torchaudio",
+        "scipy"
+      ],
+      "tags": [
+        "xtts",
+        "coqui",
+        "multilingual",
+        "voice-cloning",
+        "high-quality",
+        "huggingface"
+      ]
+    }
+  ],
+  "metadata": {
+    "version": "1.2.0",
+    "last_updated": "2025-01-24",
+    "description": "LocalKin Service Audio model configuration registry"
+  }
+}

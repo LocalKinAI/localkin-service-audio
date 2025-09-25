@@ -5,27 +5,23 @@ from pathlib import Path
 
 # Import from the localkin_service_audio package
 try:
-    from .config import get_models, find_model, save_models_config, get_config_metadata
-    from .models import (
+    from ..core import (
+        get_models, find_model, find_models_by_type, save_models_config, get_config_metadata,
         list_local_models, pull_model, run_ollama_model, run_huggingface_model,
-        get_cache_info, clear_cache
+        get_cache_info, clear_cache, transcribe_audio, synthesize_speech
     )
-    from .stt import transcribe_audio
-    from .tts import synthesize_speech
-    from .model_templates import (
+    from ..templates import (
         get_model_template, list_available_templates, create_model_from_template,
         validate_model_for_huggingface, suggest_similar_models, get_popular_models
     )
 except ImportError:
     # Fallback for direct execution
-    from config import get_models, find_model, save_models_config, get_config_metadata
-    from models import (
-        list_local_models, pull_model, run_ollama_model,
-        get_cache_info, clear_cache
+    from ..core import (
+        get_models, find_model, find_models_by_type, save_models_config, get_config_metadata,
+        list_local_models, pull_model, run_ollama_model, run_huggingface_model,
+        get_cache_info, clear_cache, transcribe_audio, synthesize_speech
     )
-    from stt import transcribe_audio
-    from tts import synthesize_speech
-    from model_templates import (
+    from ..templates import (
         get_model_template, list_available_templates, create_model_from_template,
         validate_model_for_huggingface, suggest_similar_models, get_popular_models
     )
@@ -69,10 +65,15 @@ def handle_list(args):
         print_error("No models found in configuration.")
         return
 
+    # Sort models: STT first, then TTS
+    stt_models = [m for m in supported_models if m.get('type') == 'stt']
+    tts_models = [m for m in supported_models if m.get('type') == 'tts']
+
     print(f"\n{'MODEL':<25} {'TYPE':<6} {'STATUS':<18} {'SOURCE':<15} {'DESCRIPTION'}")
     print("-" * 90)
 
-    for model in supported_models:
+    # Display STT models first
+    for model in stt_models:
         name = model.get('name', 'Unknown')
         model_type = model.get('type', 'N/A')
         source = model.get('source', 'unknown')
@@ -82,12 +83,42 @@ def handle_list(args):
         status = "N/A"
         if source == "ollama":
             status = "✅ Pulled" if any(m.startswith(name) for m in local_ollama_models) else "⬇️  Not Pulled"
-        elif source in ["openai-whisper", "pyttsx3"]:
+        elif source in ["openai-whisper", "pyttsx3", "faster-whisper"]:
             status = "📦 Local Library"
         elif source == "huggingface":
             # Check if model is cached
             try:
-                from .models import get_cache_info
+                from ..core import get_cache_info
+                cache_info = get_cache_info()
+                cached_models = [m["name"] for m in cache_info["cached_models"]]
+                status = "✅ Pulled" if name in cached_models else "⬇️  Not Pulled"
+            except Exception as e:
+                print_warning(f"Cache check failed for {name}: {e}")
+                status = "❓ Unknown"
+
+        print(f"{name:<25} {model_type:<6} {status:<18} {source:<15} {description}")
+
+    # Separator line between STT and TTS
+    if tts_models:
+        print("-" * 90)
+
+    # Display TTS models
+    for model in tts_models:
+        name = model.get('name', 'Unknown')
+        model_type = model.get('type', 'N/A')
+        source = model.get('source', 'unknown')
+        description = model.get('description', 'No description available')
+
+        # Determine status
+        status = "N/A"
+        if source == "ollama":
+            status = "✅ Pulled" if any(m.startswith(name) for m in local_ollama_models) else "⬇️  Not Pulled"
+        elif source in ["openai-whisper", "pyttsx3", "faster-whisper"]:
+            status = "📦 Local Library"
+        elif source == "huggingface":
+            # Check if model is cached
+            try:
+                from ..core import get_cache_info
                 cache_info = get_cache_info()
                 cached_models = [m["name"] for m in cache_info["cached_models"]]
                 status = "✅ Pulled" if name in cached_models else "⬇️  Not Pulled"
@@ -126,15 +157,48 @@ def handle_transcribe(args):
     print_header()
 
     input_file = args.input_file
+    model = getattr(args, 'model', 'whisper')
     model_size = getattr(args, 'model_size', 'base')
+    engine = getattr(args, 'engine', 'auto')
 
     if not os.path.exists(input_file):
         print_error(f"Input file not found: {input_file}")
         return
 
+    # Determine the actual model to use
+    if model != 'whisper':
+        # Specific model name provided (e.g., faster-whisper-tiny)
+        actual_model = model
+        model_display_name = model
+    else:
+        # Default whisper model with size
+        actual_model = model_size
+        model_display_name = f"whisper-{model_size}"
+
     # Show detailed model information
     print_info(f"🎵 Transcribing audio file: {input_file}")
-    print_info(f"🤖 Using Whisper model: {model_size}")
+    print_info(f"🤖 Using model: {model_display_name}")
+
+    # Determine which engine will be used
+    from ..core.audio_processing.stt import get_available_engines
+    engines = get_available_engines()
+
+    # Auto-select engine based on model type
+    if engine == "auto":
+        if model.startswith("faster-whisper") or (engines["faster_whisper"] and actual_model in ["tiny", "base", "small", "medium", "large", "large-v2", "large-v3", "turbo", "distil-large-v3"]):
+            actual_engine = "faster-whisper (auto-selected for speed)"
+        else:
+            actual_engine = "OpenAI Whisper (fallback)"
+    elif engine == "faster":
+        if engines["faster_whisper"]:
+            actual_engine = "faster-whisper"
+        else:
+            print_error("faster-whisper is not available. Install with: pip install faster-whisper")
+            return
+    else:
+        actual_engine = "OpenAI Whisper"
+
+    print_info(f"⚡ Engine: {actual_engine}")
 
     # Get model details
     model_details = {
@@ -142,7 +206,11 @@ def handle_transcribe(args):
         "base": {"size": "74MB", "speed": "16x", "quality": "Good"},
         "small": {"size": "244MB", "speed": "8x", "quality": "High"},
         "medium": {"size": "769MB", "speed": "4x", "quality": "Very High"},
-        "large": {"size": "1550MB", "speed": "1x", "quality": "Excellent"}
+        "large": {"size": "1550MB", "speed": "1x", "quality": "Excellent"},
+        "large-v2": {"size": "3000MB", "speed": "1x", "quality": "Excellent"},
+        "large-v3": {"size": "3000MB", "speed": "1x", "quality": "Excellent"},
+        "turbo": {"size": "1500MB", "speed": "2x", "quality": "Very High"},
+        "distil-large-v3": {"size": "1500MB", "speed": "2x", "quality": "Very High"}
     }
 
     if model_size in model_details:
@@ -154,7 +222,7 @@ def handle_transcribe(args):
     print_info("🔄 Processing audio...")
 
     try:
-        transcription = transcribe_audio(model_size, input_file)
+        transcription = transcribe_audio(actual_model, input_file, engine)
         if transcription.startswith("Error:"):
             print_error(transcription)
         else:
@@ -391,7 +459,7 @@ def handle_tts(args):
 def synthesize_huggingface_tts(model_name: str, text: str, output_path: str = None) -> bool:
     """Synthesize speech using Hugging Face TTS models."""
     try:
-        from .config import find_model
+        from ..core.config import find_model
 
         model_info = find_model(model_name)
         if not model_info or model_info.get("source") != "huggingface":
@@ -439,7 +507,32 @@ def synthesize_huggingface_tts(model_name: str, text: str, output_path: str = No
 
                 def create_pipeline():
                     try:
-                        pipeline_instance[0] = KPipeline(lang_code='a')
+                        import os
+                        from kokoro import KModel
+
+                        # Find the cached model path
+                        cache_base = os.path.expanduser("~/.cache/huggingface/hub/models--hexgrad--Kokoro-82M")
+                        if os.path.exists(cache_base):
+                            # Find the actual snapshot directory
+                            snapshots_dir = os.path.join(cache_base, "snapshots")
+                            if os.path.exists(snapshots_dir):
+                                snapshot_dirs = [d for d in os.listdir(snapshots_dir) if os.path.isdir(os.path.join(snapshots_dir, d))]
+                                if snapshot_dirs:
+                                    snapshot_dir = os.path.join(snapshots_dir, snapshot_dirs[0])
+                                    model_path = os.path.join(snapshot_dir, "kokoro-v1_0.pth")
+                                    config_path = os.path.join(snapshot_dir, "config.json")
+
+                                    if os.path.exists(model_path) and os.path.exists(config_path):
+                                        print_info("📁 Loading cached Kokoro model directly...")
+                                        # Create KModel from local files
+                                        kmodel = KModel(model=model_path, config=config_path)
+                                        pipeline_instance[0] = KPipeline(lang_code='a', model=kmodel)
+                                        pipeline_created[0] = True
+                                        return
+
+                        # Fallback: try normal loading (may download)
+                        print_info("⬇️ Downloading/loading Kokoro model...")
+                        pipeline_instance[0] = KPipeline(lang_code='a', repo_id='hexgrad/Kokoro-82M')
                         pipeline_created[0] = True
                     except Exception as e:
                         creation_error[0] = e
@@ -452,28 +545,38 @@ def synthesize_huggingface_tts(model_name: str, text: str, output_path: str = No
 
                 # Wait for pipeline creation with timeout
                 start_time = time.time()
-                timeout_seconds = 60  # 60 second timeout
+                timeout_seconds = 30  # 30 second timeout - if it takes longer, recommend API server
 
+                print_info("⏳ Loading Kokoro model (using cached files)...")
                 while not pipeline_created[0] and (time.time() - start_time) < timeout_seconds:
                     if creation_error[0]:
                         raise creation_error[0]
+                    elapsed = int(time.time() - start_time)
+                    if elapsed % 5 == 0 and elapsed > 0:  # Progress update every 5 seconds
+                        print_info(f"⏳ Still loading... ({elapsed}s)")
                     time.sleep(0.1)
 
                 if not pipeline_created[0]:
                     if creation_error[0]:
                         raise creation_error[0]
                     else:
-                        raise TimeoutError("Pipeline creation timed out")
+                        raise TimeoutError("Kokoro model loading timed out - use API server instead")
 
                 pipeline = pipeline_instance[0]
                 creation_time = time.time() - start_time
                 print_success(f"✅ Kokoro pipeline created successfully in {creation_time:.1f} seconds")
 
             except TimeoutError:
-                print_error("❌ Kokoro pipeline creation timed out")
-                print_warning("The model download may be taking too long")
-                print_info("Try using a different TTS model:")
-                print_info("  uv run kin audio tts 'text' --model native")
+                print_error("❌ Kokoro CLI loading timed out")
+                print_info("💡 For better Kokoro TTS performance, use the API server:")
+                print_info("  uv run kin audio run kokoro-82m --port 8003")
+                print_info("  curl -X POST 'http://localhost:8003/synthesize' \\")
+                print_info("       -H 'Content-Type: application/json' \\")
+                print_info("       -d '{\"text\": \"Hello world\"}' \\")
+                print_info("       --output speech.wav")
+                print_info("")
+                print_info("Alternative: Use native TTS immediately:")
+                print_info("  uv run kin audio tts 'Hello world' --model native")
                 return False
             except Exception as e:
                 print_error(f"❌ Failed to create Kokoro pipeline: {e}")
@@ -700,7 +803,7 @@ def handle_status(args):
 
     # Check cache
     try:
-        from .models import get_cache_info
+        from ..core import get_cache_info
         cache_info = get_cache_info()
         cached_count = len(cache_info["cached_models"])
         if cached_count > 0:
@@ -756,11 +859,11 @@ def handle_ps(args):
     import subprocess
     import socket
 
-    print_info("Checking for running OllamaAudio processes...")
+    print_info("Checking for running LocalKin Service Audio processes...")
 
     running_servers = []
 
-    # Check common ports for OllamaAudio servers
+    # Check common ports for LocalKin Service Audio servers
     common_ports = [8000, 8001, 8002, 8003, 8004, 8005]
 
     for port in common_ports:
@@ -772,11 +875,11 @@ def handle_ps(args):
             sock.close()
 
             if result == 0:
-                # Port is open, check if it's an OllamaAudio server
+                # Port is open, check if it's a LocalKin Service Audio server
                 try:
                     import requests
                     response = requests.get(f"http://localhost:{port}/", timeout=2)
-                    if response.status_code == 200 and "OllamaAudio" in response.text:
+                    if response.status_code == 200 and "LocalKin Service Audio" in response.text:
                         # Try to get model info
                         try:
                             model_response = requests.get(f"http://localhost:{port}/models", timeout=2)
@@ -798,13 +901,13 @@ def handle_ps(args):
                             "url": f"http://localhost:{port}"
                         })
                 except:
-                    # Port is open but not an OllamaAudio server
+                    # Port is open but not a LocalKin Service Audio server
                     continue
         except:
             continue
 
     if running_servers:
-        print_success(f"Found {len(running_servers)} running OllamaAudio server(s):")
+        print_success(f"Found {len(running_servers)} running LocalKin Service Audio server(s):")
         print("\n" + "=" * 80)
         print(f"{'PORT':<8} {'MODEL':<25} {'TYPE':<8} {'URL':<25} {'STATUS'}")
         print("=" * 80)
@@ -826,7 +929,7 @@ def handle_ps(args):
         print("=" * 80)
         print(f"\n💡 Tip: Access interactive API docs at http://localhost:<PORT>/docs")
     else:
-        print_info("No running OllamaAudio servers found.")
+        print_info("No running LocalKin Service Audio servers found.")
         print("💡 Start a server with: kin audio run <model_name> --port <port>")
 
 def handle_add_model(args):
@@ -953,7 +1056,7 @@ def handle_add_model(args):
 def handle_list_templates(args):
     """Handles the 'list-templates' command."""
     print_header()
-    print_success("🎯 Available OllamaAudio Model Templates:")
+    print_success("🎯 Available LocalKin Service Audio Model Templates:")
 
     templates = list_available_templates()
     popular = get_popular_models()
@@ -991,6 +1094,75 @@ def handle_version(args):
     print(f"🎵 LocalKin Service Audio version {__version__}")
     print(f"📍 Location: {Path(__file__).parent.absolute()}")
 
+def handle_web(args):
+    """Handles the 'web' command to launch the web-based user interface."""
+    print_header()
+
+    try:
+        from ..api import create_app
+        from fastapi import FastAPI
+        from fastapi.staticfiles import StaticFiles
+        from fastapi.templating import Jinja2Templates
+        from pathlib import Path
+        import uvicorn
+        import webbrowser
+        import threading
+        import time
+
+        print_info("🚀 Starting LocalKin Service Audio Web Interface...")
+        print_info(f"📍 Web UI will be available at: http://{args.host}:{args.port}")
+
+        # Create a dedicated web UI app
+        app = FastAPI(
+            title="LocalKin Service Audio Web Interface",
+            description="Modern web interface for LocalKin Service Audio processing",
+            version="1.0.0"
+        )
+
+        # Include UI routes
+        try:
+            from ..ui import create_ui_router
+            ui_router = create_ui_router()
+            app.include_router(ui_router, prefix="", tags=["ui"])
+
+            # Mount static files
+            ui_static_path = Path(__file__).parent.parent / "ui" / "static"
+            if ui_static_path.exists():
+                app.mount("/ui/static", StaticFiles(directory=str(ui_static_path)), name="ui-static")
+
+        except ImportError:
+            print_warning("Web UI components not available, running basic interface")
+
+        # Open browser after a short delay
+        def open_browser():
+            time.sleep(2)
+            try:
+                webbrowser.open(f"http://{args.host}:{args.port}")
+            except:
+                pass  # Silently fail if browser can't be opened
+
+        # Start browser opener in background
+        browser_thread = threading.Thread(target=open_browser, daemon=True)
+        browser_thread.start()
+
+        print_info("🌐 Web interface starting up...")
+        print_info("💡 Use Ctrl+C to stop the server")
+
+        # Start the server
+        uvicorn.run(
+            app,
+            host=args.host,
+            port=args.port,
+            log_level="info"
+        )
+
+    except ImportError as e:
+        print_error(f"Failed to import required modules: {e}")
+        print_error("Make sure you have installed LocalKin Service Audio with web dependencies:")
+        print_error("  uv sync --extra web")
+    except Exception as e:
+        print_error(f"Failed to start web interface: {e}")
+
 def main():
     parser = argparse.ArgumentParser(
         description="🎵 LocalKin Service Audio - Local STT & TTS Model Manager",
@@ -1000,6 +1172,10 @@ Examples:
   kin audio listen                    # Start real-time STT/TTS loop
   kin audio transcribe audio.wav      # Transcribe a single audio file
   kin audio transcribe audio.wav --model_size large  # Use specific model size
+
+Web Interface:
+  kin web                             # Launch web-based user interface
+  kin web --port 3000                 # Launch on specific port
 
 Model Management:
   kin audio models                    # List all available models
@@ -1020,6 +1196,12 @@ Model Management:
     parser_audio = subparsers.add_parser("audio", help="Audio processing commands")
     audio_subparsers = parser_audio.add_subparsers(dest="audio_command", help="Audio subcommands")
 
+    # Web UI command
+    parser_web = subparsers.add_parser("web", help="Launch web-based user interface")
+    parser_web.add_argument("--host", default="0.0.0.0", help="Host to bind the web server to")
+    parser_web.add_argument("--port", "-p", type=int, default=8080, help="Port for the web interface")
+    parser_web.set_defaults(func=handle_web)
+
     # Listen command (real-time STT/TTS loop)
     parser_listen = audio_subparsers.add_parser("listen", help="Start real-time STT/TTS loop")
     parser_listen.add_argument("--model", "-m", default="whisper", help="The STT model to use.")
@@ -1032,6 +1214,8 @@ Model Management:
     parser_transcribe.add_argument("input_file", help="Path to the audio file to transcribe.")
     parser_transcribe.add_argument("--model", "-m", default="whisper", help="The STT model to use.")
     parser_transcribe.add_argument("--model_size", default="base", help="The size of the Whisper model to use.")
+    parser_transcribe.add_argument("--engine", choices=["auto", "openai", "faster"], default="auto",
+                                  help="Transcription engine to use: auto (default), openai, or faster.")
     parser_transcribe.set_defaults(func=handle_transcribe)
 
     # Models command

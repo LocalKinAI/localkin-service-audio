@@ -9,10 +9,10 @@ description = "Local Speech-to-Text and Text-to-Speech Model Manager"
 readme = "localkin_service_audio/README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "OllamaAudio Team", email = "info@ollamaaudio.dev"},
+    {name = "LocalKin Team", email = "info@localkin.dev"},
 ]
 maintainers = [
-    {name = "OllamaAudio Team", email = "info@ollamaaudio.dev"},
+    {name = "LocalKin Team", email = "info@localkin.dev"},
 ]
 keywords = [
     "speech-to-text",
@@ -48,6 +48,7 @@ dependencies = [
     "scipy>=1.7.0",
     "numpy>=1.21.0,<1.25.0",  # Constrain numpy for compatibility
     "openai-whisper==20240930",  # Pin specific version
+    "faster-whisper>=1.0.0",    # Fast Whisper implementation with CTranslate2
     "pyttsx3>=2.90",
     "huggingface-hub>=0.17.0",
     "transformers>=4.21.0",
@@ -61,6 +62,7 @@ dependencies = [
     "python-multipart>=0.0.6",
     "llvmlite>=0.41.0",  # Even newer version for Python 3.10+
     "numba>=0.58.0",     # Compatible numba version
+    "ctranslate2>=4.0.0", # Required for faster-whisper
 ]
 
 [project.optional-dependencies]
@@ -77,6 +79,13 @@ docs = [
     "sphinx-rtd-theme>=1.0.0",
     "myst-parser>=0.15.0",
 ]
+web = [
+    "jinja2>=3.0.0",
+    "python-multipart>=0.0.6",  # Already included in main deps
+]
+tts = [
+    "TTS>=0.22.0"
+]
 gpu = [
     "torch>=2.0.0",  # With CUDA support
     "torchaudio>=2.0.0",
@@ -86,11 +95,11 @@ gpu = [
 kin = "localkin_service_audio.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/ollamaaudio/ollamaaudio"
-Documentation = "https://ollamaaudio.readthedocs.io/"
-Repository = "https://github.com/ollamaaudio/ollamaaudio"
-Issues = "https://github.com/ollamaaudio/ollamaaudio/issues"
-Changelog = "https://github.com/ollamaaudio/ollamaaudio/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/LocalKinAI/localkin-service-audio"
+Documentation = "https://localkin-service-audio.readthedocs.io/"
+Repository = "https://github.com/LocalKinAI/localkin-service-audio"
+Issues = "https://github.com/LocalKinAI/localkin-service-audio/issues"
+Changelog = "https://github.com/LocalKinAI/localkin-service-audio/blob/main/CHANGELOG.md"
 
 [tool.setuptools]
 zip-safe = false
@@ -112,6 +121,7 @@ dev-dependencies = [
     "mypy>=0.900",
     "pre-commit>=2.15.0",
     "ruff>=0.1.0",
+    "transformers<4.50",
 ]
 
 [tool.ruff]
