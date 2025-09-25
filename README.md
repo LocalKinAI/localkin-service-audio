@@ -4,9 +4,9 @@
 [![uv](https://img.shields.io/badge/⚡-uv-4c1d95)](https://github.com/astral-sh/uv)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Local Speech-to-Text and Text-to-Speech with LocalKin Service Audio
+## Complete Voice AI Platform: STT, TTS & LLM Integration
 
-**LocalKin Service Audio** simplifies local deployment of **Speech-to-Text (STT)** and **Text-to-Speech (TTS)** models. An intuitive **local audio** tool inspired by **Ollama's** simplicity - perfect for **local audio processing** workflows with both CLI and modern web interface support.
+**LocalKin Service Audio** is a complete **voice AI platform** featuring **Speech-to-Text (STT)**, **Text-to-Speech (TTS)**, and **Large Language Model (LLM) integration**. An intuitive **local audio** tool inspired by **Ollama's** simplicity - perfect for **voice-based conversational AI** with both CLI and modern web interface support.
 
 ---
 
@@ -17,7 +17,11 @@
 - **🎯 Multiple STT Engines**: OpenAI Whisper, faster-whisper, Ollama-based models, and Hugging Face models
 - **🔊 Multiple TTS Engines**: Native OS TTS, Ollama-based conversational models, and SpeechT5/Bark
 - **🌐 REST API Server**: Run models as API servers with automatic endpoints
-- **💻 Modern Web Interface**: Beautiful, responsive web UI for easy audio processing
+- **💻 Modern Web Interface**: Beautiful, responsive web UI with file upload, voice selection, and dynamic model discovery
+- **🤖 LLM Integration**: Voice-based conversational AI with Ollama models for intelligent responses
+- **🎭 Voice Selection**: Multiple voice options for TTS models (Kokoro, XTTS, SpeechT5)
+- **📄 File Upload Support**: Upload text files (.txt, .md, .rtf) for TTS synthesis
+- **🔍 Dynamic API Discovery**: Automatically finds and uses running API servers
 - **📦 Smart Model Management**: Auto-pull models when needed, intelligent caching
 - **💾 Persistent Cache**: Local model storage with size tracking and cleanup
 - **🔄 Auto-Pull**: Models automatically download when running if not cached
@@ -103,9 +107,17 @@ kin audio listen --model faster-whisper-tiny        # Use specific STT model
 kin audio listen --tts                               # Enable TTS with native voice
 kin audio listen --tts --tts-model speecht5-tts     # Enable TTS with lightweight model
 
+# Voice-based Conversational AI with LLM
+kin audio listen --llm ollama                       # LLM responses (text only)
+kin audio listen --llm ollama --tts                 # LLM + voice responses
+kin audio listen --llm ollama --llm-model gemma3:12b --tts --tts-model kokoro-82m  # Custom models
+
 **🎙️ Real-time Listening Features:**
 - **Smart Model Selection**: Choose any STT model (Whisper, faster-whisper variants)
 - **TTS Model Options**: Select from native, Kokoro, SpeechT5, Bark, and more
+- **🎭 Voice Selection**: Multiple voices available for supported TTS models
+- **🤖 LLM Integration**: Voice-based conversational AI with Ollama models
+- **📚 Configurable LLM Models**: Choose from available Ollama models (qwen3, gemma3, deepseek, etc.)
 - **Silence Detection**: Only processes audio with actual speech (reduces false positives)
 - **TTS Cooldown**: 2-second cooldown prevents response spam
 - **API-First Architecture**: Automatically uses running API servers for TTS
@@ -337,12 +349,16 @@ kin web --host 0.0.0.0 --port 8080
 
 **Features:**
 - 🎨 Modern, responsive web interface
+- 📄 **File Upload Support**: Upload text files (.txt, .md, .rtf) for TTS synthesis
+- 🎭 **Voice Selection**: Multiple voice options for Kokoro, XTTS, SpeechT5 models
+- 🔍 **Dynamic API Discovery**: Automatically finds and uses running API servers
 - 📤 Drag & drop file upload for transcription
 - 🔊 Real-time audio playback for generated speech
 - 📊 Live progress tracking and status updates
 - 💾 Automatic file downloads
 - 🎯 Model selection and configuration
 - 🌐 Works on any device with a browser
+- ⚡ **Smart Fallbacks**: API-first with graceful degradation to local processing
 
 ### 🚀 API Server Quick Start
 
@@ -427,9 +443,115 @@ PORT     MODEL                     TYPE     URL                       STATUS
 
 ---
 
+## 🤖 LLM Integration (Voice-Based Conversational AI)
+
+**Transform your voice into intelligent conversations with local LLMs!**
+
+### 🚀 LLM Quick Start
+
+```bash
+# Install and start Ollama
+ollama serve
+
+# Pull a model (choose from available models)
+ollama pull qwen3:14b
+
+# Voice-based conversational AI
+kin audio listen --llm ollama --tts --tts-model kokoro-82m
+```
+
+### 🎯 LLM Features
+
+- **🎙️ Voice Input**: Speak naturally to your AI assistant
+- **🧠 Intelligent Responses**: Powered by local Ollama models
+- **🔊 Voice Output**: AI responses spoken back to you
+- **📚 Model Selection**: Choose from available Ollama models
+- **⚡ Real-time**: Low-latency voice conversations
+- **🔄 Seamless Integration**: Works with existing TTS pipeline
+
+### 📋 LLM Commands
+
+```bash
+# Basic LLM integration (text responses only)
+kin audio listen --llm ollama
+
+# Full voice conversation (LLM + TTS)
+kin audio listen --llm ollama --tts
+
+# Custom LLM model
+kin audio listen --llm ollama --llm-model gemma3:12b
+
+# Complete voice AI setup
+kin audio listen --llm ollama --llm-model qwen3:14b --tts --tts-model kokoro-82m
+```
+
+### 🎭 Available Ollama Models
+
+| Model | Size | Best For | Speed |
+|-------|------|----------|-------|
+| **qwen3:14b** | 14B | General purpose (default) | Fast |
+| **gemma3:12b** | 12B | Google's optimized model | Fast |
+| **deepseek-r1:14b** | 14B | Complex reasoning | Medium |
+| **gpt-oss:20b** | 20B | High-quality responses | Slow |
+
+### 💡 LLM Usage Examples
+
+**Example 1: Voice Math Tutor**
+```
+🎵 You said: What's 15 times 7?
+🤖 Querying Ollama (qwen3:14b)...
+🧠 LLM Response: 15 times 7 equals 105.
+🔊 TTS: 15 times 7 equals 105.
+```
+
+**Example 2: Voice Language Learning**
+```
+🎵 You said: How do you say hello in French?
+🤖 Querying Ollama (gemma3:12b)...
+🧠 LLM Response: Hello in French is "Bonjour".
+🔊 TTS: Hello in French is "Bonjour". (pronounced in French accent)
+```
+
+**Example 3: Voice Coding Assistant**
+```
+🎵 You said: Write a Python function to reverse a string
+🤖 Querying Ollama (deepseek-r1:14b)...
+🧠 LLM Response: Here's a Python function to reverse a string...
+🔊 TTS: Here's a Python function to reverse a string...
+```
+
+### ⚙️ LLM Configuration
+
+| Parameter | Description | Default | Options |
+|-----------|-------------|---------|---------|
+| `--llm` | Enable LLM integration | Disabled | `ollama` |
+| `--llm-model` | Choose Ollama model | `qwen3:14b` | Any installed model |
+| `--tts` | Enable voice responses | Disabled | - |
+| `--tts-model` | TTS model for responses | `native` | kokoro-82m, speecht5-tts, etc. |
+
+### 🎯 Perfect For
+
+- **💬 Voice Assistants**: Natural conversation with AI
+- **📚 Language Learning**: Practice pronunciation and responses
+- **🎓 Tutoring**: Voice-based educational interactions
+- **🎮 Gaming**: Interactive voice NPCs
+- **💼 Presentations**: Voice-controlled demos
+- **♿ Accessibility**: Voice interfaces for various applications
+
+### 🔧 Requirements
+
+- **Ollama**: `ollama serve` running on localhost:11434
+- **Model**: At least one Ollama model installed
+- **Microphone**: For voice input
+- **Speakers**: For voice output (optional)
+
+**The LLM integration transforms LocalKin Service Audio into a complete voice-based AI assistant!** 🎙️🤖🗣️
+
+---
+
 ## 🎯 Supported Models
 
-Choose from **20 state-of-the-art audio processing models** covering the latest in speech technology:
+Choose from **19 state-of-the-art audio processing models** covering the latest in speech technology:
 
 ### 📊 Model Status Overview
 
@@ -1513,8 +1635,13 @@ kin audio status
 - ✅ **Dual STT Engines**: OpenAI Whisper + faster-whisper with automatic engine selection
 - ✅ **8 Faster-Whisper Models**: Individual model entries for all faster-whisper variants
 - ✅ **Enhanced Real-time Listening**: TTS model selection, silence detection, and intelligent caching
+- ✅ **🤖 LLM Integration**: Voice-based conversational AI with Ollama models
+- ✅ **📄 File Upload Support**: Upload text files (.txt, .md, .rtf) for TTS synthesis in web UI
+- ✅ **🎭 Voice Selection**: Multiple voice options for Kokoro, XTTS, SpeechT5 models
+- ✅ **🔍 Dynamic API Discovery**: Automatically finds and uses running API servers
+- ✅ **📚 Configurable LLM Models**: Choose from available Ollama models (qwen3, gemma3, deepseek, etc.)
 - ✅ **REST API Servers**: Run models as complete API services
-- ✅ **Modern Web Interface**: Beautiful, responsive web UI for audio processing
+- ✅ **Modern Web Interface**: Beautiful, responsive web UI with advanced features
 - ✅ **Auto-Pull**: Models download automatically when needed
 - ✅ **Smart Caching**: Persistent local storage with status tracking
 - ✅ **Hugging Face Integration**: Direct integration with HF Hub
@@ -1538,7 +1665,10 @@ kin audio status
 LocalKin Service Audio v1.0 provides a complete audio AI ecosystem:
 
 ### ✅ **Fully Functional Features**
-- **💻 Modern Web Interface**: `kin web` - Beautiful web UI for audio processing
+- **💻 Modern Web Interface**: `kin web` - Beautiful web UI with file upload, voice selection, and dynamic API discovery
+- **🤖 LLM Integration**: `kin audio listen --llm ollama` - Voice-based conversational AI
+- **🎭 Voice Selection**: Multiple voice options for Kokoro, XTTS, SpeechT5 models
+- **📄 File Upload Support**: Upload text files for TTS synthesis in web interface
 - **🔍 Process Monitoring**: `kin audio ps` - See all running servers
 - **🎯 Model Transparency**: STT/TTS commands show detailed model info
 - **🚀 REST API Servers**: Run any model as a web service

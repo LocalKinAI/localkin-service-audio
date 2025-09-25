@@ -364,6 +364,74 @@ def load_tts_model_instance(model_name: str, model_info: dict):
         print_warning(f"Error loading TTS model instance: {e}")
         return None
 
+def query_ollama_llm(text: str, model: str = "qwen3:14b") -> str:
+    """Send text to local Ollama instance and get response."""
+    try:
+        import requests
+        import json
+
+        # Default Ollama endpoint
+        ollama_url = "http://localhost:11434/api/generate"
+
+        # Prepare the prompt
+        prompt = f"User: {text}\n\nAssistant: "
+
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.7,
+                "top_p": 0.9,
+                "num_predict": 150  # Limit response length for real-time
+            }
+        }
+
+        print_info(f"🤖 Querying Ollama ({model})...")
+        response = requests.post(ollama_url, json=payload, timeout=60)
+
+        if response.status_code == 200:
+            result = response.json()
+            llm_response = result.get("response", "").strip()
+            if llm_response:
+                # Clean up the response - try to extract just the final answer
+                import re
+
+                # For models that include thinking, try to extract the final answer
+                # Look for patterns like "The answer is..." or just take the last meaningful sentence
+                if '<think>' in llm_response or 'Let me think' in llm_response:
+                    # Remove thinking sections
+                    llm_response = re.sub(r'<think>.*?</think>', '', llm_response, flags=re.DOTALL).strip()
+
+                    # Try to find the actual answer - look for final sentences
+                    sentences = re.split(r'[.!?]+', llm_response)
+                    # Filter out sentences that are just thinking
+                    meaningful_sentences = [s.strip() for s in sentences if s.strip() and
+                                          not any(word in s.lower() for word in ['think', 'okay', 'first', 'let me'])][:3]
+
+                    if meaningful_sentences:
+                        llm_response = '. '.join(meaningful_sentences) + '.'
+                    else:
+                        # Fallback: take first 200 chars and clean up
+                        llm_response = llm_response.replace('\n', ' ').strip()[:200] + '...'
+
+                print_info(f"🧠 LLM Response: {llm_response[:100]}{'...' if len(llm_response) > 100 else ''}")
+                return llm_response
+            else:
+                print_warning("LLM returned empty response")
+                return f"I heard you say: {text}"
+        else:
+            print_error(f"LLM API error: {response.status_code}")
+            return f"I heard you say: {text}"
+
+    except requests.exceptions.ConnectionError:
+        print_error("Cannot connect to Ollama (is it running on localhost:11434?)")
+        return f"I heard you say: {text}"
+    except Exception as e:
+        print_error(f"LLM query failed: {e}")
+        return f"I heard you say: {text}"
+
+
 def synthesize_speech_with_model(text: str, model_name: str) -> bool:
     """Synthesize speech using the specified TTS model with caching or API server."""
     try:
@@ -555,6 +623,8 @@ def handle_listen(args):
     model_size = getattr(args, 'model_size', 'base')
     enable_tts = getattr(args, 'tts', False)
     tts_model = getattr(args, 'tts_model', 'native')
+    enable_llm = getattr(args, 'llm', None)
+    llm_model = getattr(args, 'llm_model', 'qwen3:14b')
 
     # Determine the actual model to use (same logic as transcribe command)
     if model != 'whisper':
@@ -574,6 +644,15 @@ def handle_listen(args):
         print_info(f"🗣️ Using TTS model: {tts_model}")
     else:
         print_info("🔇 Text-to-speech output disabled (use --tts to enable)")
+
+    if enable_llm:
+        print_info("🤖 LLM integration enabled")
+        print_info(f"🧠 Using LLM provider: {enable_llm}")
+        print_info(f"📚 Using LLM model: {llm_model}")
+        if not enable_tts:
+            print_warning("⚠️ LLM responses will be displayed as text only (enable TTS with --tts for voice responses)")
+    else:
+        print_info("📝 LLM integration disabled (use --llm ollama to enable)")
 
     # Get model details for STT
     model_details = {
@@ -679,20 +758,43 @@ def handle_listen(args):
                         if not transcription.startswith("Error:") and transcription.strip():
                             print(f"🎵 You said: {transcription}")
 
-                            # Generate TTS if enabled and cooldown has passed
+                            # Generate response (LLM or default)
                             current_time = time.time()
-                            if enable_tts and transcription.strip() and (current_time - last_tts_time[0]) > tts_cooldown:
+                            if (enable_tts or enable_llm) and transcription.strip() and (current_time - last_tts_time[0]) > tts_cooldown:
                                 try:
-                                    # Use TTS with selected model
-                                    response_text = f"I heard: {transcription}"
-                                    success = synthesize_speech_with_model(response_text, tts_model)
-                                    if success:
-                                        print(f"🔊 TTS: {response_text}")
-                                        last_tts_time[0] = current_time  # Update cooldown timer
+                                    # Determine response text
+                                    if enable_llm == "ollama":
+                                        # Use LLM to generate response
+                                        response_text = query_ollama_llm(transcription, llm_model)
                                     else:
-                                        print_warning("TTS synthesis failed")
-                                except Exception as tts_e:
-                                    print_warning(f"TTS failed: {tts_e}")
+                                        # Default response
+                                        response_text = f"I heard: {transcription}"
+
+                                    # Generate TTS if enabled
+                                    if enable_tts:
+                                        success = synthesize_speech_with_model(response_text, tts_model)
+                                        if success:
+                                            print(f"🔊 TTS: {response_text}")
+                                            last_tts_time[0] = current_time  # Update cooldown timer
+                                        else:
+                                            print_warning("TTS synthesis failed")
+                                    elif enable_llm:
+                                        # Just display LLM response if TTS is disabled
+                                        print(f"🤖 Response: {response_text}")
+                                        last_tts_time[0] = current_time  # Update cooldown timer
+
+                                except Exception as response_e:
+                                    print_warning(f"Response generation failed: {response_e}")
+                                    # Fallback to basic TTS if available
+                                    if enable_tts:
+                                        try:
+                                            fallback_text = f"I heard: {transcription}"
+                                            success = synthesize_speech_with_model(fallback_text, tts_model)
+                                            if success:
+                                                print(f"🔊 TTS (fallback): {fallback_text}")
+                                                last_tts_time[0] = current_time
+                                        except:
+                                            pass
 
                     except Exception as e:
                         print_warning(f"Transcription failed: {e}")
@@ -1618,6 +1720,8 @@ Model Management:
     parser_listen.add_argument("--model_size", default="base", help="The size of the Whisper model to use.")
     parser_listen.add_argument("--tts", action="store_true", help="Enable text-to-speech output.")
     parser_listen.add_argument("--tts-model", default="native", help="The TTS model to use for speech synthesis.")
+    parser_listen.add_argument("--llm", choices=["ollama"], help="Enable LLM integration (currently supports 'ollama' for local Ollama instance).")
+    parser_listen.add_argument("--llm-model", default="qwen3:14b", help="Ollama model to use for LLM responses (default: qwen3:14b).")
     parser_listen.set_defaults(func=handle_listen)
 
     # Transcribe command
