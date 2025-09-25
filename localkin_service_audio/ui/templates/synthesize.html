@@ -14,16 +14,50 @@
                     </h4>
                 </div>
                 <div class="card-body">
-                    <!-- Text Input -->
+                    <!-- Input Type Toggle -->
                     <div class="mb-4">
+                        <label class="form-label"><strong>Input Type</strong></label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="inputType" id="textInputRadio" autocomplete="off" checked>
+                            <label class="btn btn-outline-primary" for="textInputRadio">
+                                <i class="fas fa-keyboard me-1"></i>Text Input
+                            </label>
+                            <input type="radio" class="btn-check" name="inputType" id="fileInputRadio" autocomplete="off">
+                            <label class="btn btn-outline-primary" for="fileInputRadio">
+                                <i class="fas fa-file-upload me-1"></i>Upload File
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Text Input -->
+                    <div class="mb-4" id="textInputSection">
                         <label for="textInput" class="form-label">
                             <strong>Enter Text to Synthesize</strong>
                         </label>
                         <textarea class="form-control" id="textInput" rows="4"
                                   placeholder="Enter the text you want to convert to speech..."
-                                  maxlength="5000" required></textarea>
+                                  maxlength="10000"></textarea>
                         <div class="form-text">
-                            Maximum 5000 characters. The generated speech will be saved as a WAV file.
+                            Maximum 10000 characters. Supports plain text and basic formatting.
+                        </div>
+                    </div>
+
+                    <!-- File Input -->
+                    <div class="mb-4" id="fileInputSection" style="display: none;">
+                        <label for="fileInput" class="form-label">
+                            <strong>Upload Text File</strong>
+                        </label>
+                        <input type="file" class="form-control" id="fileInput" accept=".txt,.md,.rtf">
+                        <div class="form-text">
+                            Supported formats: .txt, .md, .rtf. Maximum file size: 1MB.
+                        </div>
+                        <div id="fileInfo" class="mt-2" style="display: none;">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                File: <span id="fileName">-</span> |
+                                Size: <span id="fileSize">-</span> |
+                                Characters: <span id="fileChars">-</span>
+                            </small>
                         </div>
                     </div>
 
@@ -45,28 +79,16 @@
                         </div>
                     </div>
 
-                    <!-- Voice Options (if available) -->
+                    <!-- Voice Options (dynamic based on model) -->
                     <div class="mb-4" id="voiceOptions" style="display: none;">
                         <label class="form-label">
                             <strong>Voice Options</strong>
                         </label>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <label for="voiceGender" class="form-label small">Gender</label>
-                                <select class="form-select form-select-sm" id="voiceGender">
-                                    <option value="male">Male</option>
-                                    <option value="female" selected>Female</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="voiceStyle" class="form-label small">Style</label>
-                                <select class="form-select form-select-sm" id="voiceStyle">
-                                    <option value="neutral" selected>Neutral</option>
-                                    <option value="excited">Excited</option>
-                                    <option value="calm">Calm</option>
-                                    <option value="professional">Professional</option>
-                                </select>
-                            </div>
+                        <div id="voiceSelector">
+                            <!-- Voice options will be populated dynamically -->
+                        </div>
+                        <div class="form-text">
+                            Voice selection varies by TTS model. Some models have multiple speakers available.
                         </div>
                     </div>
 
@@ -100,19 +122,29 @@
                             </div>
                             <div class="card-body">
                                 <div class="row mb-3">
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <small class="text-muted">Model Used</small>
                                         <div id="resultModel">-</div>
                                     </div>
+                                    <div class="col-md-4">
+                                        <small class="text-muted">Voice</small>
+                                        <div id="resultVoice">-</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <small class="text-muted">Input Type</small>
+                                        <div id="resultInputType">-</div>
+                                    </div>
+                                </div>
+
+                                <div class="row mb-3">
                                     <div class="col-md-6">
                                         <small class="text-muted">Text Length</small>
                                         <div id="resultTextLength">-</div>
                                     </div>
-                                </div>
-
-                                <div class="mb-3">
-                                    <small class="text-muted">File Size</small>
-                                    <div id="resultFileSize">-</div>
+                                    <div class="col-md-6">
+                                        <small class="text-muted">File Size</small>
+                                        <div id="resultFileSize">-</div>
+                                    </div>
                                 </div>
 
                                 <!-- Audio Player -->
