@@ -108,13 +108,13 @@ kin audio listen --tts --tts-model speecht5-tts     # Enable TTS with lightweigh
 - **TTS Model Options**: Select from native, Kokoro, SpeechT5, Bark, and more
 - **Silence Detection**: Only processes audio with actual speech (reduces false positives)
 - **TTS Cooldown**: 2-second cooldown prevents response spam
-- **Smart Loading**: Lightweight models load at startup, complex models load on-demand
+- **API-First Architecture**: Automatically uses running API servers for TTS
 - **Error Recovery**: Graceful fallback to native TTS if advanced models fail
 - **Automatic Engine Selection**: `faster-whisper-*` models use faster-whisper, others use OpenAI Whisper
 
-**💡 For Complex TTS Models (Kokoro, Bark, XTTS):**
+**💡 API Server Integration:**
 
-### 🚀 **Recommended: Use API Server (Best for Real-time)**
+### 🚀 **Seamless API-First TTS (Recommended)**
 ```bash
 # Start TTS API server (models load once at startup)
 kin audio run kokoro-82m --port 8001
@@ -147,6 +147,14 @@ kin audio listen --tts --tts-model kokoro-82m
 | **CLI Listen** | 2s ⚡ | 30-60s 🐌 | Moderate | Limited ⚠️ |
 
 **🎯 Bottom Line: For real-time TTS applications, always use the API server approach!**
+
+#### 🔍 **How to Identify Which Method is Used**
+When running `kin audio listen --tts --tts-model speecht5-tts`, watch for these indicators:
+
+- **🌐 "Using API server at localhost:8003"** → API server method (fastest)
+- **🔄 "Using cached SpeechT5 model"** → Local cached model (fast)
+- **🔄 "Loading SpeechT5 model locally"** → Local loading (slower first time)
+- **🔄 "API server not running for speecht5-tts"** → Falling back to local synthesis
 
 # Text-to-Speech with native engine
 kin audio tts "Hello, world!"

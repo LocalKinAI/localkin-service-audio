@@ -365,8 +365,16 @@ def load_tts_model_instance(model_name: str, model_info: dict):
         return None
 
 def synthesize_speech_with_model(text: str, model_name: str) -> bool:
-    """Synthesize speech using the specified TTS model with caching."""
+    """Synthesize speech using the specified TTS model with caching or API server."""
     try:
+        # First, try to use API server if available
+        api_success = synthesize_via_api_server(text, model_name)
+        if api_success:
+            return True
+
+        # Fall back to local synthesis
+        print_info(f"🔄 API server not running for {model_name}, using local synthesis...")
+
         # Use cached model if available
         cached_model = get_cached_tts_model(model_name)
         if cached_model is None:
@@ -392,12 +400,15 @@ def synthesize_speech_with_model(text: str, model_name: str) -> bool:
         elif source == 'huggingface':
             # Use cached loaded model for faster synthesis
             if loaded_model and model_type == 'kokoro':
+                print_info(f"🔄 Using cached Kokoro model for {model_name}")
                 return synthesize_with_cached_kokoro(loaded_model, text)
             elif model_type == 'speecht5':
                 # SpeechT5 synthesis (will load model if needed)
+                print_info(f"🔄 Loading SpeechT5 model locally for {model_name}")
                 return synthesize_huggingface_tts(model_name, text)
             else:
                 # Fallback to regular synthesis (will load model each time)
+                print_info(f"🔄 Loading {model_name} model locally")
                 return synthesize_huggingface_tts(model_name, text)
         elif source == 'ollama':
             # Use Ollama TTS models (future implementation)
@@ -413,6 +424,80 @@ def synthesize_speech_with_model(text: str, model_name: str) -> bool:
             return synthesize_speech(text)
         except:
             return False
+
+def synthesize_via_api_server(text: str, model_name: str) -> bool:
+    """Try to synthesize speech via API server if available."""
+    try:
+        # Determine API port based on model
+        port_map = {
+            'kokoro-82m': 8001,
+            'xtts-v2': 8002,
+            'speecht5-tts': 8003,
+            'bark-small': 8004
+        }
+
+        port = port_map.get(model_name)
+        if not port:
+            print_info(f"📝 No API port mapping for {model_name}, will use local synthesis")
+            return False  # No API mapping for this model
+
+        # Check if API server is running
+        import requests
+        health_url = f"http://localhost:{port}/health"
+        try:
+            print_info(f"🔍 Checking API server for {model_name} at localhost:{port}...")
+            response = requests.get(health_url, timeout=1)
+            if response.status_code != 200:
+                print_info(f"📡 API server at port {port} returned status {response.status_code}, using local synthesis")
+                return False
+        except (requests.exceptions.RequestException, requests.exceptions.Timeout):
+            print_info(f"📡 API server at port {port} not responding, using local synthesis")
+            return False
+
+        # API server is available, send synthesis request
+        api_url = f"http://localhost:{port}/synthesize"
+        payload = {"text": text}
+
+        print_info(f"🌐 Using API server at localhost:{port} for {model_name}")
+        response = requests.post(api_url, json=payload, timeout=10)
+
+        if response.status_code == 200:
+            # Save the audio data to a temporary file and play it
+            import tempfile
+            import subprocess
+            import os
+
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
+                temp_filename = temp_file.name
+                temp_file.write(response.content)
+
+            # Play the audio
+            try:
+                if os.name == 'nt':  # Windows
+                    os.startfile(temp_filename)
+                else:  # macOS/Linux
+                    subprocess.run(['afplay' if os.uname().sysname == 'Darwin' else 'aplay', temp_filename],
+                                 capture_output=True)
+                print_info(f"🔊 TTS played via API server (localhost:{port})")
+            except Exception as play_e:
+                print_warning(f"Could not play audio from API: {play_e}")
+                return False
+            finally:
+                # Clean up temporary file
+                try:
+                    os.unlink(temp_filename)
+                except:
+                    pass
+
+            return True
+        else:
+            print_warning(f"API server returned error: {response.status_code}")
+            return False
+
+    except Exception as e:
+        # Log the error but don't print it to avoid spam
+        print_info(f"API call failed for {model_name}, falling back to local synthesis")
+        return False
 
 def synthesize_with_cached_kokoro(pipeline, text: str) -> bool:
     """Synthesize speech using a cached Kokoro pipeline."""
@@ -513,8 +598,8 @@ def handle_listen(args):
         if tts_model == 'native':
             print_info("🗣️ Using native TTS (fast startup)")
         else:
-            print_info(f"🗣️ TTS model {tts_model} will load on first use (for faster startup)")
-            print_info("💡 Tip: Use API server for persistent model loading: kin audio run kokoro-82m --port 8001")
+            print_info(f"🗣️ TTS model {tts_model} will use API server if available")
+            print_info("💡 Tip: Start API server for best performance: kin audio run kokoro-82m --port 8001")
 
     print_info("🎤 Listening... (Press Ctrl+C to stop)")
     print("-" * 60)
