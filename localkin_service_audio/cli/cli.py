@@ -201,6 +201,15 @@ def handle_transcribe(args):
     print_info(f"⚡ Engine: {actual_engine}")
 
     # Get model details
+    # Clean up model name for transcribe_audio function
+    # Remove "faster-whisper-" prefix if present
+    clean_model = actual_model
+    if actual_model.startswith("faster-whisper-"):
+        clean_model = actual_model.replace("faster-whisper-", "")
+
+    # Use clean model for size lookup if it's a faster-whisper model
+    lookup_model = clean_model if actual_model.startswith("faster-whisper-") else model_size
+
     model_details = {
         "tiny": {"size": "39MB", "speed": "32x", "quality": "Basic"},
         "base": {"size": "74MB", "speed": "16x", "quality": "Good"},
@@ -213,16 +222,16 @@ def handle_transcribe(args):
         "distil-large-v3": {"size": "1500MB", "speed": "2x", "quality": "Very High"}
     }
 
-    if model_size in model_details:
-        details = model_details[model_size]
+    if lookup_model in model_details:
+        details = model_details[lookup_model]
         print_info(f"📊 Model details: {details['size']} | {details['speed']} speed | {details['quality']} quality")
     else:
-        print_warning(f"Unknown model size: {model_size}")
+        print_warning(f"Unknown model size: {lookup_model}")
 
     print_info("🔄 Processing audio...")
 
     try:
-        transcription = transcribe_audio(actual_model, input_file, engine)
+        transcription = transcribe_audio(clean_model, input_file, engine)
         if transcription.startswith("Error:"):
             print_error(transcription)
         else:
@@ -241,22 +250,247 @@ def handle_transcribe(args):
         print_error(f"❌ Transcription failed: {e}")
 
 
+# Global TTS model cache for real-time listening
+_tts_model_cache = {}
+
+def get_cached_tts_model(model_name: str):
+    """Get or create a cached TTS model instance with actual loaded model."""
+    if model_name in _tts_model_cache:
+        cached_data = _tts_model_cache[model_name]
+        if isinstance(cached_data, dict) and 'loaded_model' in cached_data:
+            return cached_data
+        elif isinstance(cached_data, dict):
+            # Old format - just metadata, try to load
+            pass
+        else:
+            # Already a loaded instance
+            return cached_data
+
+    try:
+        # Get model information
+        model_info = find_model(model_name)
+        if not model_info:
+            print_warning(f"TTS model '{model_name}' not found, using native TTS")
+            return None
+
+        source = model_info.get('source', 'pyttsx3')
+
+        # For Hugging Face models, load and cache the actual model instance
+        if source == 'huggingface':
+            print_info(f"🔄 Loading TTS model: {model_name}...")
+            try:
+                loaded_instance = load_tts_model_instance(model_name, model_info)
+                if loaded_instance:
+                    _tts_model_cache[model_name] = loaded_instance
+                    print_info(f"✅ TTS model loaded and cached: {model_name}")
+                    return loaded_instance
+                else:
+                    print_warning(f"Failed to load TTS model {model_name}")
+                    return None
+            except Exception as load_e:
+                print_warning(f"Failed to load TTS model {model_name}: {load_e}")
+                return None
+        else:
+            # For native models, no caching needed
+            _tts_model_cache[model_name] = model_info
+            return model_info
+
+    except Exception as e:
+        print_warning(f"Failed to cache TTS model {model_name}: {e}")
+        return None
+
+def load_tts_model_instance(model_name: str, model_info: dict):
+    """Load the actual TTS model instance for caching."""
+    import threading
+    import time
+
+    try:
+        if "kokoro" in model_name.lower():
+            # Load Kokoro model with timeout
+            print_info("🎯 Creating Kokoro pipeline...")
+
+            pipeline_created = [False]
+            pipeline_instance = [None]
+            creation_error = [None]
+
+            def create_pipeline():
+                try:
+                    from kokoro import KPipeline
+                    pipeline = KPipeline(lang_code='a')  # English
+                    pipeline_instance[0] = pipeline
+                    pipeline_created[0] = True
+                except Exception as e:
+                    creation_error[0] = e
+                    pipeline_created[0] = True
+
+            # Start pipeline creation in thread
+            creation_thread = threading.Thread(target=create_pipeline, daemon=True)
+            creation_thread.start()
+
+            # Wait with timeout (30 seconds)
+            timeout = 30
+            start_time = time.time()
+            while not pipeline_created[0] and (time.time() - start_time) < timeout:
+                time.sleep(0.1)
+
+            if pipeline_instance[0]:
+                return {
+                    'model_info': model_info,
+                    'loaded_model': pipeline_instance[0],
+                    'type': 'kokoro'
+                }
+            else:
+                error = creation_error[0] if creation_error[0] else "Timeout loading model"
+                raise Exception(f"Failed to load Kokoro model: {error}")
+
+        elif "speecht5" in model_name.lower():
+            # For SpeechT5, we can load it more quickly
+            # This is a simplified version - actual implementation would load the full model
+            return {
+                'model_info': model_info,
+                'loaded_model': None,  # Will load on demand in synthesize_huggingface_tts
+                'type': 'speecht5'
+            }
+
+        else:
+            # For other models, just cache the info for now
+            return {
+                'model_info': model_info,
+                'loaded_model': None,
+                'type': 'generic'
+            }
+
+    except Exception as e:
+        print_warning(f"Error loading TTS model instance: {e}")
+        return None
+
+def synthesize_speech_with_model(text: str, model_name: str) -> bool:
+    """Synthesize speech using the specified TTS model with caching."""
+    try:
+        # Use cached model if available
+        cached_model = get_cached_tts_model(model_name)
+        if cached_model is None:
+            return synthesize_speech(text)  # Fallback to native
+
+        # Check if it's a loaded model instance
+        if isinstance(cached_model, dict) and 'loaded_model' in cached_model:
+            model_info = cached_model['model_info']
+            loaded_model = cached_model['loaded_model']
+            model_type = cached_model['type']
+            source = model_info.get('source', 'pyttsx3')
+        else:
+            # Fallback to old format
+            model_info = cached_model
+            source = model_info.get('source', 'pyttsx3')
+            loaded_model = None
+            model_type = 'generic'
+
+        # Route to appropriate TTS implementation based on source
+        if source == 'pyttsx3' or model_name == 'native':
+            # Use native OS TTS
+            return synthesize_speech(text)
+        elif source == 'huggingface':
+            # Use cached loaded model for faster synthesis
+            if loaded_model and model_type == 'kokoro':
+                return synthesize_with_cached_kokoro(loaded_model, text)
+            elif model_type == 'speecht5':
+                # SpeechT5 synthesis (will load model if needed)
+                return synthesize_huggingface_tts(model_name, text)
+            else:
+                # Fallback to regular synthesis (will load model each time)
+                return synthesize_huggingface_tts(model_name, text)
+        elif source == 'ollama':
+            # Use Ollama TTS models (future implementation)
+            print_warning("Ollama TTS models not yet implemented for real-time listening.")
+            return synthesize_speech(text)  # Fallback to native
+        else:
+            print_warning(f"Unsupported TTS source: {source}, falling back to native TTS")
+            return synthesize_speech(text)
+
+    except Exception as e:
+        print_warning(f"TTS synthesis failed: {e}, falling back to native TTS")
+        try:
+            return synthesize_speech(text)
+        except:
+            return False
+
+def synthesize_with_cached_kokoro(pipeline, text: str) -> bool:
+    """Synthesize speech using a cached Kokoro pipeline."""
+    try:
+        import soundfile as sf
+        import numpy as np
+        import tempfile
+        import os
+
+        # Generate audio with cached pipeline
+        audio_data, sample_rate = pipeline.generate(text, voice='af_sarah')
+
+        # Save to temporary file and play
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
+            temp_filename = temp_file.name
+
+        # Convert to numpy array if needed
+        if hasattr(audio_data, 'numpy'):
+            audio_array = audio_data.numpy()
+        else:
+            audio_array = np.array(audio_data)
+
+        # Save audio file
+        sf.write(temp_filename, audio_array, sample_rate)
+
+        # Play the audio (this is a simple implementation)
+        # In a real implementation, you'd want to play it asynchronously
+        try:
+            import subprocess
+            if os.name == 'nt':  # Windows
+                os.startfile(temp_filename)
+            else:  # macOS/Linux
+                subprocess.run(['afplay' if os.uname().sysname == 'Darwin' else 'aplay', temp_filename],
+                             capture_output=True)
+        except Exception as play_e:
+            print_warning(f"Could not play audio: {play_e}")
+
+        # Clean up
+        try:
+            os.unlink(temp_filename)
+        except:
+            pass
+
+        return True
+
+    except Exception as e:
+        print_warning(f"Cached Kokoro synthesis failed: {e}")
+        return False
+
 def handle_listen(args):
     """Handles the 'audio listen' command - real-time STT/TTS loop."""
     print_header()
 
+    model = getattr(args, 'model', 'whisper')
     model_size = getattr(args, 'model_size', 'base')
     enable_tts = getattr(args, 'tts', False)
+    tts_model = getattr(args, 'tts_model', 'native')
+
+    # Determine the actual model to use (same logic as transcribe command)
+    if model != 'whisper':
+        # Specific model name provided (e.g., faster-whisper-tiny)
+        actual_model = model
+        model_display_name = model
+    else:
+        # Default whisper model with size
+        actual_model = model_size
+        model_display_name = f"whisper-{model_size}"
 
     print_info("🎧 Starting real-time STT/TTS loop...")
-    print_info(f"🤖 Using Whisper model: {model_size}")
+    print_info(f"🤖 Using STT model: {model_display_name}")
 
     if enable_tts:
         print_info("🔊 Text-to-speech output enabled")
+        print_info(f"🗣️ Using TTS model: {tts_model}")
     else:
         print_info("🔇 Text-to-speech output disabled (use --tts to enable)")
 
-    # Get model details
+    # Get model details for STT
     model_details = {
         "tiny": {"size": "39MB", "speed": "32x", "quality": "Basic"},
         "base": {"size": "74MB", "speed": "16x", "quality": "Good"},
@@ -265,9 +499,22 @@ def handle_listen(args):
         "large": {"size": "1550MB", "speed": "1x", "quality": "Excellent"}
     }
 
-    if model_size in model_details:
-        details = model_details[model_size]
-        print_info(f"📊 Model details: {details['size']} | {details['speed']} speed | {details['quality']} quality")
+    # Handle faster-whisper model names
+    lookup_model = actual_model
+    if actual_model.startswith("faster-whisper-"):
+        lookup_model = actual_model.replace("faster-whisper-", "")
+
+    if lookup_model in model_details:
+        details = model_details[lookup_model]
+        print_info(f"📊 STT Model details: {details['size']} | {details['speed']} speed | {details['quality']} quality")
+
+    # TTS model preparation
+    if enable_tts:
+        if tts_model == 'native':
+            print_info("🗣️ Using native TTS (fast startup)")
+        else:
+            print_info(f"🗣️ TTS model {tts_model} will load on first use (for faster startup)")
+            print_info("💡 Tip: Use API server for persistent model loading: kin audio run kokoro-82m --port 8001")
 
     print_info("🎤 Listening... (Press Ctrl+C to stop)")
     print("-" * 60)
@@ -279,6 +526,15 @@ def handle_listen(args):
         import tempfile
         import time
 
+        # Test audio device access early to fail fast
+        print_info("🔍 Checking audio devices...")
+        try:
+            # This should work in most environments
+            default_input = sd.default.device[0]
+            print_info(f"✅ Audio system ready (default input: {default_input})")
+        except Exception as e:
+            raise RuntimeError(f"Audio system not accessible: {e}")
+
         # Audio recording parameters
         sample_rate = 16000
         channels = 1
@@ -287,6 +543,10 @@ def handle_listen(args):
 
         # Buffer to accumulate audio
         audio_buffer = []
+
+        # TTS cooldown to prevent spam
+        last_tts_time = [0]  # Use list to make it mutable in callback
+        tts_cooldown = 2  # seconds between TTS responses
 
         def audio_callback(indata, frames, time_info, status):
             """Callback function to process audio chunks."""
@@ -302,39 +562,64 @@ def handle_listen(args):
                 chunk = np.array(audio_buffer[:chunk_size], dtype=np.float32)
                 audio_buffer[:] = audio_buffer[chunk_size:]  # Remove processed chunk
 
-                # Save chunk to temporary file
-                with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
-                    temp_filename = temp_file.name
-                    wavfile.write(temp_filename, sample_rate, chunk)
+                # Check if chunk has significant audio (not just silence)
+                # Calculate RMS (Root Mean Square) to detect if there's actual speech
+                rms = np.sqrt(np.mean(chunk**2))
+                silence_threshold = 0.01  # Adjust based on microphone sensitivity
 
-                try:
-                    # Transcribe the chunk
-                    transcription = transcribe_audio(model_size, temp_filename)
+                if rms > silence_threshold:
+                    # Save chunk to temporary file
+                    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
+                        temp_filename = temp_file.name
+                        wavfile.write(temp_filename, sample_rate, chunk)
 
-                    if not transcription.startswith("Error:") and transcription.strip():
-                        print(f"🎵 You said: {transcription}")
-
-                        # Generate TTS if enabled
-                        if enable_tts and transcription.strip():
-                            try:
-                                # Use a simple TTS response
-                                response_text = f"I heard: {transcription}"
-                                success = synthesize_speech(response_text)
-                                if success:
-                                    print(f"🔊 TTS: {response_text}")
-                            except Exception as tts_e:
-                                print_warning(f"TTS failed: {tts_e}")
-
-                except Exception as e:
-                    print_warning(f"Transcription failed: {e}")
-                finally:
-                    # Clean up temp file
                     try:
-                        os.unlink(temp_filename)
-                    except:
-                        pass
+                        # Clean up model name for transcribe_audio function
+                        # Remove "faster-whisper-" prefix if present
+                        clean_model = actual_model
+                        if actual_model.startswith("faster-whisper-"):
+                            clean_model = actual_model.replace("faster-whisper-", "")
+
+                        # Determine engine based on model type
+                        from ..core.audio_processing.stt import get_available_engines
+                        engines = get_available_engines()
+                        if actual_model.startswith("faster-whisper") or (engines["faster_whisper"] and clean_model in ["tiny", "base", "small", "medium", "large", "large-v2", "large-v3", "turbo", "distil-large-v3"]):
+                            engine = "faster"
+                        else:
+                            engine = "openai"
+
+                        # Transcribe the chunk
+                        transcription = transcribe_audio(clean_model, temp_filename, engine)
+
+                        if not transcription.startswith("Error:") and transcription.strip():
+                            print(f"🎵 You said: {transcription}")
+
+                            # Generate TTS if enabled and cooldown has passed
+                            current_time = time.time()
+                            if enable_tts and transcription.strip() and (current_time - last_tts_time[0]) > tts_cooldown:
+                                try:
+                                    # Use TTS with selected model
+                                    response_text = f"I heard: {transcription}"
+                                    success = synthesize_speech_with_model(response_text, tts_model)
+                                    if success:
+                                        print(f"🔊 TTS: {response_text}")
+                                        last_tts_time[0] = current_time  # Update cooldown timer
+                                    else:
+                                        print_warning("TTS synthesis failed")
+                                except Exception as tts_e:
+                                    print_warning(f"TTS failed: {tts_e}")
+
+                    except Exception as e:
+                        print_warning(f"Transcription failed: {e}")
+                    finally:
+                        # Clean up temp file
+                        try:
+                            os.unlink(temp_filename)
+                        except:
+                            pass
 
         # Start audio stream
+        print_info("🎤 Starting audio stream...")
         with sd.InputStream(callback=audio_callback,
                            channels=channels,
                            samplerate=sample_rate,
@@ -352,6 +637,12 @@ def handle_listen(args):
         print_info("Install with: pip install sounddevice scipy")
     except Exception as e:
         print_error(f"❌ Real-time listening failed: {e}")
+        print_info("💡 This might be due to:")
+        print_info("   - No microphone available")
+        print_info("   - Audio permissions not granted")
+        print_info("   - Running in a headless environment")
+        print_info("   - Audio device busy")
+        print_info("Try: 'kin audio transcribe audio.wav' for file-based transcription instead")
 
 def handle_tts(args):
     """Handles the 'tts' command."""
@@ -643,34 +934,68 @@ def synthesize_huggingface_tts(model_name: str, text: str, output_path: str = No
                 import torch
                 import torchaudio
                 import numpy as np
-            except ImportError:
+            except ImportError as ie:
+                print_error(f"SpeechT5 import failed: {ie}")
                 print_error("transformers, torch, and torchaudio are required for SpeechT5 models.")
                 print_info("Install with: pip install transformers torch torchaudio")
                 return False
 
             try:
-                processor = SpeechT5Processor.from_pretrained(repo_id)
-                model = SpeechT5ForTextToSpeech.from_pretrained(repo_id)
-                vocoder = SpeechT5HifiGan.from_pretrained("microsoft/speecht5_hifigan")
+                # Load models with local_files_only=True to avoid network timeouts
+                processor = SpeechT5Processor.from_pretrained(repo_id, local_files_only=True)
+                model = SpeechT5ForTextToSpeech.from_pretrained(repo_id, local_files_only=True)
+                vocoder = SpeechT5HifiGan.from_pretrained("microsoft/speecht5_hifigan", local_files_only=True)
 
                 inputs = processor(text=text, return_tensors="pt")
 
-                # Generate speech
+                # Generate speech with default speaker embeddings
+                # SpeechT5 requires speaker embeddings, using zeros as default
+                import torch
+                speaker_embeddings = torch.zeros(1, 512)  # Default speaker embedding
+
                 with torch.no_grad():
                     speech = model.generate_speech(
                         inputs["input_ids"],
-                        speaker_embeddings=None,  # Use default speaker
+                        speaker_embeddings=speaker_embeddings,
                         vocoder=vocoder
                     )
 
                 if output_path:
-                    # Save to specified file
+                    # Save to specified file (ensure correct tensor dimensions)
+                    if speech.dim() == 1:
+                        speech = speech.unsqueeze(0)  # Add batch dimension
                     torchaudio.save(output_path, speech, 16000)
                 else:
-                    # Play audio directly (would need audio playback library)
-                    print_warning("Direct audio playback not implemented for SpeechT5 models.")
-                    print_info("Please specify an output file with --output")
-                    return False
+                    # Save to temporary file and play (for real-time usage)
+                    import tempfile
+                    import os
+
+                    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
+                        temp_filename = temp_file.name
+
+                    # Ensure correct tensor dimensions
+                    if speech.dim() == 1:
+                        speech = speech.unsqueeze(0)  # Add batch dimension
+
+                    # Save temporary audio file
+                    torchaudio.save(temp_filename, speech, 16000)
+
+                    # Play the audio
+                    try:
+                        import subprocess
+                        if os.name == 'nt':  # Windows
+                            os.startfile(temp_filename)
+                        else:  # macOS/Linux
+                            subprocess.run(['afplay' if os.uname().sysname == 'Darwin' else 'aplay', temp_filename],
+                                         capture_output=True)
+                    except Exception as play_e:
+                        print_warning(f"Could not play audio: {play_e}")
+
+                    # Clean up temporary file
+                    try:
+                        os.unlink(temp_filename)
+                    except:
+                        pass
 
                 return True
 
@@ -1204,9 +1529,10 @@ Model Management:
 
     # Listen command (real-time STT/TTS loop)
     parser_listen = audio_subparsers.add_parser("listen", help="Start real-time STT/TTS loop")
-    parser_listen.add_argument("--model", "-m", default="whisper", help="The STT model to use.")
+    parser_listen.add_argument("--model", "-m", default="whisper", help="The STT model to use (e.g., faster-whisper-tiny).")
     parser_listen.add_argument("--model_size", default="base", help="The size of the Whisper model to use.")
     parser_listen.add_argument("--tts", action="store_true", help="Enable text-to-speech output.")
+    parser_listen.add_argument("--tts-model", default="native", help="The TTS model to use for speech synthesis.")
     parser_listen.set_defaults(func=handle_listen)
 
     # Transcribe command

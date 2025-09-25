@@ -5,3 +5,4 @@ numpy
 openai-whisper
 pyttsx3
 pyobjc
+sentencepiece

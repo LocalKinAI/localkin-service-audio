@@ -46,9 +46,9 @@ dependencies = [
     "requests>=2.25.0",
     "sounddevice>=0.4.0",
     "scipy>=1.7.0",
-    "numpy>=1.21.0,<1.25.0",  # Constrain numpy for compatibility
-    "openai-whisper==20240930",  # Pin specific version
-    "faster-whisper>=1.0.0",    # Fast Whisper implementation with CTranslate2
+    "numpy>=1.21.0,<1.25.0", # Constrain numpy for compatibility
+    "openai-whisper==20240930", # Pin specific version
+    "faster-whisper>=1.0.0", # Fast Whisper implementation with CTranslate2
     "pyttsx3>=2.90",
     "huggingface-hub>=0.17.0",
     "transformers>=4.21.0",
@@ -60,9 +60,10 @@ dependencies = [
     "uvicorn>=0.24.0",
     "pydantic>=2.0.0",
     "python-multipart>=0.0.6",
-    "llvmlite>=0.41.0",  # Even newer version for Python 3.10+
-    "numba>=0.58.0",     # Compatible numba version
+    "llvmlite>=0.41.0", # Even newer version for Python 3.10+
+    "numba>=0.58.0", # Compatible numba version
     "ctranslate2>=4.0.0", # Required for faster-whisper
+    "sentencepiece>=0.2.1",
 ]
 
 [project.optional-dependencies]

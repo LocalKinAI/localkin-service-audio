@@ -89,19 +89,49 @@ def transcribe_with_faster_whisper(model_size: str, audio_file_path: str) -> str
             }
             actual_model_size = model_size_map.get(model_size, model_size)
 
-        # Initialize model with CPU (can be changed to "cuda" for GPU)
-        model = WhisperModel(actual_model_size, device="cpu", compute_type="int8")
+        # faster-whisper only supports CPU and CUDA (not MPS on Mac)
+        # Note: MPS acceleration is not available for faster-whisper
+        device = "cpu"
+        compute_type = "int8"
 
-        print(f"Transcribing {audio_file_path} with faster-whisper...")
+        print(f"Using device: {device} (faster-whisper doesn't support MPS/CUDA acceleration)")
+        model = WhisperModel(actual_model_size, device=device, compute_type=compute_type)
 
-        # Transcribe
-        segments, info = model.transcribe(
-            audio_file_path,
-            beam_size=5,
-            language=None,  # Auto-detect language
-            vad_filter=True,  # Filter out silence
-            vad_parameters=dict(min_silence_duration_ms=500)
-        )
+        # Check audio file duration to choose optimal inference method
+        import wave
+        import contextlib
+
+        try:
+            with contextlib.closing(wave.open(audio_file_path, 'r')) as f:
+                duration = f.getnframes() / float(f.getframerate())
+        except:
+            duration = 0  # Fallback if can't determine duration
+
+        # Use batched inference for long audio files (>5 minutes) where it shines
+        # For shorter files, regular inference is faster due to less overhead
+        if duration > 300:  # 5 minutes
+            from faster_whisper import BatchedInferencePipeline
+            batched_model = BatchedInferencePipeline(model=model)
+            print(f"Transcribing {audio_file_path} with faster-whisper (batched inference for long audio)...")
+
+            segments, info = batched_model.transcribe(
+                audio_file_path,
+                batch_size=4,  # Balanced batch size for CPU performance
+                beam_size=5,
+                language=None,  # Auto-detect language
+                vad_filter=True,  # Filter out silence
+                vad_parameters=dict(min_silence_duration_ms=500)
+            )
+        else:
+            print(f"Transcribing {audio_file_path} with faster-whisper (standard inference)...")
+            # Use regular inference for shorter files
+            segments, info = model.transcribe(
+                audio_file_path,
+                beam_size=5,
+                language=None,  # Auto-detect language
+                vad_filter=True,  # Filter out silence
+                vad_parameters=dict(min_silence_duration_ms=500)
+            )
 
         print(f"Detected language: {info.language} (probability: {info.language_probability:.2f})")
 

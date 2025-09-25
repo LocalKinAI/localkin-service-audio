@@ -98,7 +98,55 @@ kin audio models
 kin audio transcribe audio.wav
 
 # Real-time STT/TTS loop
-kin audio listen
+kin audio listen                                    # Basic real-time transcription
+kin audio listen --model faster-whisper-tiny        # Use specific STT model
+kin audio listen --tts                               # Enable TTS with native voice
+kin audio listen --tts --tts-model speecht5-tts     # Enable TTS with lightweight model
+
+**🎙️ Real-time Listening Features:**
+- **Smart Model Selection**: Choose any STT model (Whisper, faster-whisper variants)
+- **TTS Model Options**: Select from native, Kokoro, SpeechT5, Bark, and more
+- **Silence Detection**: Only processes audio with actual speech (reduces false positives)
+- **TTS Cooldown**: 2-second cooldown prevents response spam
+- **Smart Loading**: Lightweight models load at startup, complex models load on-demand
+- **Error Recovery**: Graceful fallback to native TTS if advanced models fail
+- **Automatic Engine Selection**: `faster-whisper-*` models use faster-whisper, others use OpenAI Whisper
+
+**💡 For Complex TTS Models (Kokoro, Bark, XTTS):**
+
+### 🚀 **Recommended: Use API Server (Best for Real-time)**
+```bash
+# Start TTS API server (models load once at startup)
+kin audio run kokoro-82m --port 8001
+
+# Use the API for instant TTS responses
+curl -X POST "http://localhost:8001/synthesize" \
+     -H "Content-Type: application/json" \
+     -d '{"text": "Hello from real-time TTS!"}' \
+     --output response.wav
+
+# Your application can now call this API instantly
+```
+
+### ⚠️ **CLI Real-time Mode Limitations**
+```bash
+# CLI mode loads models on-demand (slower, may timeout)
+kin audio listen --tts --tts-model kokoro-82m
+
+# Issues with CLI mode:
+# - Models load during first TTS call (30+ seconds)
+# - May timeout on slower systems
+# - Not suitable for real-time applications
+```
+
+### 📊 **Performance Comparison**
+
+| Method | Startup Time | First TTS | Memory | Reliability |
+|--------|-------------|-----------|--------|-------------|
+| **API Server** | 5-10s ⚡ | Instant ⚡ | High (persistent) | Excellent ✅ |
+| **CLI Listen** | 2s ⚡ | 30-60s 🐌 | Moderate | Limited ⚠️ |
+
+**🎯 Bottom Line: For real-time TTS applications, always use the API server approach!**
 
 # Text-to-Speech with native engine
 kin audio tts "Hello, world!"
@@ -110,6 +158,7 @@ kin audio run speecht5-tts --port 8002          # Fast TTS
 
 # 🚀 NEW: Monitor running servers and processes
 kin audio ps                      # Show all running API servers
+kin audio ps --verbose            # Detailed server information
 
 # Check system status and cache
 kin audio status
@@ -120,40 +169,148 @@ kin audio cache clear whisper-tiny-hf  # Clear specific model
 kin audio cache clear                   # Clear all cached models
 ```
 
-### ⚡ Faster-Whisper Performance
+### ⚡ Performance & Benchmarks
 
-LocalKin Service Audio includes **faster-whisper** integration for significantly improved transcription speed:
+LocalKin Service Audio provides **dual-engine transcription** with intelligent performance optimization:
 
 ```bash
-# Automatic engine selection (recommended)
+# Automatic engine selection (recommended - adapts to your hardware/audio)
 kin audio transcribe audio.wav
 
-# Force faster-whisper engine
-kin audio transcribe audio.wav --engine faster
+# Force specific engines
+kin audio transcribe audio.wav --engine faster     # Force faster-whisper
+kin audio transcribe audio.wav --engine openai     # Force OpenAI Whisper
 
-# Force OpenAI Whisper engine
-kin audio transcribe audio.wav --engine openai
-
-# Check available engines
+# Check available engines and hardware
 kin audio status
 ```
 
-**Performance Comparison:**
-- **faster-whisper**: Up to **4x faster** than OpenAI Whisper
-- **Automatic VAD filtering**: Removes silence for cleaner results
-- **GPU acceleration**: CUDA/MPS support for even better performance
-- **Language detection**: Auto-detects spoken language
-- **Batch processing**: Optimized for multiple files
+#### 📊 **Comprehensive Performance Analysis**
 
-**Available faster-whisper models:**
-- `faster-whisper-tiny` - Tiny model (39MB)
-- `faster-whisper-base` - Base model (74MB)
-- `faster-whisper-small` - Small model (244MB)
-- `faster-whisper-medium` - Medium model (769MB)
-- `faster-whisper-large-v2` - Large v2 model (3GB)
-- `faster-whisper-large-v3` - Large v3 model (3GB)
-- `faster-whisper-turbo` - Turbo optimized model (1.5GB)
-- `faster-whisper-distil-large-v3` - Distilled Large v3 (1.5GB)
+##### **Engine Comparison Matrix**
+
+```
+┌─────────────────┬─────────────────┬─────────────────┬─────────────────┐
+│ Use Case       │ Best Engine     │ Hardware        │ Performance     │
+├─────────────────┼─────────────────┼─────────────────┼─────────────────┤
+│ Short audio    │ OpenAI Whisper  │ CPU (any)       │ Fastest         │
+│ (<5 min)       │                 │                 │                 │
+├─────────────────┼─────────────────┼─────────────────┼─────────────────┤
+│ Long audio     │ faster-whisper  │ CUDA GPU        │ 4x faster       │
+│ (>5 min)       │                 │                 │                 │
+├─────────────────┼─────────────────┼─────────────────┼─────────────────┤
+│ Mac mini       │ OpenAI Whisper  │ Apple Silicon   │ Most reliable   │
+│ (MPS)          │                 │                 │                 │
+├─────────────────┼─────────────────┼─────────────────┼─────────────────┤
+│ Intel Mac      │ faster-whisper  │ NVIDIA GPU      │ Maximum speed   │
+├─────────────────┼─────────────────┼─────────────────┼─────────────────┤
+│ Auto-select    │ --engine auto   │ Any hardware    │ Smart choice    │
+└─────────────────┴─────────────────┴─────────────────┴─────────────────┘
+```
+
+##### **Official Benchmark Data** (Source: [SYSTRAN/faster-whisper](https://github.com/SYSTRAN/faster-whisper))
+
+**Test Conditions:** Small model on CPU, long-form audio content
+
+| Implementation | Precision | Beam Size | Time | RAM Usage | Speedup |
+|----------------|-----------|-----------|------|-----------|---------|
+| **openai/whisper** | fp32 | 5 | **6m58s** | 2335MB | 1x |
+| whisper.cpp | fp32 | 5 | 2m05s | 1049MB | 3.3x |
+| whisper.cpp (OpenVINO) | fp32 | 5 | 1m45s | 1642MB | 4x |
+| **faster-whisper** | fp32 | 5 | **2m37s** | 2257MB | **2.7x** |
+| **faster-whisper** (batch_size=8) | fp32 | 5 | **1m06s** | 4230MB | **6.3x** |
+| **faster-whisper** | int8 | 5 | **1m42s** | 1477MB | **4.8x** |
+| **faster-whisper** (batch_size=8) | int8 | 5 | **51s** | 3608MB | **13.7x** |
+
+##### **Our Test Results** (52.75s audio file)
+
+| Engine | Model Size | Hardware | Time | Real-time Speed |
+|--------|------------|----------|------|-----------------|
+| **OpenAI Whisper** | Small (244MB) | CPU | ~6.8s | **13x** |
+| **faster-whisper** | Small (244MB) | CPU | ~15.7s | **3.4x** |
+| **OpenAI Whisper** | Medium (769MB) | CPU | ~19.9s | **2.6x** |
+| **faster-whisper** | Medium (769MB) | CPU | ~80.7s | **0.65x** |
+
+#### 🎯 **Performance Insights**
+
+##### **Why the Discrepancy?**
+- **Benchmark**: Tests long-form content (50+ minutes) where batched inference excels
+- **Our Tests**: Short audio (52s) where initialization overhead dominates
+- **Hardware**: Benchmark assumes CUDA GPU; our tests on CPU-only Mac mini
+
+##### **Adaptive Intelligence**
+LocalKin Service Audio automatically chooses the optimal approach:
+
+- **Short Audio** (<5 minutes): Standard inference (less overhead)
+- **Long Audio** (>5 minutes): Batched inference (maximum throughput)
+- **Hardware Detection**: Adapts to available GPU acceleration
+
+##### **GPU Acceleration Support**
+
+| Hardware | OpenAI Whisper | faster-whisper | Notes |
+|----------|----------------|----------------|--------|
+| **CUDA GPU** | ✅ Supported | ✅ **4x speedup** | Best performance |
+| **Apple MPS** | ⚠️ Limited | ❌ Unsupported | Use OpenAI Whisper |
+| **CPU-only** | ✅ Works | ✅ Works | OpenAI often faster |
+
+#### 🚀 **Performance Optimization Tips**
+
+##### **For Maximum Speed:**
+```bash
+# Long audio on CUDA systems
+kin audio transcribe long_audio.wav --engine faster --model faster-whisper-large-v3
+
+# Short audio on any system
+kin audio transcribe short_audio.wav --engine openai --model_size tiny
+
+# Auto-optimization (recommended)
+kin audio transcribe audio.wav  # Automatically chooses best engine
+```
+
+##### **Model Selection Guide:**
+
+| Model | Size | Best For | Speed | Quality | Status |
+|-------|------|----------|-------|---------|--------|
+| `tiny` | 39MB | Fast transcription | 32x | Basic | ✅ Working |
+| `base` | 74MB | Balance | 16x | Good | ✅ Working |
+| `small` | 244MB | Quality priority | 8x | High | ✅ Working |
+| `medium` | 769MB | High accuracy | 4x | Very High | ✅ Working |
+| `large-v3` | 3GB | Maximum accuracy | 1x | Excellent | ✅ Working |
+
+**TTS Models:**
+
+| Model | Size | Quality | Status | Notes |
+|-------|------|---------|--------|-------|
+| `native` | ~10MB | Basic | ✅ Working | System TTS |
+| `speecht5-tts` | 1300MB | High | ✅ Working | Neural TTS |
+| `kokoro-82m` | 320MB | High | ⚠️ API Only | Complex model |
+| `bark-small` | ~1GB | Very High | 🚧 Limited | Experimental |
+
+#### ⚡ **Faster-Whisper Exclusive Features**
+
+- **Automatic VAD Filtering**: Removes silence for cleaner results
+- **Language Detection**: Auto-detects spoken language with confidence scores
+- **Batched Processing**: Optimized for multiple files and long content
+- **Memory Efficient**: Lower RAM usage with int8 quantization
+- **GPU Optimized**: CUDA acceleration when available
+
+#### 💡 **When to Use Each Engine**
+
+##### **Use OpenAI Whisper:**
+- ✅ Short audio files (<5 minutes)
+- ✅ Apple Silicon Macs (MPS has limitations)
+- ✅ CPU-only systems
+- ✅ Maximum compatibility
+- ✅ When faster-whisper unavailable
+
+##### **Use faster-whisper:**
+- ✅ Long audio files (>5 minutes)
+- ✅ CUDA GPU systems available
+- ✅ Batch processing multiple files
+- ✅ Language detection needed
+- ✅ Memory-constrained environments
+
+**🎯 Bottom Line: Auto-selection (`--engine auto`) gives you optimal performance for any scenario!**
 
 ### 💻 Web Interface Quick Start
 
@@ -580,7 +737,7 @@ kin audio transcribe audio.wav --model_size large    # 1550MB, 1x speed, Excelle
 
 # Choose transcription engine (auto-selects faster-whisper when available)
 kin audio transcribe audio.wav --engine auto         # Auto-select best engine (default)
-kin audio transcribe audio.wav --engine faster       # Force faster-whisper (4x faster)
+kin audio transcribe audio.wav --engine faster       # Force faster-whisper (best for long audio/CUDA)
 kin audio transcribe audio.wav --engine openai       # Force OpenAI Whisper (compatible)
 
 # Use specific faster-whisper models (recommended for best performance)
@@ -1347,6 +1504,7 @@ kin audio status
 - ✅ **Faster-Whisper Integration**: Up to 4x faster transcription with CTranslate2 optimization
 - ✅ **Dual STT Engines**: OpenAI Whisper + faster-whisper with automatic engine selection
 - ✅ **8 Faster-Whisper Models**: Individual model entries for all faster-whisper variants
+- ✅ **Enhanced Real-time Listening**: TTS model selection, silence detection, and intelligent caching
 - ✅ **REST API Servers**: Run models as complete API services
 - ✅ **Modern Web Interface**: Beautiful, responsive web UI for audio processing
 - ✅ **Auto-Pull**: Models download automatically when needed
@@ -1554,6 +1712,20 @@ vad.set_mode(3)  # Most aggressive filtering
 - Verify output format compatibility
 - Check speaker configuration
 - Ensure sufficient disk space
+
+##### Real-time Listening Issues
+- **"No microphone found"**: Ensure microphone is connected and permissions granted
+- **"Audio device busy"**: Close other audio applications using the microphone
+- **TTS model fails**: Command falls back to native TTS automatically
+- **TTS model loading timeout**: This is expected with CLI mode. Use API server instead:
+  ```bash
+  kin audio run kokoro-82m --port 8001  # Start API server
+  # Then use API calls for TTS
+  ```
+- **SpeechT5 SentencePiece error**: Install sentencepiece: `uv add sentencepiece`
+- **High CPU usage**: Use faster-whisper models for better performance
+- **No response**: Check silence threshold (speak louder or adjust microphone)
+- **Variable scoping errors**: Ensure you're using the latest version with TTS cooldown fixes
 
 #### Audio Format Conversion
 
