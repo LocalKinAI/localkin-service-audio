@@ -160,6 +160,7 @@ def handle_transcribe(args):
     model = getattr(args, 'model', 'whisper')
     model_size = getattr(args, 'model_size', 'base')
     engine = getattr(args, 'engine', 'auto')
+    enable_vad = getattr(args, 'vad', True)  # Default to True for transcribe command
 
     if not os.path.exists(input_file):
         print_error(f"Input file not found: {input_file}")
@@ -178,6 +179,12 @@ def handle_transcribe(args):
     # Show detailed model information
     print_info(f"🎵 Transcribing audio file: {input_file}")
     print_info(f"🤖 Using model: {model_display_name}")
+
+    if enable_vad:
+        print_info("🎙️ Voice Activity Detection (VAD) enabled")
+        print_info("🔇 VAD will filter out silence and background noise")
+    else:
+        print_info("🎤 VAD disabled - processing all audio")
 
     # Determine which engine will be used
     from ..core.audio_processing.stt import get_available_engines
@@ -231,7 +238,7 @@ def handle_transcribe(args):
     print_info("🔄 Processing audio...")
 
     try:
-        transcription = transcribe_audio(clean_model, input_file, engine)
+        transcription = transcribe_audio(clean_model, input_file, engine, enable_vad)
         if transcription.startswith("Error:"):
             print_error(transcription)
         else:
@@ -432,66 +439,28 @@ def query_ollama_llm(text: str, model: str = "qwen3:14b") -> str:
         return f"I heard you say: {text}"
 
 
-def synthesize_speech_with_model(text: str, model_name: str) -> bool:
-    """Synthesize speech using the specified TTS model with caching or API server."""
+def synthesize_speech_with_model(text: str, model_name: str, force_api_only: bool = True) -> bool:
+    """Synthesize speech using the specified TTS model with API-first approach."""
     try:
         # First, try to use API server if available
         api_success = synthesize_via_api_server(text, model_name)
         if api_success:
             return True
 
-        # Fall back to local synthesis
-        print_info(f"🔄 API server not running for {model_name}, using local synthesis...")
-
-        # Use cached model if available
-        cached_model = get_cached_tts_model(model_name)
-        if cached_model is None:
-            return synthesize_speech(text)  # Fallback to native
-
-        # Check if it's a loaded model instance
-        if isinstance(cached_model, dict) and 'loaded_model' in cached_model:
-            model_info = cached_model['model_info']
-            loaded_model = cached_model['loaded_model']
-            model_type = cached_model['type']
-            source = model_info.get('source', 'pyttsx3')
-        else:
-            # Fallback to old format
-            model_info = cached_model
-            source = model_info.get('source', 'pyttsx3')
-            loaded_model = None
-            model_type = 'generic'
-
-        # Route to appropriate TTS implementation based on source
-        if source == 'pyttsx3' or model_name == 'native':
-            # Use native OS TTS
+        # Check if this is a native TTS request (allowed to fallback locally)
+        if model_name == 'native' or not force_api_only:
+            # Fall back to local synthesis for native TTS only
+            print_info(f"🔄 API server not running for {model_name}, using local synthesis...")
             return synthesize_speech(text)
-        elif source == 'huggingface':
-            # Use cached loaded model for faster synthesis
-            if loaded_model and model_type == 'kokoro':
-                print_info(f"🔄 Using cached Kokoro model for {model_name}")
-                return synthesize_with_cached_kokoro(loaded_model, text)
-            elif model_type == 'speecht5':
-                # SpeechT5 synthesis (will load model if needed)
-                print_info(f"🔄 Loading SpeechT5 model locally for {model_name}")
-                return synthesize_huggingface_tts(model_name, text)
-            else:
-                # Fallback to regular synthesis (will load model each time)
-                print_info(f"🔄 Loading {model_name} model locally")
-                return synthesize_huggingface_tts(model_name, text)
-        elif source == 'ollama':
-            # Use Ollama TTS models (future implementation)
-            print_warning("Ollama TTS models not yet implemented for real-time listening.")
-            return synthesize_speech(text)  # Fallback to native
-        else:
-            print_warning(f"Unsupported TTS source: {source}, falling back to native TTS")
-            return synthesize_speech(text)
+
+        # For non-native models, report API unavailability instead of loading locally
+        print_error(f"❌ API server not available for {model_name}")
+        print_info(f"💡 Start the API server: kin audio run {model_name} --port 8001")
+        return False
 
     except Exception as e:
-        print_warning(f"TTS synthesis failed: {e}, falling back to native TTS")
-        try:
-            return synthesize_speech(text)
-        except:
-            return False
+        print_error(f"TTS synthesis failed: {e}")
+        return False
 
 def synthesize_via_api_server(text: str, model_name: str) -> bool:
     """Try to synthesize speech via API server if available."""
@@ -625,6 +594,7 @@ def handle_listen(args):
     tts_model = getattr(args, 'tts_model', 'native')
     enable_llm = getattr(args, 'llm', None)
     llm_model = getattr(args, 'llm_model', 'qwen3:14b')
+    enable_vad = getattr(args, 'vad', False)
 
     # Determine the actual model to use (same logic as transcribe command)
     if model != 'whisper':
@@ -653,6 +623,12 @@ def handle_listen(args):
             print_warning("⚠️ LLM responses will be displayed as text only (enable TTS with --tts for voice responses)")
     else:
         print_info("📝 LLM integration disabled (use --llm ollama to enable)")
+
+    if enable_vad:
+        print_info("🎙️ Enhanced VAD (Voice Activity Detection) enabled")
+        print_info("🔇 VAD will filter out silence and background noise for cleaner transcription")
+    else:
+        print_info("🎤 Basic silence detection enabled (use --vad for enhanced VAD with faster-whisper)")
 
     # Get model details for STT
     model_details = {
@@ -712,8 +688,18 @@ def handle_listen(args):
         last_tts_time = [0]  # Use list to make it mutable in callback
         tts_cooldown = 2  # seconds between TTS responses
 
+        # Speech detection state variables
+        speech_buffer = []  # Buffer to accumulate speech chunks
+        silence_counter = 0  # Counter for consecutive silent chunks
+        speech_detected = False  # Flag to track if we're in speech mode
+        min_speech_duration = int(0.5 * sample_rate / chunk_size)  # Minimum 0.5 seconds of speech
+        max_silence_chunks = int(1.0 * sample_rate / chunk_size)  # Allow 1.0 second of silence before processing
+        silence_threshold = 0.03  # Higher threshold for better speech detection
+
         def audio_callback(indata, frames, time_info, status):
-            """Callback function to process audio chunks."""
+            """Callback function to process audio chunks with improved speech detection."""
+            nonlocal speech_buffer, silence_counter, speech_detected
+
             if status:
                 print_warning(f"Audio status: {status}")
 
@@ -721,89 +707,130 @@ def handle_listen(args):
             audio_buffer.extend(indata[:, 0])
 
             # Process when we have enough audio
-            if len(audio_buffer) >= chunk_size:
+            while len(audio_buffer) >= chunk_size:
                 # Extract chunk
                 chunk = np.array(audio_buffer[:chunk_size], dtype=np.float32)
                 audio_buffer[:] = audio_buffer[chunk_size:]  # Remove processed chunk
 
                 # Check if chunk has significant audio (not just silence)
-                # Calculate RMS (Root Mean Square) to detect if there's actual speech
                 rms = np.sqrt(np.mean(chunk**2))
-                silence_threshold = 0.01  # Adjust based on microphone sensitivity
 
                 if rms > silence_threshold:
-                    # Save chunk to temporary file
-                    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
-                        temp_filename = temp_file.name
-                        wavfile.write(temp_filename, sample_rate, chunk)
+                    # Speech detected in this chunk
+                    if not speech_detected:
+                        # Start of speech - reset counters
+                        speech_detected = True
+                        silence_counter = 0
+                        speech_buffer = []
+                        print_info("🎤 Speech detected, listening...")
 
-                    try:
-                        # Clean up model name for transcribe_audio function
-                        # Remove "faster-whisper-" prefix if present
-                        clean_model = actual_model
-                        if actual_model.startswith("faster-whisper-"):
-                            clean_model = actual_model.replace("faster-whisper-", "")
+                    # Add chunk to speech buffer
+                    speech_buffer.append(chunk)
+                    silence_counter = 0  # Reset silence counter
 
-                        # Determine engine based on model type
-                        from ..core.audio_processing.stt import get_available_engines
-                        engines = get_available_engines()
-                        if actual_model.startswith("faster-whisper") or (engines["faster_whisper"] and clean_model in ["tiny", "base", "small", "medium", "large", "large-v2", "large-v3", "turbo", "distil-large-v3"]):
-                            engine = "faster"
-                        else:
-                            engine = "openai"
+                elif speech_detected:
+                    # We're in speech mode but this chunk is silent
+                    silence_counter += 1
+                    speech_buffer.append(chunk)  # Still add to buffer (trailing silence)
 
-                        # Transcribe the chunk
-                        transcription = transcribe_audio(clean_model, temp_filename, engine)
+                    # Check if we've had enough silence to consider speech complete
+                    if silence_counter >= max_silence_chunks and len(speech_buffer) >= min_speech_duration:
+                        # Process the accumulated speech
+                        process_speech_buffer()
 
-                        if not transcription.startswith("Error:") and transcription.strip():
-                            print(f"🎵 You said: {transcription}")
+                # If speech buffer gets too large, process it anyway (failsafe)
+                if len(speech_buffer) > int(10 * sample_rate / chunk_size):  # 10 seconds max
+                    if speech_detected:
+                        print_info("⏰ Speech buffer full, processing...")
+                        process_speech_buffer()
 
-                            # Generate response (LLM or default)
-                            current_time = time.time()
-                            if (enable_tts or enable_llm) and transcription.strip() and (current_time - last_tts_time[0]) > tts_cooldown:
-                                try:
-                                    # Determine response text
-                                    if enable_llm == "ollama":
-                                        # Use LLM to generate response
-                                        response_text = query_ollama_llm(transcription, llm_model)
-                                    else:
-                                        # Default response
-                                        response_text = f"I heard: {transcription}"
+        def process_speech_buffer():
+            """Process the accumulated speech buffer."""
+            nonlocal speech_buffer, speech_detected, silence_counter
 
-                                    # Generate TTS if enabled
-                                    if enable_tts:
-                                        success = synthesize_speech_with_model(response_text, tts_model)
-                                        if success:
-                                            print(f"🔊 TTS: {response_text}")
-                                            last_tts_time[0] = current_time  # Update cooldown timer
-                                        else:
-                                            print_warning("TTS synthesis failed")
-                                    elif enable_llm:
-                                        # Just display LLM response if TTS is disabled
-                                        print(f"🤖 Response: {response_text}")
-                                        last_tts_time[0] = current_time  # Update cooldown timer
+            if not speech_buffer:
+                return
 
-                                except Exception as response_e:
-                                    print_warning(f"Response generation failed: {response_e}")
-                                    # Fallback to basic TTS if available
-                                    if enable_tts:
-                                        try:
-                                            fallback_text = f"I heard: {transcription}"
-                                            success = synthesize_speech_with_model(fallback_text, tts_model)
-                                            if success:
-                                                print(f"🔊 TTS (fallback): {fallback_text}")
-                                                last_tts_time[0] = current_time
-                                        except:
-                                            pass
+            try:
+                # Concatenate all speech chunks
+                speech_audio = np.concatenate(speech_buffer)
 
-                    except Exception as e:
-                        print_warning(f"Transcription failed: {e}")
-                    finally:
-                        # Clean up temp file
+                # Save to temporary file
+                with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
+                    temp_filename = temp_file.name
+                    wavfile.write(temp_filename, sample_rate, speech_audio)
+
+                # Clean up model name for transcribe_audio function
+                clean_model = actual_model
+                if actual_model.startswith("faster-whisper-"):
+                    clean_model = actual_model.replace("faster-whisper-", "")
+
+                # Determine engine based on model type
+                from ..core.audio_processing.stt import get_available_engines
+                engines = get_available_engines()
+                if actual_model.startswith("faster-whisper") or (engines["faster_whisper"] and clean_model in ["tiny", "base", "small", "medium", "large", "large-v2", "large-v3", "turbo", "distil-large-v3"]):
+                    engine = "faster"
+                else:
+                    engine = "openai"
+
+                # Transcribe the speech
+                transcription = transcribe_audio(clean_model, temp_filename, engine, enable_vad)
+
+                if not transcription.startswith("Error:") and transcription.strip():
+                    print(f"🎵 You said: {transcription}")
+
+                    # Generate response (LLM or default)
+                    current_time = time.time()
+                    if (enable_tts or enable_llm) and transcription.strip() and (current_time - last_tts_time[0]) > tts_cooldown:
                         try:
-                            os.unlink(temp_filename)
-                        except:
-                            pass
+                            # Determine response text
+                            if enable_llm == "ollama":
+                                # Use LLM to generate response
+                                response_text = query_ollama_llm(transcription, llm_model)
+                            else:
+                                # Default response
+                                response_text = f"I heard: {transcription}"
+
+                            # Generate TTS if enabled
+                            if enable_tts:
+                                success = synthesize_speech_with_model(response_text, tts_model)
+                                if success:
+                                    print(f"🔊 TTS: {response_text}")
+                                    last_tts_time[0] = current_time  # Update cooldown timer
+                                else:
+                                    print_warning("TTS synthesis failed")
+                            elif enable_llm:
+                                # Just display LLM response if TTS is disabled
+                                print(f"🤖 Response: {response_text}")
+                                last_tts_time[0] = current_time  # Update cooldown timer
+
+                        except Exception as response_e:
+                            print_warning(f"Response generation failed: {response_e}")
+                            # Fallback to basic TTS if available
+                            if enable_tts:
+                                try:
+                                    fallback_text = f"I heard: {transcription}"
+                                    success = synthesize_speech_with_model(fallback_text, tts_model)
+                                    if success:
+                                        print(f"🔊 TTS (fallback): {fallback_text}")
+                                        last_tts_time[0] = current_time
+                                except:
+                                    pass
+
+            except Exception as e:
+                print_warning(f"Speech processing failed: {e}")
+            finally:
+                # Clean up temp file
+                try:
+                    os.unlink(temp_filename)
+                except:
+                    pass
+
+                # Reset speech detection state
+                speech_buffer = []
+                speech_detected = False
+                silence_counter = 0
+                print_info("✅ Ready for next speech...")
 
         # Start audio stream
         print_info("🎤 Starting audio stream...")
@@ -1722,6 +1749,7 @@ Model Management:
     parser_listen.add_argument("--tts-model", default="native", help="The TTS model to use for speech synthesis.")
     parser_listen.add_argument("--llm", choices=["ollama"], help="Enable LLM integration (currently supports 'ollama' for local Ollama instance).")
     parser_listen.add_argument("--llm-model", default="qwen3:14b", help="Ollama model to use for LLM responses (default: qwen3:14b).")
+    parser_listen.add_argument("--vad", action="store_true", help="Enable enhanced Voice Activity Detection (VAD) for better silence filtering when using faster-whisper models.")
     parser_listen.set_defaults(func=handle_listen)
 
     # Transcribe command
@@ -1731,6 +1759,7 @@ Model Management:
     parser_transcribe.add_argument("--model_size", default="base", help="The size of the Whisper model to use.")
     parser_transcribe.add_argument("--engine", choices=["auto", "openai", "faster"], default="auto",
                                   help="Transcription engine to use: auto (default), openai, or faster.")
+    parser_transcribe.add_argument("--vad", action="store_true", help="Enable Voice Activity Detection (VAD) for better silence filtering when using faster-whisper models.")
     parser_transcribe.set_defaults(func=handle_transcribe)
 
     # Models command

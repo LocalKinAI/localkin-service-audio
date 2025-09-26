@@ -8,7 +8,7 @@ try:
 except ImportError:
     FASTER_WHISPER_AVAILABLE = False
 
-def transcribe_audio(model_size: str, audio_file_path: str, engine: str = "auto") -> str:
+def transcribe_audio(model_size: str, audio_file_path: str, engine: str = "auto", enable_vad: bool = True) -> str:
     """
     Transcribes an audio file using Whisper models.
 
@@ -16,6 +16,7 @@ def transcribe_audio(model_size: str, audio_file_path: str, engine: str = "auto"
         model_size: Size of the model (tiny, base, small, medium, large, etc.)
         audio_file_path: Path to the audio file
         engine: Which engine to use - "openai", "faster", or "auto"
+        enable_vad: Enable Voice Activity Detection for faster-whisper (default: True)
 
     Returns:
         Transcribed text or error message
@@ -33,8 +34,12 @@ def transcribe_audio(model_size: str, audio_file_path: str, engine: str = "auto"
                 engine = "openai"
 
         if engine == "faster" and FASTER_WHISPER_AVAILABLE:
-            return transcribe_with_faster_whisper(model_size, audio_file_path)
+            return transcribe_with_faster_whisper(model_size, audio_file_path, enable_vad)
         else:
+            # Check if VAD was requested but we're using OpenAI Whisper
+            if enable_vad and engine != "faster":
+                print("⚠️ Warning: Voice Activity Detection (VAD) is not supported with OpenAI Whisper models.")
+                print("💡 Tip: Use faster-whisper models (e.g., --model faster-whisper-base) for VAD support.")
             return transcribe_with_openai_whisper(model_size, audio_file_path)
 
     except Exception as e:
@@ -58,10 +63,15 @@ def transcribe_with_openai_whisper(model_size: str, audio_file_path: str) -> str
     except Exception as e:
         return f"OpenAI Whisper transcription failed: {e}"
 
-def transcribe_with_faster_whisper(model_size: str, audio_file_path: str) -> str:
+def transcribe_with_faster_whisper(model_size: str, audio_file_path: str, enable_vad: bool = True) -> str:
     """
     Transcribes using faster-whisper (CTranslate2 implementation).
     Up to 4x faster than OpenAI Whisper.
+
+    Args:
+        model_size: The model size to use
+        audio_file_path: Path to the audio file
+        enable_vad: Enable Voice Activity Detection (default: True)
     """
     if not FASTER_WHISPER_AVAILABLE:
         return "Error: faster-whisper is not available. Please install it with: pip install faster-whisper"
@@ -119,8 +129,8 @@ def transcribe_with_faster_whisper(model_size: str, audio_file_path: str) -> str
                 batch_size=4,  # Balanced batch size for CPU performance
                 beam_size=5,
                 language=None,  # Auto-detect language
-                vad_filter=True,  # Filter out silence
-                vad_parameters=dict(min_silence_duration_ms=500)
+                vad_filter=enable_vad,  # Voice Activity Detection
+                vad_parameters=dict(min_silence_duration_ms=500) if enable_vad else None
             )
         else:
             print(f"Transcribing {audio_file_path} with faster-whisper (standard inference)...")
@@ -129,8 +139,8 @@ def transcribe_with_faster_whisper(model_size: str, audio_file_path: str) -> str
                 audio_file_path,
                 beam_size=5,
                 language=None,  # Auto-detect language
-                vad_filter=True,  # Filter out silence
-                vad_parameters=dict(min_silence_duration_ms=500)
+                vad_filter=enable_vad,  # Voice Activity Detection
+                vad_parameters=dict(min_silence_duration_ms=500) if enable_vad else None
             )
 
         print(f"Detected language: {info.language} (probability: {info.language_probability:.2f})")

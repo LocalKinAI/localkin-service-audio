@@ -13,6 +13,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Request, UploadFile, File, Form, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from starlette.responses import Response as StarletteResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -432,19 +433,31 @@ async def api_synthesize(
         api_success = synthesize_via_api_to_file_with_params(synthesis_params, model_name, str(output_path))
 
         if not api_success:
-            # Fall back to local synthesis
-            if model.get("source") == "huggingface":
-                # Use HuggingFace TTS for models like kokoro-82m
-                success = synthesize_huggingface_tts_with_voice(model_name, synthesis_text, str(output_path), voice)
-                if not success:
-                    raise HTTPException(status_code=500, detail="HuggingFace TTS synthesis failed")
-            else:
-                # Use native TTS for other models
+            # Check if this is native TTS (allowed to fallback locally)
+            if model_name == 'native':
+                # Use native TTS locally
                 result = synthesize_speech(synthesis_text, str(output_path))
                 if not output_path.exists():
                     raise HTTPException(status_code=500, detail="Speech synthesis failed")
+            else:
+                # For non-native models, report API unavailability
+                import json
+                error_details = {
+                    "success": False,
+                    "error": "API_UNAVAILABLE",
+                    "message": f"API server not available for {model_name}",
+                    "solution": f"Start the API server with: kin audio run {model_name} --port 8001",
+                    "model": model_name
+                }
+                # Return API unavailability as 200 with error details in JSON
+                error_details["http_status"] = 503
+                return StarletteResponse(
+                    content=json.dumps(error_details),
+                    media_type="application/json",
+                    status_code=200
+                )
 
-        return {
+        success_response = {
             "success": True,
             "audio_url": f"/ui/audio/{output_filename}",
             "model": model_name,
@@ -453,9 +466,25 @@ async def api_synthesize(
             "file_size": output_path.stat().st_size,
             "input_type": "file" if file and file.filename else "text"
         }
+        return StarletteResponse(
+            content=json.dumps(success_response),
+            media_type="application/json",
+            status_code=200
+        )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # For debugging, return error as JSON instead of raising HTTPException
+        error_response = {
+            "success": False,
+            "error": "INTERNAL_ERROR",
+            "message": str(e),
+            "model": model_name
+        }
+        return StarletteResponse(
+            content=json.dumps(error_response),
+            media_type="application/json",
+            status_code=500
+        )
 
 
 @router.get("/api/models")

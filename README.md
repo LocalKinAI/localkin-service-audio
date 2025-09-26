@@ -14,7 +14,7 @@
 
 - **🚀 Fast Startup**: Instant application launch with lazy loading architecture
 - **⚡ Faster-Whisper Integration**: Up to 4x faster transcription with CTranslate2 optimization
-- **🎯 Multiple STT Engines**: OpenAI Whisper, faster-whisper, Ollama-based models, and Hugging Face models
+- **🎯 Multiple STT Engines**: OpenAI Whisper, faster-whisper with VAD, Ollama-based models, and Hugging Face models
 - **🔊 Multiple TTS Engines**: Native OS TTS, Ollama-based conversational models, and SpeechT5/Bark
 - **🌐 REST API Server**: Run models as API servers with automatic endpoints
 - **💻 Modern Web Interface**: Beautiful, responsive web UI with file upload, voice selection, and dynamic model discovery
@@ -106,6 +106,10 @@ kin audio listen                                    # Basic real-time transcript
 kin audio listen --model faster-whisper-tiny        # Use specific STT model
 kin audio listen --tts                               # Enable TTS with native voice
 kin audio listen --tts --tts-model speecht5-tts     # Enable TTS with lightweight model
+kin audio listen --vad                               # Enhanced VAD for faster-whisper
+kin audio listen --model faster-whisper-tiny --vad  # VAD with specific model
+
+**🎤 Improved Speech Detection:** No premature cutoffs - speech is buffered until you finish speaking with natural pauses allowed!
 
 # Voice-based Conversational AI with LLM
 kin audio listen --llm ollama                       # LLM responses (text only)
@@ -118,7 +122,7 @@ kin audio listen --llm ollama --llm-model gemma3:12b --tts --tts-model kokoro-82
 - **🎭 Voice Selection**: Multiple voices available for supported TTS models
 - **🤖 LLM Integration**: Voice-based conversational AI with Ollama models
 - **📚 Configurable LLM Models**: Choose from available Ollama models (qwen3, gemma3, deepseek, etc.)
-- **Silence Detection**: Only processes audio with actual speech (reduces false positives)
+- **Advanced Silence Detection**: Improved speech detection with speech buffering, minimum duration requirements, and trailing silence tolerance
 - **TTS Cooldown**: 2-second cooldown prevents response spam
 - **API-First Architecture**: Automatically uses running API servers for TTS
 - **Error Recovery**: Graceful fallback to native TTS if advanced models fail
@@ -200,6 +204,10 @@ kin audio transcribe audio.wav
 # Force specific engines
 kin audio transcribe audio.wav --engine faster     # Force faster-whisper
 kin audio transcribe audio.wav --engine openai     # Force OpenAI Whisper
+
+# Voice Activity Detection (VAD)
+kin audio transcribe audio.wav --vad               # Enable VAD for better silence filtering
+kin audio transcribe audio.wav --model faster-whisper-tiny --vad  # VAD with specific model
 
 # Check available engines and hardware
 kin audio status
