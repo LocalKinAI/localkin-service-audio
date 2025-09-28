@@ -136,10 +136,12 @@ kin audio tts "Hello world" --model native        # Fastest, built-in
 kin audio listen --llm ollama --tts                    # Full voice AI
 kin audio listen --llm ollama --llm-model qwen3:14b    # Custom model
 kin audio listen --llm ollama --tts --stream           # Streaming responses
-kin audio listen --engine whisper-cpp --model_size small --tts --tts-model kokoro-82m --vad --llm ollama --llm-model deepseek-r1:14b --stream
+kin audio listen --engine whisper-cpp --model_size small --tts --tts-model kokoro-82m --vad --llm ollama --llm-model deepseek-r1:14b --stream                               # Custom models with Streaming
 ```
 
 **Streaming Mode**: Add `--stream` for real-time LLM responses that speak as they generate, creating more natural conversational flow.
+
+**Conversation Context**: LLM maintains conversation history during your session, allowing for contextual follow-up questions and natural dialogue flow.
 
 ## 📦 Installation & Setup
 

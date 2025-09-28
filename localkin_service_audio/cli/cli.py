@@ -29,6 +29,36 @@ except ImportError:
 # Version information
 __version__ = "0.1.0"
 
+# Global conversation memory for streaming mode
+conversation_memory = []
+MAX_CONTEXT_LENGTH = 4000  # Maximum characters to keep in context
+
+def add_to_conversation_memory(user_input: str, ai_response: str):
+    """Add a user input and AI response to the conversation memory."""
+    conversation_memory.append({"user": user_input, "assistant": ai_response})
+
+    # Manage context length - keep only recent messages that fit within limit
+    total_length = sum(len(str(msg["user"]) + str(msg["assistant"])) for msg in conversation_memory)
+    while total_length > MAX_CONTEXT_LENGTH and len(conversation_memory) > 1:
+        removed = conversation_memory.pop(0)
+        total_length -= len(str(removed["user"]) + str(removed["assistant"]))
+
+def get_conversation_context() -> str:
+    """Get the current conversation context as a formatted string."""
+    if not conversation_memory:
+        return ""
+
+    context = ""
+    for msg in conversation_memory:
+        context += f"User: {msg['user']}\n\nAssistant: {msg['assistant']}\n\n"
+
+    return context.strip()
+
+def clear_conversation_memory():
+    """Clear the conversation memory."""
+    global conversation_memory
+    conversation_memory.clear()
+
 def print_header():
     """Print the localkin-service-audio header."""
     print("🎵 LocalKin Service Audio - Local STT & TTS Model Manager")
@@ -440,8 +470,12 @@ def query_ollama_llm_streaming(text: str, model: str = "qwen3:14b"):
     # Default Ollama endpoint
     ollama_url = "http://localhost:11434/api/generate"
 
-    # Prepare the prompt
-    prompt = f"User: {text}\n\nAssistant: "
+    # Get conversation context and prepare the prompt
+    context = get_conversation_context()
+    if context:
+        prompt = f"{context}\n\nUser: {text}\n\nAssistant: "
+    else:
+        prompt = f"User: {text}\n\nAssistant: "
 
     payload = {
         "model": model,
@@ -514,13 +548,14 @@ def synthesize_speech_streaming(text_generator, tts_model: str = "native"):
         if full_text.strip():
             print_info("🗣️ Synthesizing speech from streaming response...")
             # Use the same logic as the non-streaming version
-            return synthesize_speech_with_model(full_text, tts_model, force_api_only=False)
+            success = synthesize_speech_with_model(full_text, tts_model, force_api_only=False)
+            return success, full_text
 
-        return False
+        return False, ""
 
     except Exception as e:
         print_error(f"Streaming TTS failed: {e}")
-        return False
+        return False, ""
 
 
 def query_ollama_llm(text: str, model: str = "qwen3:14b") -> str:
@@ -532,8 +567,12 @@ def query_ollama_llm(text: str, model: str = "qwen3:14b") -> str:
         # Default Ollama endpoint
         ollama_url = "http://localhost:11434/api/generate"
 
-        # Prepare the prompt
-        prompt = f"User: {text}\n\nAssistant: "
+        # Get conversation context and prepare the prompt
+        context = get_conversation_context()
+        if context:
+            prompt = f"{context}\n\nUser: {text}\n\nAssistant: "
+        else:
+            prompt = f"User: {text}\n\nAssistant: "
 
         payload = {
             "model": model,
@@ -817,6 +856,11 @@ def handle_listen(args):
     print_info("🎤 Listening... (Press Ctrl+C to stop)")
     print("-" * 60)
 
+    # Initialize conversation memory for LLM context
+    if enable_llm:
+        clear_conversation_memory()
+        print_info("🧠 Conversation memory initialized")
+
     try:
         import sounddevice as sd
         import numpy as np
@@ -956,20 +1000,28 @@ def handle_listen(args):
                                     print_info("🌊 Starting streaming response...")
                                     response_generator = query_ollama_llm_streaming(transcription, llm_model)
 
+                                    # Collect the full response for memory
+                                    full_response = ""
                                     if enable_tts:
                                         # Streaming TTS - synthesize as response comes in
-                                        success = synthesize_speech_streaming(response_generator, tts_model)
+                                        success, full_response = synthesize_speech_streaming(response_generator, tts_model)
                                         if success:
                                             last_tts_time[0] = current_time  # Update cooldown timer
                                         else:
                                             print_warning("Streaming TTS synthesis failed")
+                                            full_response = ""
                                     else:
                                         # Display streaming response in real-time
                                         print("🤖 Streaming response: ", end="", flush=True)
-                                        for token, full_response in response_generator:
+                                        for token, accumulated_response in response_generator:
                                             print(token, end="", flush=True)
+                                            full_response = accumulated_response
                                         print()  # New line after streaming
                                         last_tts_time[0] = current_time  # Update cooldown timer
+
+                                    # Add to conversation memory if we got a response
+                                    if full_response.strip():
+                                        add_to_conversation_memory(transcription, full_response)
                                 else:
                                     # Non-streaming LLM response
                                     response_text = query_ollama_llm(transcription, llm_model)
@@ -985,6 +1037,9 @@ def handle_listen(args):
                                         # Just display LLM response if TTS is disabled
                                         print(f"🤖 Response: {response_text}")
                                         last_tts_time[0] = current_time  # Update cooldown timer
+
+                                    # Add to conversation memory
+                                    add_to_conversation_memory(transcription, response_text)
                             else:
                                 # Default response (no LLM)
                                 response_text = f"I heard: {transcription}"
@@ -1051,6 +1106,11 @@ def handle_listen(args):
         print_info("   - Running in a headless environment")
         print_info("   - Audio device busy")
         print_info("Try: 'kin audio transcribe audio.wav' for file-based transcription instead")
+    finally:
+        # Clean up conversation memory
+        if enable_llm:
+            clear_conversation_memory()
+            print_info("🧠 Conversation memory cleared")
 
 def handle_tts(args):
     """Handles the 'tts' command."""
