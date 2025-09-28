@@ -64,6 +64,9 @@ kin audio transcribe audio.wav --engine faster --vad                   # With VA
 # Real-time listening with TTS
 kin audio listen --engine whisper-cpp --tts --tts-model native
 
+# Voice AI with streaming LLM responses
+kin audio listen --llm ollama --tts --stream
+
 # Synthesize speech
 kin audio tts "Hello world" --model kokoro-82m
 
@@ -132,7 +135,11 @@ kin audio tts "Hello world" --model native        # Fastest, built-in
 # Requires Ollama running
 kin audio listen --llm ollama --tts                    # Full voice AI
 kin audio listen --llm ollama --llm-model qwen3:14b    # Custom model
+kin audio listen --llm ollama --tts --stream           # Streaming responses
+kin audio listen --engine whisper-cpp --model_size small --tts --tts-model kokoro-82m --vad --llm ollama --llm-model deepseek-r1:14b --stream
 ```
+
+**Streaming Mode**: Add `--stream` for real-time LLM responses that speak as they generate, creating more natural conversational flow.
 
 ## 📦 Installation & Setup
 

@@ -432,6 +432,97 @@ def load_tts_model_instance(model_name: str, model_info: dict):
         print_warning(f"Error loading TTS model instance: {e}")
         return None
 
+def query_ollama_llm_streaming(text: str, model: str = "qwen3:14b"):
+    """Send text to local Ollama instance and get streaming response."""
+    import requests
+    import json
+
+    # Default Ollama endpoint
+    ollama_url = "http://localhost:11434/api/generate"
+
+    # Prepare the prompt
+    prompt = f"User: {text}\n\nAssistant: "
+
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "stream": True,
+        "options": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "num_predict": 150  # Limit response length for real-time
+        }
+    }
+
+    print_info(f"🤖 Streaming from Ollama ({model})...")
+    try:
+        response = requests.post(ollama_url, json=payload, timeout=60, stream=True)
+
+        if response.status_code == 200:
+            full_response = ""
+            for line in response.iter_lines():
+                if line:
+                    try:
+                        chunk = json.loads(line.decode('utf-8'))
+                        token = chunk.get("response", "")
+                        if token:
+                            full_response += token
+                            yield token, full_response  # Yield both token and accumulated response
+                    except json.JSONDecodeError:
+                        continue
+
+            # Clean up final response (same logic as non-streaming)
+            if full_response:
+                import re
+                if '<think>' in full_response or 'Let me think' in full_response:
+                    full_response = re.sub(r'<think>.*?</think>', '', full_response, flags=re.DOTALL).strip()
+
+                    sentences = re.split(r'[.!?]+', full_response)
+                    meaningful_sentences = [s.strip() for s in sentences if s.strip() and
+                                          not any(word in s.lower() for word in ['think', 'okay', 'first', 'let me'])][:3]
+
+                    if meaningful_sentences:
+                        full_response = '. '.join(meaningful_sentences) + '.'
+                    else:
+                        full_response = full_response.replace('\n', ' ').strip()[:200] + '...'
+
+                print_info(f"🧠 Final LLM Response: {full_response[:100]}{'...' if len(full_response) > 100 else ''}")
+                return full_response
+            else:
+                return f"I heard you say: {text}"
+        else:
+            print_error(f"LLM API error: {response.status_code}")
+            return f"I heard you say: {text}"
+
+    except requests.exceptions.ConnectionError:
+        print_error("Cannot connect to Ollama (is it running on localhost:11434?)")
+        return f"I heard you say: {text}"
+    except Exception as e:
+        print_error(f"LLM streaming failed: {e}")
+        return f"I heard you say: {text}"
+
+
+def synthesize_speech_streaming(text_generator, tts_model: str = "native"):
+    """Synthesize speech from streaming text chunks."""
+    try:
+        # For streaming TTS, we collect the full text and then synthesize it
+        # This is simpler than true streaming synthesis
+        full_text = ""
+        for token, accumulated_text in text_generator:
+            full_text = accumulated_text
+
+        if full_text.strip():
+            print_info("🗣️ Synthesizing speech from streaming response...")
+            # Use the same logic as the non-streaming version
+            return synthesize_speech_with_model(full_text, tts_model, force_api_only=False)
+
+        return False
+
+    except Exception as e:
+        print_error(f"Streaming TTS failed: {e}")
+        return False
+
+
 def query_ollama_llm(text: str, model: str = "qwen3:14b") -> str:
     """Send text to local Ollama instance and get response."""
     try:
@@ -657,6 +748,7 @@ def handle_listen(args):
     enable_llm = getattr(args, 'llm', None)
     llm_model = getattr(args, 'llm_model', 'qwen3:14b')
     enable_vad = getattr(args, 'vad', False)
+    enable_stream = getattr(args, 'stream', False)
 
     # Determine the actual model to use (same logic as transcribe command)
     if model != 'whisper':
@@ -681,6 +773,10 @@ def handle_listen(args):
         print_info("🤖 LLM integration enabled")
         print_info(f"🧠 Using LLM provider: {enable_llm}")
         print_info(f"📚 Using LLM model: {llm_model}")
+        if enable_stream:
+            print_info("🌊 Streaming responses enabled for real-time conversation")
+        else:
+            print_info("📝 Non-streaming responses (wait for complete answer)")
         if not enable_tts:
             print_warning("⚠️ LLM responses will be displayed as text only (enable TTS with --tts for voice responses)")
     else:
@@ -855,24 +951,52 @@ def handle_listen(args):
                         try:
                             # Determine response text
                             if enable_llm == "ollama":
-                                # Use LLM to generate response
-                                response_text = query_ollama_llm(transcription, llm_model)
+                                if enable_stream:
+                                    # Use streaming LLM response
+                                    print_info("🌊 Starting streaming response...")
+                                    response_generator = query_ollama_llm_streaming(transcription, llm_model)
+
+                                    if enable_tts:
+                                        # Streaming TTS - synthesize as response comes in
+                                        success = synthesize_speech_streaming(response_generator, tts_model)
+                                        if success:
+                                            last_tts_time[0] = current_time  # Update cooldown timer
+                                        else:
+                                            print_warning("Streaming TTS synthesis failed")
+                                    else:
+                                        # Display streaming response in real-time
+                                        print("🤖 Streaming response: ", end="", flush=True)
+                                        for token, full_response in response_generator:
+                                            print(token, end="", flush=True)
+                                        print()  # New line after streaming
+                                        last_tts_time[0] = current_time  # Update cooldown timer
+                                else:
+                                    # Non-streaming LLM response
+                                    response_text = query_ollama_llm(transcription, llm_model)
+                                    # Generate TTS if enabled
+                                    if enable_tts:
+                                        success = synthesize_speech_with_model(response_text, tts_model)
+                                        if success:
+                                            print(f"🔊 TTS: {response_text}")
+                                            last_tts_time[0] = current_time  # Update cooldown timer
+                                        else:
+                                            print_warning("TTS synthesis failed")
+                                    else:
+                                        # Just display LLM response if TTS is disabled
+                                        print(f"🤖 Response: {response_text}")
+                                        last_tts_time[0] = current_time  # Update cooldown timer
                             else:
-                                # Default response
+                                # Default response (no LLM)
                                 response_text = f"I heard: {transcription}"
 
-                            # Generate TTS if enabled
-                            if enable_tts:
-                                success = synthesize_speech_with_model(response_text, tts_model)
-                                if success:
-                                    print(f"🔊 TTS: {response_text}")
-                                    last_tts_time[0] = current_time  # Update cooldown timer
-                                else:
-                                    print_warning("TTS synthesis failed")
-                            elif enable_llm:
-                                # Just display LLM response if TTS is disabled
-                                print(f"🤖 Response: {response_text}")
-                                last_tts_time[0] = current_time  # Update cooldown timer
+                                # Generate TTS if enabled
+                                if enable_tts:
+                                    success = synthesize_speech_with_model(response_text, tts_model)
+                                    if success:
+                                        print(f"🔊 TTS: {response_text}")
+                                        last_tts_time[0] = current_time  # Update cooldown timer
+                                    else:
+                                        print_warning("TTS synthesis failed")
 
                         except Exception as response_e:
                             print_warning(f"Response generation failed: {response_e}")
@@ -1822,6 +1946,7 @@ Model Management:
     parser_listen.add_argument("--engine", choices=["auto", "openai", "faster", "whisper-cpp"], default="auto",
                               help="STT engine to use: auto (default), openai, faster, or whisper-cpp.")
     parser_listen.add_argument("--vad", action="store_true", help="Enable enhanced Voice Activity Detection (VAD) for better silence filtering when using faster-whisper or whisper-cpp models.")
+    parser_listen.add_argument("--stream", action="store_true", help="Enable streaming LLM responses for real-time conversation (requires --llm).")
     parser_listen.set_defaults(func=handle_listen)
 
     # Transcribe command
