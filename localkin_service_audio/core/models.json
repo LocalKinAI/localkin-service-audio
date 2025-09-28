@@ -181,6 +181,98 @@
       ]
     },
     {
+      "name": "whisper-cpp-tiny",
+      "type": "stt",
+      "description": "Whisper.cpp Tiny - Ultra-fast C/C++ implementation, lowest accuracy",
+      "source": "whisper-cpp",
+      "license": "MIT",
+      "size_mb": 39,
+      "requirements": [
+        "whisper.cpp"
+      ],
+      "engines": ["whisper-cpp"],
+      "tags": [
+        "ultra-fast",
+        "lightweight",
+        "cpp",
+        "ggml",
+        "c-optimized"
+      ]
+    },
+    {
+      "name": "whisper-cpp-base",
+      "type": "stt",
+      "description": "Whisper.cpp Base - Fast C/C++ implementation, good balance",
+      "source": "whisper-cpp",
+      "license": "MIT",
+      "size_mb": 74,
+      "requirements": [
+        "whisper.cpp"
+      ],
+      "engines": ["whisper-cpp"],
+      "tags": [
+        "fast",
+        "balanced",
+        "cpp",
+        "ggml",
+        "c-optimized"
+      ]
+    },
+    {
+      "name": "whisper-cpp-small",
+      "type": "stt",
+      "description": "Whisper.cpp Small - C/C++ implementation, high accuracy",
+      "source": "whisper-cpp",
+      "license": "MIT",
+      "size_mb": 244,
+      "requirements": [
+        "whisper.cpp"
+      ],
+      "engines": ["whisper-cpp"],
+      "tags": [
+        "high-accuracy",
+        "cpp",
+        "ggml",
+        "c-optimized"
+      ]
+    },
+    {
+      "name": "whisper-cpp-medium",
+      "type": "stt",
+      "description": "Whisper.cpp Medium - C/C++ implementation, very high accuracy",
+      "source": "whisper-cpp",
+      "license": "MIT",
+      "size_mb": 769,
+      "requirements": [
+        "whisper.cpp"
+      ],
+      "engines": ["whisper-cpp"],
+      "tags": [
+        "very-high-accuracy",
+        "cpp",
+        "ggml",
+        "c-optimized"
+      ]
+    },
+    {
+      "name": "whisper-cpp-large",
+      "type": "stt",
+      "description": "Whisper.cpp Large - C/C++ implementation, maximum accuracy",
+      "source": "whisper-cpp",
+      "license": "MIT",
+      "size_mb": 1550,
+      "requirements": [
+        "whisper.cpp"
+      ],
+      "engines": ["whisper-cpp"],
+      "tags": [
+        "maximum-accuracy",
+        "cpp",
+        "ggml",
+        "c-optimized"
+      ]
+    },
+    {
       "name": "native",
       "type": "tts",
       "description": "Native macOS TTS via pyttsx3",

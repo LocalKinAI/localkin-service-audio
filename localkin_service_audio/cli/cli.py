@@ -192,10 +192,20 @@ def handle_transcribe(args):
 
     # Auto-select engine based on model type
     if engine == "auto":
-        if model.startswith("faster-whisper") or (engines["faster_whisper"] and actual_model in ["tiny", "base", "small", "medium", "large", "large-v2", "large-v3", "turbo", "distil-large-v3"]):
+        # Priority: whisper-cpp (fastest) > faster-whisper > openai-whisper
+        if model.startswith("whisper-cpp-") or (engines.get("whisper_cpp", False) and actual_model in ["tiny", "base", "small", "medium", "large"]):
+            actual_engine = "whisper-cpp (auto-selected for maximum speed)"
+        elif model.startswith("faster-whisper") or (engines["faster_whisper"] and actual_model in ["tiny", "base", "small", "medium", "large", "large-v2", "large-v3", "turbo", "distil-large-v3"]):
             actual_engine = "faster-whisper (auto-selected for speed)"
         else:
             actual_engine = "OpenAI Whisper (fallback)"
+    elif engine == "whisper-cpp":
+        if engines.get("whisper_cpp", False):
+            actual_engine = "whisper-cpp"
+        else:
+            print_error("whisper-cpp is not available. Please install whisper.cpp and ensure whisper-cli is in your PATH.")
+            print_info("Installation: https://github.com/ggerganov/whisper.cpp")
+            return
     elif engine == "faster":
         if engines["faster_whisper"]:
             actual_engine = "faster-whisper"
@@ -209,29 +219,80 @@ def handle_transcribe(args):
 
     # Get model details
     # Clean up model name for transcribe_audio function
-    # Remove "faster-whisper-" prefix if present
+    # Remove prefixes if present
     clean_model = actual_model
     if actual_model.startswith("faster-whisper-"):
         clean_model = actual_model.replace("faster-whisper-", "")
+    elif actual_model.startswith("whisper-cpp-"):
+        clean_model = actual_model.replace("whisper-cpp-", "")
 
-    # Use clean model for size lookup if it's a faster-whisper model
-    lookup_model = clean_model if actual_model.startswith("faster-whisper-") else model_size
+    # Determine engine based on model type and user selection
+    if engine == "whisper-cpp":
+        final_engine = "whisper-cpp"
+    elif engine == "faster":
+        final_engine = "faster"
+    else:
+        # Auto-determination logic
+        from ..core.audio_processing.stt import get_available_engines
+        engines = get_available_engines()
+        if actual_model.startswith("whisper-cpp") or (engines.get("whisper_cpp", False) and clean_model in ["tiny", "base", "small", "medium", "large"]):
+            final_engine = "whisper-cpp"
+        elif actual_model.startswith("faster-whisper") or (engines["faster_whisper"] and clean_model in ["tiny", "base", "small", "medium", "large", "large-v2", "large-v3", "turbo", "distil-large-v3"]):
+            final_engine = "faster"
+        else:
+            final_engine = "openai"
 
+    # Use clean model for size lookup
+    lookup_model = clean_model
+
+    # Model details for different engines
     model_details = {
-        "tiny": {"size": "39MB", "speed": "32x", "quality": "Basic"},
-        "base": {"size": "74MB", "speed": "16x", "quality": "Good"},
-        "small": {"size": "244MB", "speed": "8x", "quality": "High"},
-        "medium": {"size": "769MB", "speed": "4x", "quality": "Very High"},
-        "large": {"size": "1550MB", "speed": "1x", "quality": "Excellent"},
+        "tiny": {
+            "openai": {"size": "39MB", "speed": "1x", "quality": "Basic"},
+            "faster": {"size": "39MB", "speed": "32x", "quality": "Basic"},
+            "cpp": {"size": "39MB", "speed": "50x+", "quality": "Basic"}
+        },
+        "base": {
+            "openai": {"size": "74MB", "speed": "1x", "quality": "Good"},
+            "faster": {"size": "74MB", "speed": "16x", "quality": "Good"},
+            "cpp": {"size": "74MB", "speed": "25x+", "quality": "Good"}
+        },
+        "small": {
+            "openai": {"size": "244MB", "speed": "0.5x", "quality": "High"},
+            "faster": {"size": "244MB", "speed": "8x", "quality": "High"},
+            "cpp": {"size": "244MB", "speed": "12x+", "quality": "High"}
+        },
+        "medium": {
+            "openai": {"size": "769MB", "speed": "0.25x", "quality": "Very High"},
+            "faster": {"size": "769MB", "speed": "4x", "quality": "Very High"},
+            "cpp": {"size": "769MB", "speed": "6x+", "quality": "Very High"}
+        },
+        "large": {
+            "openai": {"size": "1550MB", "speed": "0.125x", "quality": "Excellent"},
+            "faster": {"size": "1550MB", "speed": "2x", "quality": "Excellent"},
+            "cpp": {"size": "1550MB", "speed": "3x+", "quality": "Excellent"}
+        },
         "large-v2": {"size": "3000MB", "speed": "1x", "quality": "Excellent"},
         "large-v3": {"size": "3000MB", "speed": "1x", "quality": "Excellent"},
         "turbo": {"size": "1500MB", "speed": "2x", "quality": "Very High"},
         "distil-large-v3": {"size": "1500MB", "speed": "2x", "quality": "Very High"}
     }
 
+    # Show model details based on engine
     if lookup_model in model_details:
         details = model_details[lookup_model]
-        print_info(f"📊 Model details: {details['size']} | {details['speed']} speed | {details['quality']} quality")
+        if isinstance(details, dict) and final_engine in ["whisper-cpp", "cpp"]:
+            engine_details = details["cpp"]
+            print_info(f"📊 Model details: {engine_details['size']} | {engine_details['speed']} speed | {engine_details['quality']} quality")
+        elif isinstance(details, dict) and final_engine in ["faster", "faster-whisper"]:
+            engine_details = details["faster"]
+            print_info(f"📊 Model details: {engine_details['size']} | {engine_details['speed']} speed | {engine_details['quality']} quality")
+        elif isinstance(details, dict) and final_engine in ["openai", "openai-whisper"]:
+            engine_details = details["openai"]
+            print_info(f"📊 Model details: {engine_details['size']} | {engine_details['speed']} speed | {engine_details['quality']} quality")
+        elif "size" in details:
+            # Fallback for models without per-engine details
+            print_info(f"📊 Model details: {details['size']} | {details['speed']} speed | {details['quality']} quality")
     else:
         print_warning(f"Unknown model size: {lookup_model}")
 
@@ -590,6 +651,7 @@ def handle_listen(args):
 
     model = getattr(args, 'model', 'whisper')
     model_size = getattr(args, 'model_size', 'base')
+    engine = getattr(args, 'engine', 'auto')
     enable_tts = getattr(args, 'tts', False)
     tts_model = getattr(args, 'tts_model', 'native')
     enable_llm = getattr(args, 'llm', None)
@@ -628,7 +690,7 @@ def handle_listen(args):
         print_info("🎙️ Enhanced VAD (Voice Activity Detection) enabled")
         print_info("🔇 VAD will filter out silence and background noise for cleaner transcription")
     else:
-        print_info("🎤 Basic silence detection enabled (use --vad for enhanced VAD with faster-whisper)")
+        print_info("🎤 Basic silence detection enabled (use --vad for enhanced VAD with faster-whisper or whisper-cpp)")
 
     # Get model details for STT
     model_details = {
@@ -765,16 +827,24 @@ def handle_listen(args):
                 if actual_model.startswith("faster-whisper-"):
                     clean_model = actual_model.replace("faster-whisper-", "")
 
-                # Determine engine based on model type
+                # Determine engine based on model type and user selection
                 from ..core.audio_processing.stt import get_available_engines
                 engines = get_available_engines()
-                if actual_model.startswith("faster-whisper") or (engines["faster_whisper"] and clean_model in ["tiny", "base", "small", "medium", "large", "large-v2", "large-v3", "turbo", "distil-large-v3"]):
-                    engine = "faster"
+
+                # Use the user-specified engine if provided, otherwise auto-select
+                if engine == "auto":
+                    # Priority: whisper-cpp (fastest) > faster-whisper > openai-whisper
+                    if actual_model.startswith("whisper-cpp") or (engines.get("whisper_cpp", False) and clean_model in ["tiny", "base", "small", "medium", "large"]):
+                        selected_engine = "whisper-cpp"
+                    elif actual_model.startswith("faster-whisper") or (engines["faster_whisper"] and clean_model in ["tiny", "base", "small", "medium", "large", "large-v2", "large-v3", "turbo", "distil-large-v3"]):
+                        selected_engine = "faster"
+                    else:
+                        selected_engine = "openai"
                 else:
-                    engine = "openai"
+                    selected_engine = engine
 
                 # Transcribe the speech
-                transcription = transcribe_audio(clean_model, temp_filename, engine, enable_vad)
+                transcription = transcribe_audio(clean_model, temp_filename, selected_engine, enable_vad)
 
                 if not transcription.startswith("Error:") and transcription.strip():
                     print(f"🎵 You said: {transcription}")
@@ -1749,7 +1819,9 @@ Model Management:
     parser_listen.add_argument("--tts-model", default="native", help="The TTS model to use for speech synthesis.")
     parser_listen.add_argument("--llm", choices=["ollama"], help="Enable LLM integration (currently supports 'ollama' for local Ollama instance).")
     parser_listen.add_argument("--llm-model", default="qwen3:14b", help="Ollama model to use for LLM responses (default: qwen3:14b).")
-    parser_listen.add_argument("--vad", action="store_true", help="Enable enhanced Voice Activity Detection (VAD) for better silence filtering when using faster-whisper models.")
+    parser_listen.add_argument("--engine", choices=["auto", "openai", "faster", "whisper-cpp"], default="auto",
+                              help="STT engine to use: auto (default), openai, faster, or whisper-cpp.")
+    parser_listen.add_argument("--vad", action="store_true", help="Enable enhanced Voice Activity Detection (VAD) for better silence filtering when using faster-whisper or whisper-cpp models.")
     parser_listen.set_defaults(func=handle_listen)
 
     # Transcribe command
@@ -1757,8 +1829,8 @@ Model Management:
     parser_transcribe.add_argument("input_file", help="Path to the audio file to transcribe.")
     parser_transcribe.add_argument("--model", "-m", default="whisper", help="The STT model to use.")
     parser_transcribe.add_argument("--model_size", default="base", help="The size of the Whisper model to use.")
-    parser_transcribe.add_argument("--engine", choices=["auto", "openai", "faster"], default="auto",
-                                  help="Transcription engine to use: auto (default), openai, or faster.")
+    parser_transcribe.add_argument("--engine", choices=["auto", "openai", "faster", "whisper-cpp"], default="auto",
+                                  help="Transcription engine to use: auto (default), openai, faster, or whisper-cpp.")
     parser_transcribe.add_argument("--vad", action="store_true", help="Enable Voice Activity Detection (VAD) for better silence filtering when using faster-whisper models.")
     parser_transcribe.set_defaults(func=handle_transcribe)
 

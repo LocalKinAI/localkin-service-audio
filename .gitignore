@@ -50,6 +50,9 @@ Thumbs.db
 cache/
 *.cache
 
+# Build dependencies (cloned by build scripts)
+external/
+
 # Audio files (test files, generated output)
 *.wav
 *.mp3
