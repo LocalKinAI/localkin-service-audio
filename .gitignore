@@ -61,7 +61,8 @@ external/
 *.m4a
 *.aac
 test_audio.wav
-speech.wav
+speech.wavpy
+!audio.wav
 
 # Model files (if downloaded locally)
 *.bin

@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "localkin-service-audio"
-version = "0.1.0"
+version = "1.0.0"
 description = "Local Speech-to-Text and Text-to-Speech Model Manager"
 readme = "localkin_service_audio/README.md"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "LocalKin Team", email = "info@localkin.dev"},
 ]
@@ -30,10 +30,8 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: End Users/Desktop",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",

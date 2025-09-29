@@ -27,7 +27,7 @@ except ImportError:
     )
 
 # Version information
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
 # Global conversation memory for streaming mode
 conversation_memory = []
