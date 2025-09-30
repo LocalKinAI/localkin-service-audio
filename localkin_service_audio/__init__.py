@@ -5,7 +5,7 @@ A CLI tool for managing and running local STT and TTS models,
 inspired by Ollama's simplicity for local AI model management.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.0.5"
 __author__ = "LocalKin Team"
 __description__ = "Local STT & TTS Model Manager"
 

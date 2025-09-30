@@ -5,6 +5,7 @@ from pathlib import Path
 
 # Import from the localkin_service_audio package
 try:
+    from .. import __version__  # Import version from package
     from ..core import (
         get_models, find_model, find_models_by_type, save_models_config, get_config_metadata,
         list_local_models, pull_model, run_ollama_model, run_huggingface_model,
@@ -16,6 +17,7 @@ try:
     )
 except ImportError:
     # Fallback for direct execution
+    from .. import __version__  # Import version from package
     from ..core import (
         get_models, find_model, find_models_by_type, save_models_config, get_config_metadata,
         list_local_models, pull_model, run_ollama_model, run_huggingface_model,
@@ -25,9 +27,6 @@ except ImportError:
         get_model_template, list_available_templates, create_model_from_template,
         validate_model_for_huggingface, suggest_similar_models, get_popular_models
     )
-
-# Version information
-__version__ = "1.0.0"
 
 # Global conversation memory for streaming mode
 conversation_memory = []

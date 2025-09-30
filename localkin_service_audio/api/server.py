@@ -159,8 +159,19 @@ def load_tts_model(model_name: str):
             try:
                 from kokoro import KPipeline
                 import soundfile as sf
-            except ImportError:
-                raise ImportError("kokoro package is required for Kokoro models. Install with: pip install kokoro>=0.9.2")
+            except ImportError as e:
+                if "_lzma" in str(e):
+                    raise ImportError(
+                        "Kokoro TTS requires LZMA compression support which is missing from your Python installation. "
+                        "Try using system Python instead: /usr/bin/python3, or reinstall Python with LZMA support."
+                    )
+                elif "AlbertModel" in str(e):
+                    raise ImportError(
+                        "Kokoro TTS failed to import required transformers components. "
+                        "This may be due to missing LZMA support. Try using system Python: /usr/bin/python3"
+                    )
+                else:
+                    raise ImportError(f"kokoro package is required for Kokoro models. Install with: pip install kokoro>=0.9.2. Error: {e}")
 
             # Kokoro supports multiple languages - default to English ('a')
             # You can extend this to support other languages
@@ -184,13 +195,18 @@ def load_tts_model(model_name: str):
                 else:
                     raise e
             except Exception as e:
-                if "spacy" in str(e).lower() or "en_core_web_sm" in str(e).lower():
+                if "_lzma" in str(e):
+                    raise RuntimeError(
+                        "Kokoro TTS requires LZMA compression support. "
+                        "Try using system Python instead: /usr/bin/python3"
+                    )
+                elif "spacy" in str(e).lower() or "en_core_web_sm" in str(e).lower():
                     raise RuntimeError(
                         "Kokoro TTS requires spaCy English model. "
                         "Install it with: python -m spacy download en_core_web_sm"
                     )
                 else:
-                    raise e
+                    raise RuntimeError(f"Failed to initialize Kokoro TTS pipeline: {e}")
 
             loaded_models[model_name] = {
                 "type": "kokoro",

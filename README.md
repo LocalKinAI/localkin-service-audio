@@ -1,5 +1,6 @@
 # LocalKin Service Audio 🎵
 
+[![PyPI version](https://badge.fury.io/py/localkin-service-audio.svg)](https://pypi.org/project/localkin-service-audio/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![uv](https://img.shields.io/badge/⚡-uv-4c1d95)](https://github.com/astral-sh/uv)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -33,18 +34,43 @@
 
 ## 🚀 Quick Start
 
+### Recommended: Install with uv (Best for Kokoro TTS)
+
+Using `uv` ensures you have proper Python environment with LZMA support for Kokoro TTS:
+
 ```bash
-# Install uv if you haven't already (highly recommended)
+# Install uv (fast Python package manager)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Clone and install LocalKin Service Audio
-git clone https://github.com/LocalKinAI/localkin-service-audio.git
-cd localkin-service-audio
-uv sync
+# Install LocalKin Service Audio
+uv pip install localkin-service-audio
 
 # Start using it!
 kin --help
+
+# Try Kokoro TTS (requires LZMA support)
+kin audio run kokoro-82m --port 8001
 ```
+
+### Alternative: Install with pip
+
+If you prefer traditional pip (may have LZMA issues with pyenv):
+
+```bash
+# Install from PyPI
+pip install localkin-service-audio
+
+# or upgrade
+pip uninstall localkin-service-audio
+pip install localkin-service-audio --upgrade --no-cache-dir
+
+# Start using it!
+kin --help
+
+# If you get LZMA errors with Kokoro, see troubleshooting below or use uv
+```
+
+**💡 Pro Tip:** If you encounter "Could not import module 'pipeline'" errors with Kokoro TTS, use the `uv` installation method or see [Troubleshooting](#kokoro-tts-could-not-import-module-pipeline-error).
 
 ### Basic Usage
 
@@ -147,18 +173,39 @@ kin audio listen --engine whisper-cpp --model_size small --tts --tts-model kokor
 
 ### Prerequisites
 - **Python 3.10+** (required for optimal performance)
-- **uv** (fast Python package installer - highly recommended)
 - **Ollama** (optional, for LLM integration)
 - **FFmpeg** (for audio processing)
 
-### Quick Install with uv
+### Recommended: Install with uv (Best Compatibility)
 ```bash
-# Install uv (fast Python package installer)
+# Install uv (fast Python package manager with proper environment handling)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Clone and install
+# Install LocalKin Service Audio
+uv pip install localkin-service-audio
+
+# Verify installation
+kin --version
+```
+
+**Why uv?** It ensures proper Python environment with LZMA support needed for Kokoro TTS, avoiding common pyenv-related issues.
+
+### Alternative: Install from PyPI
+```bash
+# Install from PyPI (may have LZMA issues with pyenv)
+pip install localkin-service-audio
+
+# Verify installation
+kin --version
+```
+
+### Install from Source (For Contributors/Advanced Users)
+```bash
+# Clone repository for development or advanced setup
 git clone https://github.com/LocalKinAI/localkin-service-audio.git
 cd localkin-service-audio
+
+# Install with uv
 uv sync
 ```
 
@@ -275,6 +322,68 @@ kin audio pull whisper-base
 ```bash
 # If you get library loading errors, rebuild whisper.cpp
 ./scripts/build_whisper_cpp.sh
+```
+
+#### Kokoro TTS "Could not import module 'pipeline'" Error
+If you get this error when trying to use Kokoro TTS:
+```
+ERROR: Could not import module 'pipeline'. Are this object's requirements defined correctly?
+```
+
+This means your Python installation is missing LZMA compression support. Here are the solutions:
+
+**Option 1: Use System Python (Recommended - Quickest)**
+```bash
+# System Python has LZMA support built-in
+/usr/bin/python3 -m pip install --user localkin-service-audio
+
+# Add to your PATH or create an alias
+echo 'alias kin="/usr/bin/python3 -m localkin_service_audio.cli"' >> ~/.zshrc
+source ~/.zshrc
+
+# Now run normally
+kin audio run kokoro-82m --port 8001
+```
+
+**Option 2: Use uv with System Python**
+```bash
+# Use uv with system Python (keeps LZMA support)
+/usr/bin/python3 -m pip install uv
+
+# Create a virtual environment with system Python
+/usr/bin/python3 -m venv ~/.venv/localkin
+source ~/.venv/localkin/bin/activate
+
+# Install with uv
+uv pip install localkin-service-audio
+
+# Run kokoro TTS
+kin audio run kokoro-82m --port 8001
+```
+
+**Option 3: Use SpeechT5 Instead (No Python changes needed)**
+```bash
+# SpeechT5 works without LZMA - use with your current Python
+kin audio run speecht5-tts --port 8001
+```
+
+**Option 4: Fix pyenv Python (Advanced - requires reinstalling all packages)**
+```bash
+# Only if you really want to fix pyenv Python
+# WARNING: This removes all installed packages!
+
+# Install LZMA library first
+brew install xz
+
+# List your packages to reinstall later
+pip freeze > requirements_backup.txt
+
+# Reinstall Python with LZMA support
+pyenv uninstall 3.10.0
+pyenv install 3.10.0
+
+# Reinstall packages
+pip install -r requirements_backup.txt
 ```
 
 ## 🤝 Contributing

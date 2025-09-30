@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "localkin-service-audio"
-version = "1.0.0"
+version = "1.0.5"
 description = "Local Speech-to-Text and Text-to-Speech Model Manager"
-readme = "localkin_service_audio/README.md"
+readme = "README.md"
 license = "MIT"
 authors = [
     {name = "LocalKin Team", email = "info@localkin.dev"},
@@ -94,8 +94,8 @@ gpu = [
 kin = "localkin_service_audio.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/LocalKinAI/localkin-service-audio"
-Documentation = "https://localkin-service-audio.readthedocs.io/"
+Homepage = "https://localkin.ai/"
+Documentation = "https://localkin.ai/"
 Repository = "https://github.com/LocalKinAI/localkin-service-audio"
 Issues = "https://github.com/LocalKinAI/localkin-service-audio/issues"
 Changelog = "https://github.com/LocalKinAI/localkin-service-audio/blob/main/CHANGELOG.md"
@@ -110,7 +110,13 @@ include = ["localkin_service_audio*"]
 exclude = ["tests*", "docs*", "scripts*"]
 
 [tool.setuptools.package-data]
-localkin_service_audio = ["models.json", "README.md"]
+localkin_service_audio = [
+    "core/models.json",
+    "templates/*",
+    "ui/templates/*",
+    "ui/static/*",
+    "README.md"
+]
 
 [tool.uv]
 dev-dependencies = [
