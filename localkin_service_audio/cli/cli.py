@@ -1133,12 +1133,29 @@ def handle_tts(args):
     source = model_info.get('source', 'unknown')
     model_type = model_info.get('type', 'unknown')
 
-    # Show model information
+    # Check if this is a transformer/HuggingFace model - reject immediately
+    if source == 'huggingface':
+        print_error(f"❌ Error: Transformer-based TTS models must use the API server")
+        print("")
+        print(f"💡 Model '{model_name}' is a transformer model and cannot be used with CLI direct synthesis")
+        print("")
+        print(f"✅ Please use the API server instead:")
+        print("")
+        print(f"   Step 1: Start the server:")
+        print(f"      kin audio run {model_name} --port 8001")
+        print("")
+        print(f"   Step 2: Use the API:")
+        print(f"      curl -X POST \"http://localhost:8001/synthesize\" \\")
+        print(f"           -H \"Content-Type: application/json\" \\")
+        print(f"           -d '{{\"text\": \"{text[:50]}...\"}}' \\")
+        print(f"           --output speech.wav")
+        print("")
+        print(f"ℹ️  CLI 'kin audio tts' only supports 'native' (system TTS)")
+        return
+
+    # Show model information for native TTS
     print_info(f"🤖 Using TTS model: {model_name}")
     print_info(f"🔗 Source: {source}")
-    if source == 'huggingface':
-        repo = model_info.get('huggingface_repo', 'Unknown')
-        print_info(f"📦 Repository: {repo}")
     print_info(f"📏 Size: {model_info.get('size_mb', 'Unknown')}MB")
 
     # Show text preview

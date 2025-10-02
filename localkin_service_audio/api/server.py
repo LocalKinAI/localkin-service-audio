@@ -141,17 +141,22 @@ def load_tts_model(model_name: str):
             }
 
         elif "bark" in model_name.lower():
-            # Bark models use a different approach
-            from transformers import AutoProcessor, AutoModel
+            # Bark models use specific Bark classes
+            from transformers import BarkProcessor, BarkModel
+            import torch
 
-            processor = AutoProcessor.from_pretrained(repo_id)
-            model = AutoModel.from_pretrained(repo_id)
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            
+            processor = BarkProcessor.from_pretrained(repo_id)
+            model = BarkModel.from_pretrained(repo_id)
+            model = model.to(device)
 
             loaded_models[model_name] = {
                 "type": "bark",
                 "processor": processor,
                 "model": model,
-                "repo_id": repo_id
+                "repo_id": repo_id,
+                "device": device
             }
 
         elif "kokoro" in model_name.lower():
@@ -398,13 +403,17 @@ def create_app(model_name: str) -> FastAPI:
                         model = model_data["model"]
                         vocoder = model_data["vocoder"]
 
+                        # Use default speaker embeddings (512-dimensional for SpeechT5 speaker embeddings)
+                        # Create a neutral speaker embedding with some random variation
+                        speaker_embeddings = torch.randn(1, 512, dtype=torch.float32) * 0.1
+
                         inputs = processor(text=request.text, return_tensors="pt")
 
                         # Generate speech
                         with torch.no_grad():
                             speech = model.generate_speech(
                                 inputs["input_ids"],
-                                speaker_embeddings=None,  # Use default speaker
+                                speaker_embeddings=speaker_embeddings,
                                 vocoder=vocoder
                             )
 
@@ -529,14 +538,49 @@ def create_app(model_name: str) -> FastAPI:
 
                     elif model_data["type"] == "bark":
                         # Bark specific implementation
+                        from transformers import BarkProcessor, BarkModel
+                        import torch
+                        import scipy
+
                         processor = model_data["processor"]
                         model = model_data["model"]
 
-                        # This is a placeholder - Bark implementation would be more complex
-                        # involving proper tokenization and generation
-                        raise HTTPException(
-                            status_code=501,
-                            detail="Bark TTS implementation not yet fully implemented"
+                        # Bark uses special voice presets (e.g., "v2/en_speaker_0" through "v2/en_speaker_9")
+                        voice_preset = request.speaker or "v2/en_speaker_6"  # Default to speaker 6
+
+                        # Process inputs
+                        inputs = processor(request.text, voice_preset=voice_preset, return_tensors="pt")
+
+                        # Move to device if available
+                        device = "cuda" if torch.cuda.is_available() else "cpu"
+                        model = model.to(device)
+                        inputs = {k: v.to(device) for k, v in inputs.items()}
+
+                        # Generate audio
+                        with torch.no_grad():
+                            audio_array = model.generate(**inputs)
+
+                        # Convert to numpy and squeeze
+                        audio_array = audio_array.cpu().numpy().squeeze()
+
+                        # Bark uses 24kHz sample rate
+                        sample_rate = model.generation_config.sample_rate
+
+                        # Save to file using scipy
+                        scipy.io.wavfile.write(output_path, rate=sample_rate, data=audio_array)
+
+                        # Read the audio file and return it directly
+                        with open(output_path, 'rb') as f:
+                            audio_data = f.read()
+
+                        # Clean up the temp file
+                        os.unlink(output_path)
+
+                        # Return audio file directly
+                        return Response(
+                            content=audio_data,
+                            media_type="audio/wav",
+                            headers={"Content-Disposition": "attachment; filename=speech.wav"}
                         )
 
                     else:

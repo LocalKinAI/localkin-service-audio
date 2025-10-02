@@ -1929,7 +1929,7 @@ wheels = [
 
 [[package]]
 name = "localkin-service-audio"
-version = "0.1.0"
+version = "1.0.7"
 source = { editable = "." }
 dependencies = [
     { name = "ctranslate2" },

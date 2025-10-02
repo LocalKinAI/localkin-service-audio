@@ -5,9 +5,27 @@ A CLI tool for managing and running local STT and TTS models,
 inspired by Ollama's simplicity for local AI model management.
 """
 
-__version__ = "1.0.5"
+import os
+from pathlib import Path
+
+__version__ = "1.0.6"
 __author__ = "LocalKin Team"
 __description__ = "Local STT & TTS Model Manager"
+
+def get_sample_audio_path():
+    """Get the path to the included sample audio file for testing.
+    
+    Returns:
+        str: Absolute path to the sample.wav file
+        
+    Example:
+        >>> import localkin_service_audio as lsa
+        >>> sample_path = lsa.get_sample_audio_path()
+        >>> print(f"Sample audio: {sample_path}")
+    """
+    package_dir = Path(__file__).parent
+    sample_path = package_dir / "samples" / "sample.wav"
+    return str(sample_path)
 
 # Import main CLI entry point
 from .cli import main
@@ -42,5 +60,7 @@ __all__ = [
     # UI
     "create_ui_router",
     # Templates
-    "get_model_template", "list_available_templates", "create_model_from_template"
+    "get_model_template", "list_available_templates", "create_model_from_template",
+    # Utilities
+    "get_sample_audio_path"
 ]

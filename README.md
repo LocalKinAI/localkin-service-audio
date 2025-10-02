@@ -34,6 +34,8 @@
 
 ## 🚀 Quick Start
 
+**📋 New to this?** If you're setting up on a clean machine or want a complete setup guide with Python, pyenv, virtual environments, whisper.cpp, and more, see the [Complete Installation & Setup Guide](#-installation--setup) below.
+
 ### Recommended: Install with uv (Best for Kokoro TTS)
 
 Using `uv` ensures you have proper Python environment with LZMA support for Kokoro TTS:
@@ -70,7 +72,10 @@ kin --help
 # If you get LZMA errors with Kokoro, see troubleshooting below or use uv
 ```
 
-**💡 Pro Tip:** If you encounter "Could not import module 'pipeline'" errors with Kokoro TTS, use the `uv` installation method or see [Troubleshooting](#kokoro-tts-could-not-import-module-pipeline-error).
+**💡 Pro Tips:** 
+- If you encounter "Could not import module 'pipeline'" errors with Kokoro TTS, use the `uv` installation method or see [Troubleshooting](#kokoro-tts-could-not-import-module-pipeline-error)
+- For clean machine setup, see the [Complete Installation Guide](#-installation--setup) below
+- Need whisper.cpp or Ollama? See [Step 5](#step-5-install-whispercpp-optional---for-faster-stt) and [Step 7](#step-7-install-ollama-optional---for-voice-ai-features)
 
 ### Basic Usage
 
@@ -82,10 +87,16 @@ kin --help
 # List all available models with status
 kin audio models
 
-# Transcribe audio files
+# Get the included sample audio file for testing
+python -c "import localkin_service_audio as lsa; print(lsa.get_sample_audio_path())"
+
+# Transcribe audio files (use sample.wav for testing)
 kin audio transcribe audio.wav                    # Auto-select best engine
 kin audio transcribe audio.wav --engine whisper-cpp --model_size tiny  # Ultra-fast
 kin audio transcribe audio.wav --engine faster --vad                   # With VAD
+
+# Or use the included sample audio:
+python -c "import localkin_service_audio as lsa; from localkin_service_audio import transcribe_audio; print(transcribe_audio(lsa.get_sample_audio_path()))"
 
 # Real-time listening with TTS
 kin audio listen --engine whisper-cpp --tts --tts-model native
@@ -93,12 +104,20 @@ kin audio listen --engine whisper-cpp --tts --tts-model native
 # Voice AI with streaming LLM responses
 kin audio listen --llm ollama --tts --stream
 
-# Synthesize speech
-kin audio tts "Hello world" --model kokoro-82m
+# Synthesize speech (native/pyttsx3)
+kin audio tts "Hello world" --model native
+
+# For Kokoro TTS, use the API server (more reliable)
+kin audio run kokoro-82m --port 8001  # Start server
+# Then use API: curl -X POST "http://localhost:8001/synthesize" -H "Content-Type: application/json" -d '{"text":"Hello world"}'
 
 # Start web interface
 kin web
 ```
+
+**📦 Sample Audio Included:** A sample audio file is included in the package for immediate testing. Access it with `localkin_service_audio.get_sample_audio_path()`.
+
+**💡 Note:** Kokoro TTS works best via the API server (`kin audio run kokoro-82m`). Direct CLI synthesis (`kin audio tts`) is best for native/pyttsx3 models.
 
 ## 🎯 Supported Models
 
@@ -133,12 +152,25 @@ kin audio transcribe audio.wav  # Auto-selects best available
 
 ### TTS Models - Text-to-Speech
 
-#### 🚀 API Server Models (Recommended for Production)
+View all available models:
 ```bash
-# Start API server (loads once, instant responses)
-kin audio run kokoro-82m --port 8001      # High quality, 320MB
-kin audio run speecht5-tts --port 8002    # Fast, 130MB
-kin audio run xtts-v2 --port 8003         # Voice cloning, 1.8GB
+kin audio models  # List all STT and TTS models
+```
+
+#### 🚀 API Server Models (Transformer-Based - Recommended)
+
+All transformer-based TTS models must be used via API server:
+
+```bash
+# ✅ Fully Working Models
+kin audio run kokoro-82m --port 8001      # 🎯 Best quality, natural voice, 320MB
+kin audio run xtts-v2 --port 8002         # Voice cloning, multilingual, 1.8GB
+kin audio run speecht5-tts --port 8004    # Microsoft SpeechT5, fast, 1.3GB
+kin audio run bark-small --port 8005      # Suno Bark, expressive, 1.6GB
+
+# ⚠️ Models Under Development (Not Yet Fully Implemented)
+# kin audio run mms-tts-eng --port 8006     # Implementation in progress
+# kin audio run tortoise-tts --port 8003    # Implementation in progress
 
 # Use API
 curl -X POST "http://localhost:8001/synthesize" \
@@ -147,12 +179,52 @@ curl -X POST "http://localhost:8001/synthesize" \
      --output speech.wav
 ```
 
-#### 💻 CLI Models (Development/Testing)
+**Available TTS Models:**
+- **kokoro-82m** - High-quality neural TTS (320MB) - 🔥 Recommended - ✅ **Fully Working**
+- **xtts-v2** - Coqui XTTS v2, voice cloning (1.8GB) - ✅ **Fully Working**
+- **speecht5-tts** - Microsoft SpeechT5 (1.3GB) - ✅ **Fully Working**
+- **bark-small** - Suno Bark Small (1.6GB) - ✅ **Fully Working**
+- **native** - System TTS (pyttsx3) - CLI only - ✅ **Works**
+- **mms-tts-eng** - Meta MMS TTS English (1.2GB) - ⚠️ *Not yet implemented*
+- **tortoise-tts** - High-quality multi-speaker (4.5GB) - ⚠️ *Not yet implemented*
+
+#### 💻 CLI Direct Synthesis (Native Only)
 ```bash
-# Direct CLI usage (loads on-demand)
-kin audio tts "Hello world" --model kokoro-82m
-kin audio tts "Hello world" --model native        # Fastest, built-in
+# Only native/system TTS is supported for direct CLI synthesis
+kin audio tts "Hello world" --model native        # ✅ Works - System TTS
+
+# Transformer models are rejected with helpful guidance:
+kin audio tts "Hello world" --model kokoro-82m    # ❌ Immediately shows error:
+# "Error: Transformer-based TTS models must use the API server"
+# "Please use: kin audio run kokoro-82m --port 8001"
+# "Then call the API endpoint for synthesis"
 ```
+
+**⚠️ Important:** CLI `kin audio tts` only works with `native` (system TTS). All transformer-based models (Kokoro, XTTS, SpeechT5, Bark, MMS, Tortoise) require the API server.
+
+**✅ Correct Usage for Transformer Models:**
+```bash
+# Step 1: Start API server (one-time, stays loaded)
+kin audio run kokoro-82m --port 8001
+
+# Step 2: Use the API (instant responses)
+curl -X POST "http://localhost:8001/synthesize" \
+     -H "Content-Type: application/json" \
+     -d '{"text": "Hello world"}' \
+     --output speech.wav
+
+# Or use Python API:
+python -c "
+from localkin_service_audio import synthesize_speech
+result = synthesize_speech('Hello world')
+"
+```
+
+**💡 Why API Server?**
+- Model loads **once** and stays in memory (not on every request)
+- Synthesis is **instant** after initial load
+- Multiple requests reuse the loaded model
+- Better resource management and error handling
 
 ### 🤖 LLM Integration
 
@@ -171,17 +243,218 @@ kin audio listen --engine whisper-cpp --model_size small --tts --tts-model kokor
 
 ## 📦 Installation & Setup
 
-### Prerequisites
-- **Python 3.10+** (required for optimal performance)
-- **Ollama** (optional, for LLM integration)
-- **FFmpeg** (for audio processing)
+### 🎯 Prerequisites for Clean Machine Setup
 
-### Recommended: Install with uv (Best Compatibility)
+Before installing LocalKin Service Audio, ensure you have these system tools:
+
+#### macOS
 ```bash
-# Install uv (fast Python package manager with proper environment handling)
+# Install Homebrew (if not already installed)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install essential build tools
+xcode-select --install  # Install Xcode Command Line Tools
+
+# Install dependencies
+brew install openssl readline sqlite3 xz zlib tcl-tk ffmpeg
+```
+
+#### Ubuntu/Debian
+```bash
+# Update package list
+sudo apt-get update
+
+# Install essential build tools
+sudo apt-get install -y build-essential curl git
+
+# Install Python build dependencies
+sudo apt-get install -y make libssl-dev zlib1g-dev \
+  libbz2-dev libreadline-dev libsqlite3-dev wget llvm \
+  libncursesw5-dev xz-utils tk-dev libxml2-dev \
+  libxmlsec1-dev libffi-dev liblzma-dev
+
+# Install FFmpeg
+sudo apt-get install -y ffmpeg
+```
+
+#### Windows (WSL2 Recommended)
+```powershell
+# Install WSL2
+wsl --install
+
+# Then follow Ubuntu/Debian instructions inside WSL2
+```
+
+---
+
+### Step 1: Install Python 3.10+ with pyenv (Recommended)
+
+#### macOS/Linux: Install pyenv
+```bash
+# Install pyenv
+curl https://pyenv.run | bash
+
+# Add to your shell configuration (~/.zshrc or ~/.bashrc)
+export PYENV_ROOT="$HOME/.pyenv"
+export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init -)"
+
+# Reload your shell
+source ~/.zshrc  # or source ~/.bashrc
+```
+
+**Note:** If you followed the Prerequisites section above, all required dependencies are already installed.
+
+#### Install Python 3.10+ with LZMA Support
+```bash
+# Install Python 3.10 (or newer) with LZMA support
+pyenv install 3.10.16
+
+# Set as global Python version
+pyenv global 3.10.16
+
+# Verify LZMA support (critical for Kokoro TTS)
+python -c "import lzma; print('✅ LZMA support OK')"
+
+# Verify Python version
+python --version
+```
+
+### Step 2: Install uv (Fast Package Manager)
+
+```bash
+# Install uv (highly recommended for better dependency management)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Install LocalKin Service Audio
+# Verify installation
+uv --version
+```
+
+### Step 3: Create Virtual Environment with uv
+
+```bash
+# Create a virtual environment for LocalKin
+uv venv ~/.venv/localkin
+
+# Activate the virtual environment
+source ~/.venv/localkin/bin/activate  # On macOS/Linux
+# Or on Windows: .venv\localkin\Scripts\activate
+
+# Your prompt should now show (localkin)
+```
+
+### Step 4: Install LocalKin Service Audio
+
+#### Option A: With uv (Recommended)
+```bash
+# Install LocalKin Service Audio with uv
+uv pip install localkin-service-audio
+
+# Verify installation
+kin --version
+```
+
+#### Option B: With pip
+```bash
+# Install from PyPI
+pip install localkin-service-audio
+
+# Verify installation
+kin --version
+```
+
+### Step 5: Install whisper.cpp (Optional - for faster STT)
+
+whisper.cpp provides native, optimized speech recognition:
+
+```bash
+# Download and build whisper.cpp using the provided script
+kin audio models whisper.cpp-setup
+
+# Or manually:
+# 1. Clone whisper.cpp
+git clone https://github.com/ggerganov/whisper.cpp.git ~/whisper.cpp
+cd ~/whisper.cpp
+
+# 2. Build whisper.cpp
+make
+
+# 3. Download a model (e.g., base model)
+bash ./models/download-ggml-model.sh base
+
+# 4. Verify it works
+./main -f samples/jfk.wav -m models/ggml-base.bin
+
+# 5. Add to PATH or specify path when using kin
+export WHISPER_CPP_PATH=~/whisper.cpp
+```
+
+### Step 6: Verify FFmpeg Installation
+
+```bash
+# FFmpeg should already be installed from Prerequisites
+# Verify it's working
+ffmpeg -version
+```
+
+**Note:** If you skipped the Prerequisites section, install FFmpeg now:
+- **macOS**: `brew install ffmpeg`
+- **Ubuntu/Debian**: `sudo apt-get install ffmpeg`
+
+### Step 7: Install Ollama (Optional - for Voice AI Features)
+
+```bash
+# macOS/Linux
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Start Ollama service
+ollama serve
+
+# Pull a model (in another terminal)
+ollama pull qwen2.5:3b  # or any model you prefer
+
+# Verify
+ollama list
+```
+
+### Quick Start After Setup
+
+```bash
+# Activate your virtual environment
+source ~/.venv/localkin/bin/activate
+
+# Check available models
+kin audio models
+
+# Test with included sample audio
+python -c "import localkin_service_audio as lsa; print(f'Sample audio: {lsa.get_sample_audio_path()}')"
+
+# Try speech recognition with the sample
+python3 << EOF
+import localkin_service_audio as lsa
+result = lsa.transcribe_audio(lsa.get_sample_audio_path())
+print(f"Transcription: {result}")
+EOF
+
+# Or use CLI with your own audio file
+kin audio transcribe audio.wav --engine whisper-cpp
+
+# Start Kokoro TTS server
+kin audio run kokoro-82m --port 8001
+
+# Voice AI conversation (requires Ollama)
+kin audio listen --llm ollama --tts --stream
+```
+
+### Alternative: Quick Install (Without Virtual Environment)
+
+If you prefer a simpler setup without virtual environments:
+
+```bash
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install LocalKin directly
 uv pip install localkin-service-audio
 
 # Verify installation
@@ -189,15 +462,6 @@ kin --version
 ```
 
 **Why uv?** It ensures proper Python environment with LZMA support needed for Kokoro TTS, avoiding common pyenv-related issues.
-
-### Alternative: Install from PyPI
-```bash
-# Install from PyPI (may have LZMA issues with pyenv)
-pip install localkin-service-audio
-
-# Verify installation
-kin --version
-```
 
 ### Install from Source (For Contributors/Advanced Users)
 ```bash
