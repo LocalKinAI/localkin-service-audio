@@ -9,10 +9,17 @@ except ImportError:
     FASTER_WHISPER_AVAILABLE = False
 
 try:
-    from .whisper_cpp import WhisperCppSTT, transcribe_with_whisper_cpp, get_whisper_cpp_engines
+    import pywhispercpp as pw
     WHISPER_CPP_AVAILABLE = True
 except ImportError:
     WHISPER_CPP_AVAILABLE = False
+
+# Keep old implementation as fallback
+try:
+    from .whisper_cpp import WhisperCppSTT, transcribe_with_whisper_cpp, get_whisper_cpp_engines
+    WHISPER_CPP_AVAILABLE_OLD = True
+except ImportError:
+    WHISPER_CPP_AVAILABLE_OLD = False
     WhisperCppSTT = None
     transcribe_with_whisper_cpp = None
     get_whisper_cpp_engines = None
@@ -172,66 +179,69 @@ def transcribe_with_faster_whisper(model_size: str, audio_file_path: str, enable
 
 def transcribe_with_whisper_cpp_engine(model_size: str, audio_file_path: str, **kwargs) -> str:
     """
-    Transcribes using whisper.cpp (C/C++ implementation).
+    Transcribes using pywhispercpp (Python bindings for whisper.cpp).
     Extremely fast and efficient.
 
     Args:
         model_size: The model size to use (tiny, base, small, medium, large)
         audio_file_path: Path to the audio file
-        **kwargs: Additional arguments for whisper-cli
+        **kwargs: Additional arguments
 
     Returns:
         Transcribed text
     """
     if not WHISPER_CPP_AVAILABLE:
-        return "Error: whisper.cpp is not available. Please install whisper.cpp and ensure whisper-cli is in your PATH."
+        # Fallback to old implementation if available
+        if WHISPER_CPP_AVAILABLE_OLD and transcribe_with_whisper_cpp:
+            return transcribe_with_whisper_cpp(model_size, audio_file_path, **kwargs)
+        return "Error: pywhispercpp is not available. Please install it with: pip install pywhispercpp"
 
     try:
-        # Map model size to whisper.cpp model name
-        model_name_map = {
-            "tiny": "whisper-cpp-tiny",
-            "base": "whisper-cpp-base",
-            "small": "whisper-cpp-small",
-            "medium": "whisper-cpp-medium",
-            "large": "whisper-cpp-large"
-        }
+        # pywhispercpp uses model names without .bin extension
+        model_filename = model_size
 
-        whisper_cpp_model = model_name_map.get(model_size, model_size)
+        print(f"Loading pywhispercpp model '{model_filename}'... (This might download the model on first use)")
 
-        # Try to find or download the model
-        stt = WhisperCppSTT()
+        # Import the Model class from pywhispercpp
+        from pywhispercpp.model import Model
 
-        # Check if it's already a whisper-cpp model name
-        if not whisper_cpp_model.startswith("whisper-cpp-"):
-            whisper_cpp_model = f"whisper-cpp-{model_size}"
+        # Initialize whisper model with pywhispercpp
+        model = Model(model_filename)
 
-        print(f"Loading whisper.cpp model '{whisper_cpp_model}'...")
+        print(f"Transcribing {audio_file_path} with pywhispercpp...")
 
-        # Try to download the model if not available
-        try:
-            model_path = stt.download_model(whisper_cpp_model)
-        except Exception as download_e:
-            return f"Failed to download whisper.cpp model: {download_e}"
+        # Load audio with librosa and resample if needed (Whisper requires 16kHz)
+        import numpy as np
+        import librosa
 
-        print(f"Transcribing {audio_file_path} with whisper.cpp...")
+        # Load audio file with librosa (handles resampling automatically)
+        print(f"Loading audio file: {audio_file_path}")
+        audio_array, sample_rate = librosa.load(audio_file_path, sr=16000, mono=True)
 
         # Extract language from kwargs if provided
         language = kwargs.pop('language', None)
 
-        # Transcribe with whisper.cpp
-        result = stt.transcribe(
-            audio_file_path,
-            model_path=model_path,
-            language=language,
-            output_format="txt",
-            **kwargs
-        )
+        # Transcribe with pywhispercpp using numpy array
+        result = model.transcribe(audio_array, language=language if language else None)
+
+        # Extract text from result - pywhispercpp returns a list of segments
+        transcribed_text = ""
+        if isinstance(result, list):
+            for segment in result:
+                if hasattr(segment, 'text'):
+                    transcribed_text += segment.text
+                elif isinstance(segment, dict) and 'text' in segment:
+                    transcribed_text += segment['text']
+        elif isinstance(result, dict) and 'text' in result:
+            transcribed_text = result['text']
+        elif isinstance(result, str):
+            transcribed_text = result
 
         print("Transcription complete.")
-        return result
+        return transcribed_text.strip()
 
     except Exception as e:
-        return f"whisper.cpp transcription failed: {e}"
+        return f"pywhispercpp transcription failed: {e}"
 
 def get_available_engines() -> Dict[str, bool]:
     """
@@ -240,11 +250,11 @@ def get_available_engines() -> Dict[str, bool]:
     engines = {
         "openai_whisper": True,  # Always available
         "faster_whisper": FASTER_WHISPER_AVAILABLE,
-        "whisper_cpp": WHISPER_CPP_AVAILABLE
+        "whisper_cpp": WHISPER_CPP_AVAILABLE  # Now uses pywhispercpp
     }
 
-    # If whisper.cpp is available, also check if executable is actually found
-    if WHISPER_CPP_AVAILABLE and get_whisper_cpp_engines:
+    # Keep old whisper-cpp check as fallback
+    if not WHISPER_CPP_AVAILABLE and WHISPER_CPP_AVAILABLE_OLD and get_whisper_cpp_engines:
         cpp_engines = get_whisper_cpp_engines()
         engines["whisper_cpp"] = cpp_engines.get("whisper_cpp", False)
 

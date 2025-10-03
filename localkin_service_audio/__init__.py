@@ -8,7 +8,7 @@ inspired by Ollama's simplicity for local AI model management.
 import os
 from pathlib import Path
 
-__version__ = "1.0.6"
+__version__ = "1.1.0"
 __author__ = "LocalKin Team"
 __description__ = "Local STT & TTS Model Manager"
 

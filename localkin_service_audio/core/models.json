@@ -188,7 +188,7 @@
       "license": "MIT",
       "size_mb": 39,
       "requirements": [
-        "whisper.cpp"
+        "pywhispercpp"
       ],
       "engines": ["whisper-cpp"],
       "tags": [
@@ -207,7 +207,7 @@
       "license": "MIT",
       "size_mb": 74,
       "requirements": [
-        "whisper.cpp"
+        "pywhispercpp"
       ],
       "engines": ["whisper-cpp"],
       "tags": [
@@ -226,7 +226,7 @@
       "license": "MIT",
       "size_mb": 244,
       "requirements": [
-        "whisper.cpp"
+        "pywhispercpp"
       ],
       "engines": ["whisper-cpp"],
       "tags": [
@@ -244,7 +244,7 @@
       "license": "MIT",
       "size_mb": 769,
       "requirements": [
-        "whisper.cpp"
+        "pywhispercpp"
       ],
       "engines": ["whisper-cpp"],
       "tags": [
@@ -262,7 +262,7 @@
       "license": "MIT",
       "size_mb": 1550,
       "requirements": [
-        "whisper.cpp"
+        "pywhispercpp"
       ],
       "engines": ["whisper-cpp"],
       "tags": [

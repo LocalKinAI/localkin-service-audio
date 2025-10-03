@@ -125,16 +125,16 @@ kin web
 
 #### 🚀 Ultra-Fast whisper.cpp Models (Recommended)
 ```bash
-# Download models
-python scripts/download_whisper_cpp_models.py --list
-python scripts/download_whisper_cpp_models.py tiny base small
+# Automatic installation - no manual setup needed!
+# Models download automatically on first use
 
-# Usage
+# Usage - works immediately after pip install
 kin audio transcribe audio.wav --engine whisper-cpp --model_size tiny  # 50x faster!
 kin audio listen --engine whisper-cpp --model_size base               # Real-time
 ```
 
 **Performance:** Up to 50x faster than OpenAI Whisper with low memory usage.
+**✅ Automatic:** No separate installation required - included with `pywhispercpp` package.
 
 #### ⚡ Fast Whisper Models (Balanced)
 ```bash
@@ -363,31 +363,18 @@ pip install localkin-service-audio
 kin --version
 ```
 
-### Step 5: Install whisper.cpp (Optional - for faster STT)
+### Step 5: whisper.cpp (✅ Automatically Included!)
 
-whisper.cpp provides native, optimized speech recognition:
+whisper.cpp is now automatically included via the `pywhispercpp` package - no manual installation needed!
 
 ```bash
-# Download and build whisper.cpp using the provided script
-kin audio models whisper.cpp-setup
+# whisper.cpp models work immediately after pip install
+kin audio transcribe audio.wav --engine whisper-cpp --model_size tiny
 
-# Or manually:
-# 1. Clone whisper.cpp
-git clone https://github.com/ggerganov/whisper.cpp.git ~/whisper.cpp
-cd ~/whisper.cpp
-
-# 2. Build whisper.cpp
-make
-
-# 3. Download a model (e.g., base model)
-bash ./models/download-ggml-model.sh base
-
-# 4. Verify it works
-./main -f samples/jfk.wav -m models/ggml-base.bin
-
-# 5. Add to PATH or specify path when using kin
-export WHISPER_CPP_PATH=~/whisper.cpp
+# Models download automatically on first use - no setup required!
 ```
+
+**Note:** If you need the original C++ executable for advanced use cases, you can still install it manually as before.
 
 ### Step 6: Verify FFmpeg Installation
 
