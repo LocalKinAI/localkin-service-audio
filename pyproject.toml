@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "localkin-service-audio"
-version = "1.1.0"
+version = "1.0.6"
 description = "Local Speech-to-Text and Text-to-Speech Model Manager"
 readme = "README.md"
 license = "MIT"
@@ -63,8 +63,6 @@ dependencies = [
     "ctranslate2>=4.0.0", # Required for faster-whisper
     "sentencepiece>=0.2.1",
     "TTS>=0.22.0",  # Coqui TTS for XTTS-v2 model
-    "pywhispercpp>=1.0.0",  # Whisper.cpp Python bindings for fast STT
-    "librosa>=0.10.0",  # Audio processing library for whisper-cpp
 ]
 
 [project.optional-dependencies]
