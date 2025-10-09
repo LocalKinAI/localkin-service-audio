@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalKin Audio - Voice AI Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>[x-cloak] { display: none !important; }</style>
+</head>
+<body class="h-full bg-gradient-to-br from-slate-50 to-blue-50" x-data="app()" x-init="init()">
+
+    <!-- Main Container -->
+    <div class="min-h-screen flex flex-col">
+
+        <!-- Header -->
+        <header class="bg-white shadow-sm sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-4xl">🎵</span>
+                        <div>
+                            <h1 class="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                                LocalKin Audio
+                            </h1>
+                            <p class="text-sm text-gray-600">Complete Voice AI Platform</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-4">
+                        <div class="hidden md:flex items-center space-x-2 text-sm">
+                            <div class="px-3 py-1 bg-green-100 text-green-800 rounded-full flex items-center space-x-1">
+                                <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                <span>Online</span>
+                            </div>
+                            <span class="text-gray-600" x-text="`${stats.models_count || 0} Models`"></span>
+                        </div>
+                        <button @click="showStats = !showStats" class="p-2 hover:bg-gray-100 rounded-lg">
+                            <i data-lucide="activity" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="mt-4 flex space-x-1 border-b border-gray-200">
+                    <button @click="currentTab = 'home'"
+                            :class="currentTab === 'home' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-600 hover:text-gray-900'"
+                            class="px-4 py-2 font-medium text-sm flex items-center space-x-2">
+                        <i data-lucide="home" class="w-4 h-4"></i>
+                        <span>Home</span>
+                    </button>
+                    <button @click="currentTab = 'transcribe'"
+                            :class="currentTab === 'transcribe' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-600 hover:text-gray-900'"
+                            class="px-4 py-2 font-medium text-sm flex items-center space-x-2">
+                        <i data-lucide="mic" class="w-4 h-4"></i>
+                        <span>Transcribe</span>
+                    </button>
+                    <button @click="currentTab = 'synthesize'"
+                            :class="currentTab === 'synthesize' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-600 hover:text-gray-900'"
+                            class="px-4 py-2 font-medium text-sm flex items-center space-x-2">
+                        <i data-lucide="volume-2" class="w-4 h-4"></i>
+                        <span>Synthesize</span>
+                    </button>
+                    <button @click="currentTab = 'models'"
+                            :class="currentTab === 'models' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-600 hover:text-gray-900'"
+                            class="px-4 py-2 font-medium text-sm flex items-center space-x-2">
+                        <i data-lucide="database" class="w-4 h-4"></i>
+                        <span>Models</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+
+            <!-- Home Tab -->
+            <div x-show="currentTab === 'home'" x-cloak>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <!-- Quick Action Cards -->
+                    <div @click="currentTab = 'transcribe'" class="bg-white rounded-xl shadow-sm hover:shadow-md transition p-6 cursor-pointer group">
+                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                            <i data-lucide="mic" class="w-6 h-6 text-blue-600"></i>
+                        </div>
+                        <h3 class="font-semibold text-gray-900 mb-2">Speech-to-Text</h3>
+                        <p class="text-sm text-gray-600">Convert audio to text</p>
+                    </div>
+
+                    <div @click="currentTab = 'synthesize'" class="bg-white rounded-xl shadow-sm hover:shadow-md transition p-6 cursor-pointer group">
+                        <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                            <i data-lucide="volume-2" class="w-6 h-6 text-green-600"></i>
+                        </div>
+                        <h3 class="font-semibold text-gray-900 mb-2">Text-to-Speech</h3>
+                        <p class="text-sm text-gray-600">Generate natural speech</p>
+                    </div>
+
+                    <div @click="currentTab = 'models'" class="bg-white rounded-xl shadow-sm hover:shadow-md transition p-6 cursor-pointer group">
+                        <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                            <i data-lucide="database" class="w-6 h-6 text-purple-600"></i>
+                        </div>
+                        <h3 class="font-semibold text-gray-900 mb-2">Models</h3>
+                        <p class="text-sm text-gray-600">Manage AI models</p>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-sm p-6 text-white">
+                        <div class="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center mb-4">
+                            <i data-lucide="zap" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="font-semibold mb-2">{{ stats.models_count || 24 }} Models</h3>
+                        <p class="text-sm opacity-90">Ready to use</p>
+                    </div>
+                </div>
+
+                <!-- Features Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white rounded-xl p-6 text-center">
+                        <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i data-lucide="shield" class="w-8 h-8 text-blue-600"></i>
+                        </div>
+                        <h3 class="font-semibold text-gray-900 mb-2">Privacy First</h3>
+                        <p class="text-sm text-gray-600">100% local processing. Your data never leaves your device.</p>
+                    </div>
+
+                    <div class="bg-white rounded-xl p-6 text-center">
+                        <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i data-lucide="zap" class="w-8 h-8 text-green-600"></i>
+                        </div>
+                        <h3 class="font-semibold text-gray-900 mb-2">Lightning Fast</h3>
+                        <p class="text-sm text-gray-600">Optimized models with GPU acceleration for instant results.</p>
+                    </div>
+
+                    <div class="bg-white rounded-xl p-6 text-center">
+                        <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i data-lucide="layers" class="w-8 h-8 text-purple-600"></i>
+                        </div>
+                        <h3 class="font-semibold text-gray-900 mb-2">Multiple Models</h3>
+                        <p class="text-sm text-gray-600">Choose from 24+ AI models for perfect quality/speed balance.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transcribe Tab -->
+            <div x-show="currentTab === 'transcribe'" x-cloak>
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6">Speech-to-Text</h2>
+
+                    <div class="space-y-6">
+                        <!-- File Upload -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Audio File</label>
+                            <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-500 transition">
+                                <input type="file" id="audioFile" accept="audio/*" class="hidden" @change="handleAudioFile">
+                                <label for="audioFile" class="cursor-pointer">
+                                    <i data-lucide="upload" class="w-12 h-12 text-gray-400 mx-auto mb-3"></i>
+                                    <p class="text-sm text-gray-600">Click to upload or drag and drop</p>
+                                    <p class="text-xs text-gray-500 mt-1">WAV, MP3, FLAC, OGG (Max 100MB)</p>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Model Selection -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Model</label>
+                            <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                                <option value="whisper-cpp-tiny">Whisper.cpp Tiny (Ultra Fast)</option>
+                                <option value="whisper-cpp-base">Whisper.cpp Base (Fast)</option>
+                                <option value="faster-whisper-small">Faster Whisper Small (Balanced)</option>
+                                <option value="whisper-base">OpenAI Whisper Base (High Quality)</option>
+                            </select>
+                        </div>
+
+                        <!-- Transcribe Button -->
+                        <button class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition">
+                            <i data-lucide="mic" class="w-5 h-5 inline mr-2"></i>
+                            Transcribe Audio
+                        </button>
+
+                        <!-- Results -->
+                        <div x-show="transcription" class="bg-gray-50 rounded-lg p-4">
+                            <h3 class="font-semibold text-gray-900 mb-2">Transcription Result</h3>
+                            <p class="text-gray-700" x-text="transcription"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Synthesize Tab -->
+            <div x-show="currentTab === 'synthesize'" x-cloak>
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6">Text-to-Speech</h2>
+
+                    <div class="space-y-6">
+                        <!-- Text Input -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Text to Synthesize</label>
+                            <textarea x-model="textToSynthesize" rows="6"
+                                      class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                      placeholder="Enter text to convert to speech..."></textarea>
+                            <p class="text-xs text-gray-500 mt-1" x-text="`${textToSynthesize.length} characters`"></p>
+                        </div>
+
+                        <!-- Model & Voice Selection -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">TTS Model</label>
+                                <select x-model="ttsModel" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                                    <option value="kokoro-82m">Kokoro 82M (Recommended)</option>
+                                    <option value="xtts-v2">XTTS v2 (Voice Cloning)</option>
+                                    <option value="speecht5-tts">SpeechT5 (Fast)</option>
+                                    <option value="native">Native/System TTS</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Voice</label>
+                                <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                                    <option value="female">Female (Sarah)</option>
+                                    <option value="male">Male (Adam)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Synthesize Button -->
+                        <button class="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 rounded-lg font-medium hover:from-green-700 hover:to-emerald-700 transition">
+                            <i data-lucide="volume-2" class="w-5 h-5 inline mr-2"></i>
+                            Generate Speech
+                        </button>
+
+                        <!-- Audio Player -->
+                        <div x-show="audioUrl" class="bg-gray-50 rounded-lg p-4">
+                            <h3 class="font-semibold text-gray-900 mb-3">Generated Audio</h3>
+                            <audio controls class="w-full" x-bind:src="audioUrl"></audio>
+                            <button class="mt-3 text-sm text-indigo-600 hover:text-indigo-700">
+                                <i data-lucide="download" class="w-4 h-4 inline mr-1"></i>
+                                Download Audio
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Models Tab -->
+            <div x-show="currentTab === 'models'" x-cloak>
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6">Model Library</h2>
+
+                    <!-- Model Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <template x-for="model in models" :key="model.name">
+                            <div class="border border-gray-200 rounded-lg p-4 hover:border-indigo-500 transition">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900" x-text="model.name"></h3>
+                                        <p class="text-sm text-gray-600" x-text="model.description"></p>
+                                    </div>
+                                    <span class="px-2 py-1 text-xs rounded-full"
+                                          :class="model.cached ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'"
+                                          x-text="model.cached ? 'Cached' : 'Available'"></span>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm text-gray-500" x-text="model.size"></span>
+                                    <button x-show="!model.cached" class="text-sm text-indigo-600 hover:text-indigo-700">
+                                        <i data-lucide="download" class="w-4 h-4 inline mr-1"></i>
+                                        Download
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-white border-t border-gray-200 mt-auto">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <p class="text-center text-sm text-gray-600">
+                    LocalKin Audio v{{ version }} - Complete Voice AI Platform
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Alpine.js App Logic -->
+    <script>
+        function app() {
+            return {
+                currentTab: 'home',
+                showStats: false,
+                stats: {},
+                models: [],
+                transcription: '',
+                textToSynthesize: '',
+                ttsModel: 'kokoro-82m',
+                audioUrl: null,
+                version: '1.1.3',
+
+                async init() {
+                    await this.loadStats();
+                    await this.loadModels();
+                    lucide.createIcons();
+
+                    // Refresh icons when tab changes
+                    this.$watch('currentTab', () => {
+                        this.$nextTick(() => lucide.createIcons());
+                    });
+                },
+
+                async loadStats() {
+                    try {
+                        const response = await fetch('/api/status');
+                        this.stats = await response.json();
+                    } catch (error) {
+                        console.error('Failed to load stats:', error);
+                    }
+                },
+
+                async loadModels() {
+                    try {
+                        const response = await fetch('/api/models');
+                        const data = await response.json();
+                        this.models = data.models?.slice(0, 10) || [];
+                    } catch (error) {
+                        console.error('Failed to load models:', error);
+                    }
+                },
+
+                handleAudioFile(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        console.log('Audio file selected:', file.name);
+                        // Add upload logic here
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

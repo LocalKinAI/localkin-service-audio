@@ -213,3 +213,4 @@ production.log
 *.avi
 *.mov
 *.mkv
+electron-app/

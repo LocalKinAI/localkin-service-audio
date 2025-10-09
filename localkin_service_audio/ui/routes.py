@@ -292,12 +292,12 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    """Main web interface page."""
+    """Main web interface page with modern UI."""
     models = get_models()
     cache_info = get_cache_info()
     templates_list = list_available_templates()
 
-    return templates.TemplateResponse("index.html", {
+    return templates.TemplateResponse("modern_index.html", {
         "request": request,
         "models": models,
         "cache_info": cache_info,
