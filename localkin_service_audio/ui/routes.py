@@ -21,7 +21,7 @@ from ..core import (
     get_models, find_model, list_local_models,
     transcribe_audio, synthesize_speech, get_cache_info
 )
-from ..cli.cli import synthesize_huggingface_tts, print_error, print_info
+from ..cli.cli_legacy import synthesize_huggingface_tts, print_error, print_info
 from ..templates import list_available_templates
 
 

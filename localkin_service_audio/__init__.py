@@ -1,16 +1,22 @@
 """
-LocalKin Service Audio - Local Speech-to-Text and Text-to-Speech Model Manager
+LocalKin Service Audio - Voice AI Platform
 
-A CLI tool for managing and running local STT and TTS models,
-inspired by Ollama's simplicity for local AI model management.
+A comprehensive voice AI platform with:
+- Multiple STT engines (Whisper, SenseVoice, Paraformer, Moonshine)
+- Multiple TTS engines (Kokoro, CosyVoice, ChatTTS, F5-TTS)
+- Chinese language support
+- Voice cloning capabilities
+- MCP integration for Claude Code/Desktop
+
+Inspired by Ollama's simplicity for local AI model management.
 """
 
 import os
 from pathlib import Path
 
-__version__ = "1.1.3"
+__version__ = "2.0.0"
 __author__ = "LocalKin Team"
-__description__ = "Local STT & TTS Model Manager"
+__description__ = "Voice AI Platform - Local STT/TTS with Chinese Language Support"
 
 def get_sample_audio_path():
     """Get the path to the included sample audio file for testing.
