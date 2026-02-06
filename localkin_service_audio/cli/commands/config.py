@@ -156,6 +156,7 @@ def _show_overview(s):
 
     print("\n🌍 Environment Overrides:")
     env_vars = {
+        "LOCALKIN_HOME": "(base directory for all paths)",
         "LOCALKIN_CACHE_DIR": "cache_dir",
         "LOCALKIN_CONFIG_DIR": "config_dir",
         "LOCALKIN_MODELS_DIR": "models_dir",
@@ -211,6 +212,7 @@ def _show_paths(s):
     print(f"  models.yaml: {s.config_dir / 'models.yaml'}")
 
     print("\n🌍 Environment variable overrides:")
+    print("  LOCALKIN_HOME           -> base directory for all paths")
     print("  LOCALKIN_CACHE_DIR      -> cache_dir")
     print("  LOCALKIN_CONFIG_DIR     -> config_dir")
     print("  LOCALKIN_MODELS_DIR     -> models_dir")

@@ -8,14 +8,19 @@ import os
 import json
 
 
+def _default_home() -> Path:
+    """Get the base directory, respecting LOCALKIN_HOME."""
+    return Path(os.environ.get("LOCALKIN_HOME", Path.home() / ".localkin-service-audio"))
+
+
 @dataclass
 class Settings:
     """Application settings."""
 
     # Paths
-    cache_dir: Path = field(default_factory=lambda: Path.home() / ".localkin-service-audio" / "cache")
-    config_dir: Path = field(default_factory=lambda: Path.home() / ".localkin-service-audio")
-    models_dir: Path = field(default_factory=lambda: Path.home() / ".localkin-service-audio" / "models")
+    cache_dir: Path = field(default_factory=lambda: _default_home() / "cache")
+    config_dir: Path = field(default_factory=lambda: _default_home())
+    models_dir: Path = field(default_factory=lambda: _default_home() / "models")
 
     # Default models
     default_stt_model: str = "whisper-cpp:base"
@@ -38,7 +43,7 @@ class Settings:
     def load(cls, config_path: Optional[Path] = None) -> "Settings":
         """Load settings from config file."""
         if config_path is None:
-            config_path = Path.home() / ".localkin-service-audio" / "config.json"
+            config_path = _default_home() / "config.json"
 
         settings = cls()
 
