@@ -60,13 +60,32 @@ kin web
 # Install uv if you don't have it
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Install LocalKin Audio
+# Create a virtual environment and install
+uv venv
 uv pip install localkin-service-audio
 
 # Or install from source (for development)
 git clone https://github.com/LocalKinAI/localkin-service-audio.git
 cd localkin-service-audio
 uv sync
+```
+
+**Using in a new terminal:** The virtual environment needs to be activated each session:
+
+```bash
+# Option 1: Activate the venv
+source .venv/bin/activate
+kin audio models
+
+# Option 2: Use uv run (no activation needed)
+uv run kin audio models
+```
+
+To auto-activate, add to your `~/.zshrc` or `~/.bashrc`:
+
+```bash
+# Activate .venv automatically when entering a project directory
+cd() { builtin cd "$@" && [ -f .venv/bin/activate ] && source .venv/bin/activate; }
 ```
 
 ### Using pip
@@ -79,17 +98,19 @@ pip install localkin-service-audio
 
 ```bash
 # Chinese language models
-pip install localkin-service-audio[chinese]
+uv pip install localkin-service-audio[chinese]
 
 # Voice cloning models
-pip install localkin-service-audio[cloning]
+uv pip install localkin-service-audio[cloning]
 
 # MCP server for Claude
-pip install localkin-service-audio[mcp]
+uv pip install localkin-service-audio[mcp]
 
 # All features
-pip install localkin-service-audio[all-new]
+uv pip install localkin-service-audio[all-new]
 ```
+
+> Replace `uv pip` with `pip` if not using uv.
 
 ## CLI Usage
 
@@ -534,7 +555,11 @@ localkin_service_audio/
 git clone https://github.com/LocalKinAI/localkin-service-audio.git
 cd localkin-service-audio
 
-# Install with dev dependencies
+# Install with dev dependencies (uv recommended)
+uv venv && source .venv/bin/activate
+uv pip install -e ".[dev]"
+
+# Or with pip
 pip install -e ".[dev]"
 
 # Run tests
@@ -544,6 +569,12 @@ pytest tests/
 ruff check .
 black --check .
 ```
+
+> **Tip:** With `uv`, you can skip activation and run commands directly:
+> ```bash
+> uv run kin audio models
+> uv run pytest tests/
+> ```
 
 ## Troubleshooting
 
