@@ -23,9 +23,10 @@ from ..ui import create_ui_router
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Cache configuration (duplicated from models.py to avoid circular imports)
+# Cache configuration - use settings for LOCALKIN_HOME support
 from pathlib import Path
-HF_CACHE_DIR = Path.home() / ".localkin-service-audio" / "cache" / "huggingface"
+from localkin_service_audio.core.config.settings import _default_home
+HF_CACHE_DIR = _default_home() / "cache" / "huggingface"
 HF_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 def get_cache_info():

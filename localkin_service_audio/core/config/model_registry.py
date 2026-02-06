@@ -318,9 +318,10 @@ class ModelRegistry:
 
     def _load_external_models(self):
         """Load models from external config files."""
+        from .settings import _default_home
         config_paths = [
-            Path.home() / ".localkin-service-audio" / "models.json",
-            Path.home() / ".localkin-service-audio" / "models.yaml",
+            _default_home() / "models.json",
+            _default_home() / "models.yaml",
         ]
 
         # Add environment variable path if set

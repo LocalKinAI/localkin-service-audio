@@ -7,8 +7,10 @@ import hashlib
 
 OLLAMA_API_URL = "http://localhost:11434"
 
-# Cache configuration
-CACHE_DIR = Path.home() / ".localkin-service-audio" / "cache"
+# Cache configuration - use settings for LOCALKIN_HOME support
+from .config.settings import _default_home
+
+CACHE_DIR = _default_home() / "cache"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 HF_CACHE_DIR = CACHE_DIR / "huggingface"
 HF_CACHE_DIR.mkdir(exist_ok=True)
