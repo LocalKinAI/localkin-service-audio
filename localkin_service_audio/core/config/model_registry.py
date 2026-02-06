@@ -268,17 +268,6 @@ class ModelRegistry:
                 description="Kokoro TTS - high-quality multilingual neural TTS",
                 tags=["multilingual", "neural", "quality"],
             ),
-            "kokoro:82m": ModelConfig(
-                name="kokoro:82m",
-                type=ModelType.TTS,
-                engine="kokoro",
-                model_size="82m",
-                languages=["en", "es", "fr", "hi", "it", "ja", "pt", "zh"],
-                voices=["af_heart", "af_bella", "af_sarah", "am_adam", "am_michael", "bf_emma", "bm_george", "zf_xiaoxiao", "jf_alpha"],
-                description="Kokoro 82M - multilingual neural TTS",
-                tags=["multilingual", "neural"],
-            ),
-
             # Chinese TTS
             "cosyvoice:300m": ModelConfig(
                 name="cosyvoice:300m",

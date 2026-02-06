@@ -75,7 +75,7 @@ def synthesize_via_api_to_file(text: str, model_name: str, output_path: str) -> 
         print(f"🌐 Using discovered API server at localhost:{port} for {model_name}")
 
         # Use longer timeout for complex models when API server is confirmed loaded
-        timeout = 60 if model_name in ['kokoro-82m', 'xtts-v2', 'speecht5-tts'] else 30
+        timeout = 60 if model_name in ['kokoro', 'kokoro-82m', 'xtts-v2', 'speecht5-tts'] else 30
         print(f"⏳ Using {timeout}s timeout for {model_name} synthesis")
 
         response = requests.post(api_url, json=payload, timeout=timeout)
@@ -116,7 +116,7 @@ def synthesize_via_api_to_file_with_params(params: dict, model_name: str, output
         print(f"🌐 Using discovered API server at localhost:{port} for {model_name}")
 
         # Use longer timeout for complex models when API server is confirmed loaded
-        timeout = 60 if model_name in ['kokoro-82m', 'xtts-v2', 'speecht5-tts'] else 30
+        timeout = 60 if model_name in ['kokoro', 'kokoro-82m', 'xtts-v2', 'speecht5-tts'] else 30
         print(f"⏳ Using {timeout}s timeout for {model_name} synthesis")
 
         response = requests.post(api_url, json=payload, timeout=timeout)
@@ -418,7 +418,7 @@ async def api_synthesize(
         synthesis_params = {"text": synthesis_text}
 
         # Add voice parameter for supported models
-        if voice and model_name in ['kokoro-82m', 'xtts-v2', 'speecht5-tts', 'tortoise-tts']:
+        if voice and model_name in ['kokoro', 'kokoro-82m', 'xtts-v2', 'speecht5-tts', 'tortoise-tts']:
             synthesis_params["voice"] = voice
             print(f"🎭 Using voice: {voice} for {model_name}")
 

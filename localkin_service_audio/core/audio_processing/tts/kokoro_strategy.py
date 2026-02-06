@@ -124,8 +124,12 @@ class KokoroStrategy(TTSStrategy):
             print(f"Kokoro TTS loaded")
             return True
 
-        except ImportError:
-            print("Kokoro not installed. Install with: pip install kokoro")
+        except ImportError as e:
+            if "kokoro" in str(e):
+                print("Kokoro not installed. Install with: pip install kokoro")
+            else:
+                print(f"Kokoro dependency error: {e}")
+                print("Try: pip install kokoro>=0.9.2")
             return False
         except Exception as e:
             print(f"Failed to load Kokoro model: {e}")
