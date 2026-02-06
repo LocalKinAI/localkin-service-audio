@@ -5,6 +5,24 @@ All notable changes to LocalKin Service Audio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-02-05
+
+### Added
+- **Restored CLI commands from v1.x**: `status`, `cache`, `ps`, `add-model`, `list-templates`
+  - `kin audio status` - System health check (library availability, model registry, cache)
+  - `kin audio cache info` - Show cached models and sizes
+  - `kin audio cache clear [model]` - Clear model cache with confirmation
+  - `kin audio ps` - Show running LocalKin Audio servers on ports 8000-8005
+  - `kin audio add-model` - Register models from templates or HuggingFace repos
+  - `kin audio list-templates` - List available model templates
+- Unit tests for all 5 restored commands
+
+### Fixed
+- Relaxed `numpy` version constraint (removed `<1.25.0` upper bound) for compatibility with modern PyTorch/scipy
+- Moved `TTS` (Coqui) from core dependencies to optional `[tts]` extra to fix pip install failures
+
+---
+
 ## [2.0.0] - 2026-02-04
 
 ### 🎉 Major Release: Voice AI Platform with Chinese Language Support

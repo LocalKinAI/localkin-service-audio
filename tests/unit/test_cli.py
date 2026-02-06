@@ -256,6 +256,146 @@ class TestConfigCommand:
         assert result.exit_code == 0
 
 
+class TestStatusCommand:
+    """Tests for the status command."""
+
+    def test_status_help(self, runner):
+        """Test status help."""
+        result = runner.invoke(cli, ["audio", "status", "--help"])
+
+        assert result.exit_code == 0
+        assert "system" in result.output.lower() or "status" in result.output.lower()
+
+    def test_status_runs(self, runner):
+        """Test status command runs and shows library checks."""
+        result = runner.invoke(cli, ["audio", "status"])
+
+        assert result.exit_code == 0
+        assert "STT Libraries" in result.output
+        assert "TTS Libraries" in result.output
+        assert "ML Libraries" in result.output
+        assert "Model Registry" in result.output
+        assert "Configuration" in result.output
+        assert "Cache" in result.output
+
+
+class TestCacheCommand:
+    """Tests for the cache command."""
+
+    def test_cache_help(self, runner):
+        """Test cache help."""
+        result = runner.invoke(cli, ["audio", "cache", "--help"])
+
+        assert result.exit_code == 0
+        assert "info" in result.output
+        assert "clear" in result.output
+
+    def test_cache_info(self, runner):
+        """Test cache info command."""
+        result = runner.invoke(cli, ["audio", "cache", "info"])
+
+        assert result.exit_code == 0
+        assert "Cache" in result.output
+
+    def test_cache_default_shows_info(self, runner):
+        """Test that bare cache command shows info."""
+        result = runner.invoke(cli, ["audio", "cache"])
+
+        assert result.exit_code == 0
+        assert "Cache" in result.output
+
+    def test_cache_clear_abort(self, runner):
+        """Test cache clear aborts when user says no."""
+        result = runner.invoke(cli, ["audio", "cache", "clear"], input="n\n")
+
+        # Should abort (exit code 1 from click.Abort)
+        assert result.exit_code != 0 or "Aborted" in result.output
+
+
+class TestPSCommand:
+    """Tests for the ps command."""
+
+    def test_ps_help(self, runner):
+        """Test ps help."""
+        result = runner.invoke(cli, ["audio", "ps", "--help"])
+
+        assert result.exit_code == 0
+        assert "running" in result.output.lower() or "server" in result.output.lower()
+
+    def test_ps_runs(self, runner):
+        """Test ps command runs."""
+        result = runner.invoke(cli, ["audio", "ps"])
+
+        assert result.exit_code == 0
+        assert "Scanning" in result.output or "server" in result.output.lower()
+
+
+class TestAddModelCommand:
+    """Tests for the add-model command."""
+
+    def test_add_model_help(self, runner):
+        """Test add-model help."""
+        result = runner.invoke(cli, ["audio", "add-model", "--help"])
+
+        assert result.exit_code == 0
+        assert "--template" in result.output
+        assert "--repo" in result.output
+        assert "--name" in result.output
+
+    def test_add_model_requires_template_or_repo(self, runner):
+        """Test add-model requires --template or --repo."""
+        result = runner.invoke(cli, ["audio", "add-model", "--name", "test"])
+
+        assert result.exit_code != 0
+
+    def test_add_model_requires_name(self, runner):
+        """Test add-model requires --name."""
+        result = runner.invoke(cli, ["audio", "add-model", "--template", "whisper_stt"])
+
+        assert result.exit_code != 0
+
+    def test_add_model_invalid_template(self, runner):
+        """Test add-model with invalid template."""
+        result = runner.invoke(
+            cli, ["audio", "add-model", "--template", "nonexistent", "--name", "test"]
+        )
+
+        assert result.exit_code != 0
+        assert "not found" in result.output.lower()
+
+    def test_add_model_with_template(self, runner):
+        """Test add-model with valid template."""
+        with patch("localkin_service_audio.core.config_legacy.save_models_config", return_value=True):
+            result = runner.invoke(
+                cli,
+                ["audio", "add-model", "--template", "whisper_stt", "--name", "test-whisper"],
+                input="y\n",  # Confirm overwrite if already exists
+            )
+
+        # Should succeed or prompt for overwrite
+        assert "test-whisper" in result.output
+
+
+class TestListTemplatesCommand:
+    """Tests for the list-templates command."""
+
+    def test_list_templates_help(self, runner):
+        """Test list-templates help."""
+        result = runner.invoke(cli, ["audio", "list-templates", "--help"])
+
+        assert result.exit_code == 0
+
+    def test_list_templates_runs(self, runner):
+        """Test list-templates shows templates."""
+        result = runner.invoke(cli, ["audio", "list-templates"])
+
+        assert result.exit_code == 0
+        assert "Templates" in result.output
+        assert "whisper_stt" in result.output
+        assert "bark_tts" in result.output
+        assert "Usage" in result.output
+
+
 class TestCLIErrorHandling:
     """Tests for CLI error handling."""
 

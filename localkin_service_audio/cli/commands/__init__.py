@@ -9,6 +9,11 @@ from .recommend import recommend
 from .benchmark import benchmark
 from .listen import listen
 from .config import config
+from .status import status
+from .cache import cache
+from .ps import ps
+from .add_model import add_model
+from .list_templates import list_templates
 
 __all__ = [
     "transcribe",
@@ -23,4 +28,9 @@ __all__ = [
     "benchmark",
     "listen",
     "config",
+    "status",
+    "cache",
+    "ps",
+    "add_model",
+    "list_templates",
 ]

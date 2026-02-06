@@ -162,6 +162,15 @@ kin audio pull whisper-cpp:base
 
 # Remove a model
 kin audio rm whisper-cpp:base
+
+# Add a model from a template
+kin audio add-model --template whisper_stt --name my-whisper
+
+# Add a model from HuggingFace
+kin audio add-model --repo openai/whisper-medium --name whisper-med --type stt
+
+# List available model templates
+kin audio list-templates
 ```
 
 ### Model Recommendations
@@ -193,6 +202,25 @@ kin audio config --init
 ```
 
 Configuration files are stored in `~/.localkin-service-audio/`.
+
+### System Status & Diagnostics
+
+```bash
+# Check system status (libraries, registry, cache)
+kin audio status
+
+# Show cache info
+kin audio cache info
+
+# Clear cache for a specific model
+kin audio cache clear whisper-large
+
+# Clear all cached models
+kin audio cache clear
+
+# Show running LocalKin Audio servers
+kin audio ps
+```
 
 ### API Server
 

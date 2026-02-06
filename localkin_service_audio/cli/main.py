@@ -17,6 +17,11 @@ from .commands import (
     benchmark,
     listen,
     config,
+    status,
+    cache,
+    ps,
+    add_model,
+    list_templates,
 )
 from .commands.serve import serve, web
 
@@ -65,6 +70,11 @@ audio.add_command(serve)
 audio.add_command(recommend)
 audio.add_command(benchmark)
 audio.add_command(config)
+audio.add_command(status)
+audio.add_command(cache)
+audio.add_command(ps)
+audio.add_command(add_model)
+audio.add_command(list_templates)
 
 # Top-level commands
 cli.add_command(web)
