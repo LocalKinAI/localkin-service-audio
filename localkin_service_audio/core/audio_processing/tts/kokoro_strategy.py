@@ -102,6 +102,21 @@ class KokoroStrategy(TTSStrategy):
         "zm_yunyang": "Yunyang (Chinese Male)",
     }
 
+    @staticmethod
+    def _ensure_spacy_model():
+        """Ensure the spacy English model is available (needed by misaki/kokoro)."""
+        try:
+            import spacy.util
+            if not spacy.util.is_package("en_core_web_sm"):
+                print("Downloading spacy English model (one-time setup)...")
+                import subprocess, sys
+                subprocess.check_call(
+                    [sys.executable, "-m", "spacy", "download", "en_core_web_sm"],
+                    stdout=subprocess.DEVNULL,
+                )
+        except Exception:
+            pass  # Let kokoro handle the error downstream
+
     def load(self, model_config: ModelConfig, device: str = "auto") -> bool:
         """Load Kokoro TTS model."""
         try:
@@ -111,6 +126,10 @@ class KokoroStrategy(TTSStrategy):
             model_name = model_config.model_size or "kokoro-82m"
 
             print(f"Loading Kokoro TTS model '{model_name}'...")
+
+            # Ensure spacy model is available (misaki uses spacy.cli.download
+            # which calls pip internally — fails in uv venvs without pip)
+            self._ensure_spacy_model()
 
             # Initialize Kokoro pipeline for American English by default
             self._pipelines = {}
@@ -125,8 +144,11 @@ class KokoroStrategy(TTSStrategy):
             return True
 
         except ImportError as e:
-            if "kokoro" in str(e):
+            err = str(e)
+            if "kokoro" in err:
                 print("Kokoro not installed. Install with: pip install kokoro")
+            elif "AlbertModel" in err:
+                print("Incompatible transformers version. Fix with: pip install 'transformers>=4.21,<4.50'")
             else:
                 print(f"Kokoro dependency error: {e}")
                 print("Try: pip install kokoro>=0.9.2")
