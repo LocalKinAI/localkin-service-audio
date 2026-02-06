@@ -15,9 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `kin audio ps` - Show running LocalKin Audio servers on ports 8000-8005
   - `kin audio add-model` - Register models from templates or HuggingFace repos
   - `kin audio list-templates` - List available model templates
-- Unit tests for all 5 restored commands
+- **`-h` and `-V` short flags** for help and version
+- **`kin audio config set`** subcommand for changing settings from CLI
+- **`LOCALKIN_HOME` environment variable** to relocate all data (cache, config, models) to another disk
+- **Kokoro multilingual TTS**: 54 voices across 9 languages (en, es, fr, hi, it, ja, pt, zh)
+  - Auto-selects correct Kokoro language pipeline based on voice prefix
+  - Chinese voices: `zf_xiaoxiao`, `zf_xiaobei`, `zm_yunyang`, etc.
+  - Japanese voices: `jf_alpha`, `jf_nezumi`, `jm_kumo`, etc.
+  - French, Spanish, Italian, Hindi, Portuguese voices
+- Unit tests for all 5 restored commands (114 total tests)
 
 ### Fixed
+- **Kokoro TTS 404 error**: Default voice `af` no longer exists on HuggingFace; changed to `af_heart`
+- All hardcoded `~/.localkin-service-audio` paths now respect `LOCALKIN_HOME` (`core/models.py`, `core/config/model_registry.py`, `api/server.py`)
+- `kin audio config` now uses Settings singleton (was showing wrong cache path)
 - Relaxed `numpy` version constraint (removed `<1.25.0` upper bound) for compatibility with modern PyTorch/scipy
 - Moved `TTS` (Coqui) from core dependencies to optional `[tts]` extra to fix pip install failures
 

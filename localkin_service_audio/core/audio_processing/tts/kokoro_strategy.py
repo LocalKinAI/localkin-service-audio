@@ -25,17 +25,81 @@ class KokoroStrategy(TTSStrategy):
 
     AVAILABLE_MODELS = ["kokoro-82m", "kokoro-128m"]
 
+    # Language code mapping: voice prefix -> Kokoro lang_code
+    LANG_CODES = {
+        "a": "a",   # American English
+        "b": "b",   # British English
+        "e": "e",   # European (Spanish)
+        "f": "f",   # French
+        "h": "h",   # Hindi
+        "i": "i",   # Italian
+        "j": "j",   # Japanese
+        "p": "p",   # Portuguese (Brazilian)
+        "z": "z",   # Chinese (Mandarin)
+    }
+
     # Kokoro voice presets
     VOICES = {
-        "af": "American Female",
+        # American English
+        "af_alloy": "Alloy (American Female)",
+        "af_aoede": "Aoede (American Female)",
         "af_bella": "Bella (American Female)",
+        "af_heart": "Heart (American Female)",
+        "af_jessica": "Jessica (American Female)",
+        "af_kore": "Kore (American Female)",
+        "af_nicole": "Nicole (American Female)",
+        "af_nova": "Nova (American Female)",
+        "af_river": "River (American Female)",
         "af_sarah": "Sarah (American Female)",
+        "af_sky": "Sky (American Female)",
         "am_adam": "Adam (American Male)",
+        "am_echo": "Echo (American Male)",
+        "am_eric": "Eric (American Male)",
+        "am_fenrir": "Fenrir (American Male)",
+        "am_liam": "Liam (American Male)",
         "am_michael": "Michael (American Male)",
+        "am_onyx": "Onyx (American Male)",
+        "am_puck": "Puck (American Male)",
+        # British English
+        "bf_alice": "Alice (British Female)",
         "bf_emma": "Emma (British Female)",
         "bf_isabella": "Isabella (British Female)",
+        "bf_lily": "Lily (British Female)",
+        "bm_daniel": "Daniel (British Male)",
+        "bm_fable": "Fable (British Male)",
         "bm_george": "George (British Male)",
         "bm_lewis": "Lewis (British Male)",
+        # European (Spanish)
+        "ef_dora": "Dora (European Female)",
+        "em_alex": "Alex (European Male)",
+        # French
+        "ff_siwis": "Siwis (French Female)",
+        # Hindi
+        "hf_alpha": "Alpha (Hindi Female)",
+        "hf_beta": "Beta (Hindi Female)",
+        "hm_omega": "Omega (Hindi Male)",
+        "hm_psi": "Psi (Hindi Male)",
+        # Italian
+        "if_sara": "Sara (Italian Female)",
+        "im_nicola": "Nicola (Italian Male)",
+        # Japanese
+        "jf_alpha": "Alpha (Japanese Female)",
+        "jf_gongitsune": "Gongitsune (Japanese Female)",
+        "jf_nezumi": "Nezumi (Japanese Female)",
+        "jf_tebukuro": "Tebukuro (Japanese Female)",
+        "jm_kumo": "Kumo (Japanese Male)",
+        # Portuguese (Brazilian)
+        "pf_dora": "Dora (Portuguese Female)",
+        "pm_alex": "Alex (Portuguese Male)",
+        # Chinese (Mandarin)
+        "zf_xiaobei": "Xiaobei (Chinese Female)",
+        "zf_xiaoni": "Xiaoni (Chinese Female)",
+        "zf_xiaoxiao": "Xiaoxiao (Chinese Female)",
+        "zf_xiaoyi": "Xiaoyi (Chinese Female)",
+        "zm_yunjian": "Yunjian (Chinese Male)",
+        "zm_yunxi": "Yunxi (Chinese Male)",
+        "zm_yunxia": "Yunxia (Chinese Male)",
+        "zm_yunyang": "Yunyang (Chinese Male)",
     }
 
     def load(self, model_config: ModelConfig, device: str = "auto") -> bool:
@@ -48,12 +112,14 @@ class KokoroStrategy(TTSStrategy):
 
             print(f"Loading Kokoro TTS model '{model_name}'...")
 
-            # Initialize Kokoro
-            self.model = kokoro.KPipeline(lang_code='a')  # 'a' for American English
+            # Initialize Kokoro pipeline for American English by default
+            self._pipelines = {}
+            self._pipelines["a"] = kokoro.KPipeline(lang_code='a')
+            self.model = self._pipelines["a"]
 
             self.model_config = model_config
             self._is_loaded = True
-            self._current_voice = "af"  # Default voice
+            self._current_voice = "af_heart"  # Default voice
 
             print(f"Kokoro TTS loaded")
             return True
@@ -64,6 +130,15 @@ class KokoroStrategy(TTSStrategy):
         except Exception as e:
             print(f"Failed to load Kokoro model: {e}")
             return False
+
+    def _get_pipeline(self, voice_id: str):
+        """Get or create a Kokoro pipeline for the voice's language."""
+        import kokoro
+        lang_prefix = voice_id[0] if voice_id else "a"
+        lang_code = self.LANG_CODES.get(lang_prefix, "a")
+        if lang_code not in self._pipelines:
+            self._pipelines[lang_code] = kokoro.KPipeline(lang_code=lang_code)
+        return self._pipelines[lang_code]
 
     def synthesize(
         self,
@@ -80,10 +155,13 @@ class KokoroStrategy(TTSStrategy):
         start_time = time.time()
 
         try:
-            voice_id = voice or self._current_voice or "af"
+            voice_id = voice or self._current_voice or "af_heart"
+
+            # Get the right pipeline for this voice's language
+            pipeline = self._get_pipeline(voice_id)
 
             # Generate audio
-            generator = self.model(
+            generator = pipeline(
                 text,
                 voice=voice_id,
                 speed=speed,
@@ -115,12 +193,18 @@ class KokoroStrategy(TTSStrategy):
         except Exception as e:
             raise RuntimeError(f"Synthesis failed: {e}")
 
+    # Voice prefix -> ISO language code
+    VOICE_LANG_MAP = {
+        "a": "en", "b": "en", "e": "es", "f": "fr",
+        "h": "hi", "i": "it", "j": "ja", "p": "pt", "z": "zh",
+    }
+
     def list_voices(self) -> List[VoiceInfo]:
         """List available Kokoro voices."""
         voices = []
         for voice_id, name in self.VOICES.items():
-            lang = "en"
-            gender = "female" if voice_id.startswith(("af", "bf")) else "male"
+            lang = self.VOICE_LANG_MAP.get(voice_id[0], "en")
+            gender = "female" if voice_id[1] == "f" else "male"
 
             voices.append(VoiceInfo(
                 id=voice_id,
@@ -133,7 +217,7 @@ class KokoroStrategy(TTSStrategy):
 
     @classmethod
     def get_supported_languages(cls) -> List[str]:
-        return ["en"]
+        return ["en", "es", "fr", "hi", "it", "ja", "pt", "zh"]
 
     @classmethod
     def get_available_models(cls) -> List[str]:

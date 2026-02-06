@@ -115,15 +115,48 @@ kin audio transcribe audio.wav --format srt --timestamps
 ### Text-to-Speech
 
 ```bash
-# Basic synthesis
+# Basic synthesis (uses Kokoro with af_heart voice)
 kin audio tts "Hello world"
 
-# Specify model and voice
-kin audio tts "Hello world" --model kokoro --voice af_bella
-kin audio tts "你好世界" --model cosyvoice:300m --voice 中文女
+# List all available voices
+kin audio tts "" --model kokoro --list-voices
+
+# American English voices
+kin audio tts "Hello world" --voice af_bella       # Bella (Female)
+kin audio tts "Hello world" --voice am_adam         # Adam (Male)
+kin audio tts "Hello world" --voice af_nova         # Nova (Female)
+
+# British English voices
+kin audio tts "Good morning" --voice bf_emma        # Emma (British Female)
+kin audio tts "Good morning" --voice bm_george      # George (British Male)
+
+# Chinese (Mandarin) voices
+kin audio tts "你好世界" --voice zf_xiaoxiao         # Xiaoxiao (Chinese Female)
+kin audio tts "今天天气真好" --voice zm_yunyang       # Yunyang (Chinese Male)
+
+# Japanese voices
+kin audio tts "こんにちは" --voice jf_alpha           # Alpha (Japanese Female)
+kin audio tts "ありがとう" --voice jm_kumo            # Kumo (Japanese Male)
+
+# French, Spanish, Italian, Hindi, Portuguese
+kin audio tts "Bonjour le monde" --voice ff_siwis   # French
+kin audio tts "Hola mundo" --voice ef_dora           # Spanish
+kin audio tts "Ciao mondo" --voice if_sara           # Italian
+kin audio tts "नमस्ते" --voice hf_alpha              # Hindi
+kin audio tts "Olá mundo" --voice pf_dora            # Portuguese
+
+# Adjust speech speed (0.5 = slow, 2.0 = fast)
+kin audio tts "Hello world" --speed 0.8
+kin audio tts "Hello world" --speed 1.5
 
 # Save to file
 kin audio tts "Hello world" --output speech.wav
+
+# Save without auto-playing
+kin audio tts "Hello world" --output speech.wav --no-play
+
+# CosyVoice for Chinese (voice cloning capable)
+kin audio tts "你好世界" --model cosyvoice:300m --voice 中文女
 ```
 
 ### Real-time Listening
@@ -199,9 +232,21 @@ kin audio config --models
 
 # Initialize config directory with sample config
 kin audio config --init
+
+# Change settings
+kin audio config set default_tts_model kokoro
+kin audio config set default_stt_model faster-whisper:large-v3
+kin audio config set api_port 9000
+kin audio config set default_device cuda
 ```
 
-Configuration files are stored in `~/.localkin-service-audio/`.
+Configuration files are stored in `$LOCALKIN_HOME/` (default: `~/.localkin-service-audio/`).
+
+Set `LOCALKIN_HOME` to relocate all data (cache, config, models) to another disk:
+
+```bash
+export LOCALKIN_HOME="/path/to/large/disk/.localkin-service-audio"
+```
 
 ### System Status & Diagnostics
 
@@ -246,13 +291,37 @@ kin web --port 5000
 
 ### TTS Models
 
-| Model | Engine | Languages | Features |
-|-------|--------|-----------|----------|
-| `native` | pyttsx3 | System | No download |
-| `kokoro` | Kokoro | English | High quality |
-| `cosyvoice:300m` | CosyVoice | zh, en, ja, ko | Voice cloning |
-| `chattts` | ChatTTS | zh, en | Conversational |
-| `f5-tts` | F5-TTS | en, zh | Zero-shot cloning |
+| Model | Engine | Languages | Voices | Features |
+|-------|--------|-----------|--------|----------|
+| `native` | pyttsx3 | System | OS default | No download |
+| `kokoro` | Kokoro | en, es, fr, hi, it, ja, pt, zh | 54 voices | High quality, multilingual |
+| `cosyvoice:300m` | CosyVoice | zh, en, ja, ko, yue | Multiple | Voice cloning |
+| `chattts` | ChatTTS | zh, en | Random seed | Conversational |
+| `f5-tts` | F5-TTS | en, zh | Reference audio | Zero-shot cloning |
+
+### Kokoro Voice Reference
+
+Kokoro supports 54 voices across 9 languages. Voice IDs follow the pattern `{lang}{gender}_{name}`:
+
+| Prefix | Language | Example Voices |
+|--------|----------|----------------|
+| `af_` | American English (Female) | `af_heart`, `af_bella`, `af_nova`, `af_sarah`, `af_sky` |
+| `am_` | American English (Male) | `am_adam`, `am_michael`, `am_echo`, `am_puck` |
+| `bf_` | British English (Female) | `bf_emma`, `bf_alice`, `bf_lily`, `bf_isabella` |
+| `bm_` | British English (Male) | `bm_george`, `bm_lewis`, `bm_daniel`, `bm_fable` |
+| `zf_` | Chinese Mandarin (Female) | `zf_xiaoxiao`, `zf_xiaobei`, `zf_xiaoni`, `zf_xiaoyi` |
+| `zm_` | Chinese Mandarin (Male) | `zm_yunyang`, `zm_yunxi`, `zm_yunjian`, `zm_yunxia` |
+| `jf_` | Japanese (Female) | `jf_alpha`, `jf_nezumi`, `jf_gongitsune`, `jf_tebukuro` |
+| `jm_` | Japanese (Male) | `jm_kumo` |
+| `ff_` | French (Female) | `ff_siwis` |
+| `ef_` | Spanish (Female) | `ef_dora` |
+| `em_` | Spanish (Male) | `em_alex` |
+| `hf_` | Hindi (Female) | `hf_alpha`, `hf_beta` |
+| `hm_` | Hindi (Male) | `hm_omega`, `hm_psi` |
+| `if_` | Italian (Female) | `if_sara` |
+| `im_` | Italian (Male) | `im_nicola` |
+| `pf_` | Portuguese (Female) | `pf_dora` |
+| `pm_` | Portuguese (Male) | `pm_alex` |
 
 ## Python API
 
@@ -275,10 +344,27 @@ result = engine.transcribe("audio.wav", language="en")
 print(f"Text: {result.text}")
 print(f"Language: {result.language}")
 
-# Load and use TTS
+# Load and use TTS - English
 engine.load_tts("kokoro")
-audio = engine.synthesize("Hello world", voice="af_bella")
-audio.save("output.wav")
+audio = engine.synthesize("Hello world", voice="af_heart")
+audio.save("english.wav")
+
+# TTS - Chinese (auto-selects Chinese pipeline)
+audio = engine.synthesize("你好世界", voice="zf_xiaoxiao")
+audio.save("chinese.wav")
+
+# TTS - Japanese
+audio = engine.synthesize("こんにちは世界", voice="jf_alpha")
+audio.save("japanese.wav")
+
+# TTS - with speed control
+audio = engine.synthesize("Hello", voice="am_adam", speed=0.8)
+audio.save("slow.wav")
+
+# List available voices
+voices = engine.list_voices()
+for v in voices:
+    print(f"{v.id}: {v.name} ({v.language}, {v.gender})")
 
 # Voice cloning (with supported models)
 engine.load_tts("f5-tts")
@@ -360,16 +446,27 @@ ws.onmessage = (e) => console.log(JSON.parse(e.data).text);
 ### Environment Variables
 
 ```bash
-# Custom model config file
-export LOCALKIN_MODEL_CONFIG=~/.localkin/models.yaml
+# Base directory for all data (cache, config, models)
+export LOCALKIN_HOME="/Volumes/Data/.localkin-service-audio"
 
-# Default device
-export LOCALKIN_DEVICE=cuda  # or cpu, mps
+# Override individual directories
+export LOCALKIN_CACHE_DIR="/tmp/my-cache"
+export LOCALKIN_CONFIG_DIR="/path/to/config"
+export LOCALKIN_MODELS_DIR="/path/to/models"
+
+# Default engine settings
+export LOCALKIN_DEFAULT_STT="faster-whisper:large-v3"
+export LOCALKIN_DEFAULT_TTS="kokoro"
+export LOCALKIN_DEVICE=cuda  # or cpu, mps, auto
+
+# API server
+export LOCALKIN_API_HOST="127.0.0.1"
+export LOCALKIN_API_PORT="8000"
 ```
 
 ### Custom Models
 
-Create `~/.localkin-service-audio/models.json`:
+Create `$LOCALKIN_HOME/models.json` (default: `~/.localkin-service-audio/models.json`):
 
 ```json
 {
