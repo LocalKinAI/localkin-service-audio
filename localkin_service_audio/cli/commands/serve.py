@@ -115,7 +115,18 @@ def web(host: str, port: int):
 
     try:
         import uvicorn
-        from ...ui.routes import app
+        from fastapi import FastAPI
+        from fastapi.staticfiles import StaticFiles
+        from pathlib import Path
+        from ...ui.routes import create_ui_router
+
+        app = FastAPI(title="LocalKin Audio - Web UI")
+        app.include_router(create_ui_router())
+
+        # Mount static files if the directory exists
+        static_dir = Path(__file__).parent.parent.parent / "ui" / "static"
+        if static_dir.exists():
+            app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
         uvicorn.run(app, host=host, port=port)
 

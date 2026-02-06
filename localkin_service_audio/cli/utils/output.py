@@ -33,6 +33,69 @@ def print_info(message: str):
     print(f"ℹ️  {message}")
 
 
+def _check_engine_installed(engine: str) -> bool:
+    """Check if an engine's required library is installed."""
+    import importlib
+    engine_imports = {
+        "whisper": "whisper",
+        "openai-whisper": "whisper",
+        "faster-whisper": "faster_whisper",
+        "whisper-cpp": "pywhispercpp",
+        "sensevoice": "funasr",
+        "funasr": "funasr",
+        "paraformer": "funasr",
+        "moonshine": "moonshine_onnx",
+        "native": "pyttsx3",
+        "pyttsx3": "pyttsx3",
+        "kokoro": "kokoro",
+        "cosyvoice": "cosyvoice",
+        "chattts": "ChatTTS",
+        "f5-tts": "f5_tts",
+        "f5": "f5_tts",
+        "parler": "parler_tts",
+        "gpt-sovits": "GPT_SoVITS",
+        "parakeet": "nemo",
+        "canary": "nemo",
+    }
+    pkg = engine_imports.get(engine)
+    if not pkg:
+        return False
+    try:
+        importlib.import_module(pkg)
+        return True
+    except ImportError:
+        return False
+
+
+# Engines with NO strategy implementation (future work)
+_PLANNED_ENGINES = {"parakeet", "canary", "gpt-sovits", "parler"}
+
+# Cache so we only probe imports once per session
+_engine_status_cache: dict = {}
+
+
+def _get_engine_status(engine: str) -> str:
+    """Return status string for an engine: ready / install needed / planned."""
+    if engine in _engine_status_cache:
+        return _engine_status_cache[engine]
+
+    if engine in _PLANNED_ENGINES:
+        status = "planned"
+    elif _check_engine_installed(engine):
+        status = "ready"
+    else:
+        status = "install"
+    _engine_status_cache[engine] = status
+    return status
+
+
+_STATUS_LABELS = {
+    "ready": "✅ Ready",
+    "install": "📦 Not installed",
+    "planned": "🔮 Planned",
+}
+
+
 def print_model_table(models: list, show_status: bool = True):
     """Print a formatted table of models."""
     if not models:
@@ -40,12 +103,10 @@ def print_model_table(models: list, show_status: bool = True):
         return
 
     # Header
-    if show_status:
-        print(f"\n{'MODEL':<30} {'TYPE':<6} {'ENGINE':<15} {'STATUS':<12} {'DESCRIPTION'}")
-        print("-" * 100)
-    else:
-        print(f"\n{'MODEL':<30} {'TYPE':<6} {'ENGINE':<15} {'DESCRIPTION'}")
-        print("-" * 85)
+    print(f"\n{'MODEL':<30} {'TYPE':<6} {'ENGINE':<15} {'STATUS':<18} {'DESCRIPTION'}")
+    print("-" * 105)
+
+    counts = {"ready": 0, "install": 0, "planned": 0}
 
     for model in models:
         name = getattr(model, 'name', str(model))
@@ -54,14 +115,20 @@ def print_model_table(models: list, show_status: bool = True):
             model_type = model_type.value
         engine = getattr(model, 'engine', 'N/A')
         description = getattr(model, 'description', 'No description')[:40]
-        status = "📦 Available"
+        status = _get_engine_status(engine)
+        counts[status] = counts.get(status, 0) + 1
+        label = _STATUS_LABELS.get(status, status)
 
-        if show_status:
-            print(f"{name:<30} {model_type:<6} {engine:<15} {status:<12} {description}")
-        else:
-            print(f"{name:<30} {model_type:<6} {engine:<15} {description}")
+        print(f"{name:<30} {model_type:<6} {engine:<15} {label:<18} {description}")
 
-    print(f"\n📊 Total: {len(models)} models")
+    parts = []
+    if counts["ready"]:
+        parts.append(f"{counts['ready']} ready")
+    if counts["install"]:
+        parts.append(f"{counts['install']} need install")
+    if counts["planned"]:
+        parts.append(f"{counts['planned']} planned")
+    print(f"\n📊 Total: {len(models)} models ({', '.join(parts)})")
 
 
 def format_duration(seconds: float) -> str:

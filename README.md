@@ -181,14 +181,16 @@ kin audio listen --silence-threshold 0.02 --silence-duration 2.0
 ### Model Management
 
 ```bash
-# List all models
+# List all models with availability status
 kin audio models
 
-# List only STT models
+# Filter by type, language, engine, or tag
 kin audio models --type stt
-
-# List only TTS models
 kin audio models --type tts
+kin audio models --language zh
+kin audio models --engine kokoro
+kin audio models --tag voice-cloning
+kin audio models --search whisper
 
 # Pull a model
 kin audio pull whisper-cpp:base
@@ -279,25 +281,35 @@ kin web --port 5000
 
 ## Supported Models
 
-### STT Models
+`kin audio models` shows all 28 models with real-time availability status:
+- **✅ Ready** — engine installed, usable now
+- **📦 Not installed** — strategy code exists, just needs `pip install`
+- **🔮 Planned** — future implementation
 
-| Model | Engine | Languages | Features |
-|-------|--------|-----------|----------|
-| `whisper:base` | OpenAI Whisper | Multilingual | Standard accuracy |
-| `whisper-cpp:base` | whisper.cpp | Multilingual | Fast CPU inference |
-| `faster-whisper:large-v3` | CTranslate2 | Multilingual | 4x faster, GPU |
-| `sensevoice:small` | FunASR | zh, en, ja, ko | Emotion detection |
-| `paraformer:zh` | FunASR | Chinese | Fast Chinese ASR |
+### STT Models (20)
 
-### TTS Models
+| Model | Engine | Languages | Features | Status |
+|-------|--------|-----------|----------|--------|
+| `whisper:tiny/base/small/medium/large-v3` | OpenAI Whisper | Multilingual | Standard reference | Ready |
+| `faster-whisper:tiny/base/large-v3/turbo/distil-large-v3` | CTranslate2 | Multilingual | 4x faster, GPU | Ready |
+| `whisper-cpp:tiny/base/small/medium` | whisper.cpp | Multilingual | Fast CPU inference | Ready |
+| `moonshine:tiny/base` | Moonshine | English | 5x real-time, ~20MB | Install needed |
+| `sensevoice:small` | FunASR | zh, en, ja, ko | 15x faster, emotion detection | Install needed |
+| `paraformer:zh` | FunASR | Chinese | Fast Chinese ASR | Install needed |
+| `parakeet:1.1b` | NVIDIA NeMo | English | >2000x real-time | Planned |
+| `canary:1b` | NVIDIA NeMo | Multilingual | #1 HuggingFace leaderboard | Planned |
 
-| Model | Engine | Languages | Voices | Features |
-|-------|--------|-----------|--------|----------|
-| `native` | pyttsx3 | System | OS default | No download |
-| `kokoro` | Kokoro | en, es, fr, hi, it, ja, pt, zh | 54 voices | High quality, multilingual |
-| `cosyvoice:300m` | CosyVoice | zh, en, ja, ko, yue | Multiple | Voice cloning |
-| `chattts` | ChatTTS | zh, en | Random seed | Conversational |
-| `f5-tts` | F5-TTS | en, zh | Reference audio | Zero-shot cloning |
+### TTS Models (8)
+
+| Model | Engine | Languages | Features | Status |
+|-------|--------|-----------|----------|--------|
+| `native` | pyttsx3 | System | No download needed | Ready |
+| `kokoro` / `kokoro:82m` | Kokoro | en, es, fr, hi, it, ja, pt, zh | 54 voices, multilingual | Ready |
+| `cosyvoice:300m` | CosyVoice | zh, en, ja, ko, yue | Voice cloning, streaming | Install needed |
+| `chattts` | ChatTTS | zh, en | Conversational, emotion | Install needed |
+| `f5-tts` | F5-TTS | en, zh | Zero-shot voice cloning | Install needed |
+| `gpt-sovits` | GPT-SoVITS | zh, en, ja | Voice cloning with 5s audio | Planned |
+| `parler-tts` | Parler | English | Text-described voice | Planned |
 
 ### Kokoro Voice Reference
 

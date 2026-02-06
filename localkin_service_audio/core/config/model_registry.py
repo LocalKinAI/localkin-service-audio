@@ -181,7 +181,29 @@ class ModelRegistry:
                 tags=["multilingual", "accurate", "cpu"],
             ),
 
-            # Chinese STT Models (placeholders for Sprint 3)
+            # Moonshine - ultra-fast English STT
+            "moonshine:tiny": ModelConfig(
+                name="moonshine:tiny",
+                type=ModelType.STT,
+                engine="moonshine",
+                model_size="tiny",
+                repo_id="usefulsensors/moonshine-tiny",
+                languages=["en"],
+                description="Moonshine tiny - ultra-fast real-time ASR (~20MB)",
+                tags=["english", "ultra-fast", "lightweight", "cpu"],
+            ),
+            "moonshine:base": ModelConfig(
+                name="moonshine:base",
+                type=ModelType.STT,
+                engine="moonshine",
+                model_size="base",
+                repo_id="usefulsensors/moonshine-base",
+                languages=["en"],
+                description="Moonshine base - 5x real-time on CPU",
+                tags=["english", "fast", "cpu"],
+            ),
+
+            # Chinese / Multilingual STT
             "sensevoice:small": ModelConfig(
                 name="sensevoice:small",
                 type=ModelType.STT,
@@ -204,7 +226,7 @@ class ModelRegistry:
                 tags=["chinese", "fast", "accurate"],
             ),
 
-            # NVIDIA Models (placeholders for Sprint 3)
+            # NVIDIA Models (planned)
             "parakeet:1.1b": ModelConfig(
                 name="parakeet:1.1b",
                 type=ModelType.STT,
@@ -257,7 +279,7 @@ class ModelRegistry:
                 tags=["multilingual", "neural"],
             ),
 
-            # Chinese TTS Models (placeholders for Sprint 4)
+            # Chinese TTS
             "cosyvoice:300m": ModelConfig(
                 name="cosyvoice:300m",
                 type=ModelType.TTS,

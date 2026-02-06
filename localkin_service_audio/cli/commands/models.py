@@ -94,11 +94,11 @@ def models(
 
         if stt_models:
             print("\n🎤 Speech-to-Text (STT) Models:")
-            print_model_table(stt_models, show_status=False)
+            print_model_table(stt_models)
 
         if tts_models:
             print("\n🔊 Text-to-Speech (TTS) Models:")
-            print_model_table(tts_models, show_status=False)
+            print_model_table(tts_models)
 
         if not stt_models and not tts_models:
             print_info("No models found matching your criteria.")

@@ -23,9 +23,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Chinese voices: `zf_xiaoxiao`, `zf_xiaobei`, `zm_yunyang`, etc.
   - Japanese voices: `jf_alpha`, `jf_nezumi`, `jm_kumo`, etc.
   - French, Spanish, Italian, Hindi, Portuguese voices
+- **Moonshine STT** added to model registry (`moonshine:tiny`, `moonshine:base`) — ultra-fast English ASR
+- **Model availability status** in `kin audio models`: shows ✅ Ready / 📦 Not installed / 🔮 Planned
+- **28 total models** registered (20 STT + 8 TTS) with clear status indicators
+- **`kin web`** web interface working (fixed FastAPI app creation and Jinja2 template errors)
 - Unit tests for all 5 restored commands (114 total tests)
 
 ### Fixed
+- **`kin web` import error**: was importing non-existent `app` from `ui.routes`; now builds FastAPI app from `create_ui_router()`
+- **`kin web` template error**: Jinja2 `||` syntax and undefined `stats` variable in `modern_index.html`
 - **Kokoro TTS 404 error**: Default voice `af` no longer exists on HuggingFace; changed to `af_heart`
 - All hardcoded `~/.localkin-service-audio` paths now respect `LOCALKIN_HOME` (`core/models.py`, `core/config/model_registry.py`, `api/server.py`)
 - `kin audio config` now uses Settings singleton (was showing wrong cache path)
