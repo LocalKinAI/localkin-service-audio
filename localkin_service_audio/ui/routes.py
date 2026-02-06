@@ -156,13 +156,6 @@ def synthesize_huggingface_tts_with_voice(model_name: str, text: str, output_pat
             # Kokoro TTS implementation with voice
             print_info("🔧 Initializing Kokoro TTS...")
             try:
-                # Ensure spaCy model is available (same setup as API server)
-                import os
-                import sys
-                system_site_packages = '/Users/jackysun/.pyenv/versions/3.10.0/lib/python3.10/site-packages'
-                if system_site_packages not in sys.path:
-                    sys.path.insert(0, system_site_packages)
-
                 from kokoro import KPipeline
                 import torch
 

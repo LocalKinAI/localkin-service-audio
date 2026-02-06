@@ -14,7 +14,7 @@ Inspired by Ollama's simplicity for local AI model management.
 import os
 from pathlib import Path
 
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 __author__ = "LocalKin Team"
 __description__ = "Voice AI Platform - Local STT/TTS with Chinese Language Support"
 

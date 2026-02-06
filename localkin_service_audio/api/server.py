@@ -180,14 +180,6 @@ def load_tts_model(model_name: str):
                     raise ImportError(f"kokoro package is required for Kokoro models. Install with: pip install kokoro>=0.9.2. Error: {e}")
 
             # Kokoro supports multiple languages - default to English ('a')
-            # You can extend this to support other languages
-            # Ensure spaCy model is available
-            import os
-            import sys
-            system_site_packages = '/Users/jackysun/.pyenv/versions/3.10.0/lib/python3.10/site-packages'
-            if system_site_packages not in sys.path:
-                sys.path.insert(0, system_site_packages)
-
             try:
                 pipeline = KPipeline(lang_code='a')  # 'a' for American English
             except SystemExit as e:

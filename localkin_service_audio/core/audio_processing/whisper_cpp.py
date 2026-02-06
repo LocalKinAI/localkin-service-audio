@@ -221,7 +221,8 @@ class WhisperCppSTT:
             Path to downloaded model file
         """
         if download_dir is None:
-            download_dir = Path.home() / ".cache" / "whisper-cpp"
+            from localkin_service_audio.core.config.settings import _default_home
+            download_dir = _default_home() / "cache" / "whisper-cpp"
             download_dir.mkdir(parents=True, exist_ok=True)
 
         models = self.get_available_models()

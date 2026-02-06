@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "localkin-service-audio"
-version = "2.0.0"
+version = "2.0.1"
 description = "Voice AI Platform - Local STT/TTS with Chinese Language Support"
 readme = "README.md"
 license = "MIT"
@@ -31,7 +31,7 @@ keywords = [
     "mcp",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: End Users/Desktop",
     "Operating System :: OS Independent",

@@ -1,8 +1,32 @@
-requests
-sounddevice
-scipy
-numpy
-openai-whisper
-pyttsx3
-pyobjc
-sentencepiece
+# Core
+requests>=2.25.0
+click>=8.0.0
+rich>=10.0.0
+pydantic>=2.0.0
+# Audio
+sounddevice>=0.4.0
+soundfile>=0.12.0
+librosa>=0.10.0
+scipy>=1.7.0
+numpy>=1.21.0
+# STT - Whisper family
+openai-whisper==20240930
+faster-whisper>=1.0.0
+pywhispercpp>=1.0.0
+ctranslate2>=4.0.0
+# TTS
+pyttsx3>=2.90
+kokoro>=0.9.2
+# ML
+torch>=2.0.0
+torchaudio>=2.0.0
+transformers>=4.21.0
+huggingface-hub>=0.17.0
+sentencepiece>=0.2.1
+# Compatibility
+llvmlite>=0.41.0
+numba>=0.58.0
+# API
+fastapi>=0.104.0
+uvicorn>=0.24.0
+python-multipart>=0.0.6
