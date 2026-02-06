@@ -26,8 +26,11 @@ from .commands import (
 from .commands.serve import serve, web
 
 
-@click.group()
-@click.version_option(version=__version__, prog_name="kin")
+CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
+
+
+@click.group(context_settings=CONTEXT_SETTINGS)
+@click.version_option(__version__, "-V", "--version", prog_name="kin")
 @click.pass_context
 def cli(ctx):
     """
