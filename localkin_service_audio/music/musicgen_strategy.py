@@ -17,9 +17,6 @@ from typing import Optional
 import os
 import tempfile
 
-import torch
-from transformers import MusicgenForConditionalGeneration, AutoProcessor
-
 from .base import MusicEngine
 from ..core.types import AudioResult, ModelConfig
 
@@ -54,6 +51,9 @@ class MusicGenStrategy(MusicEngine):
             True if loaded successfully
         """
         try:
+            import torch
+            from transformers import MusicgenForConditionalGeneration, AutoProcessor
+
             self.device = self._detect_device(device)
             self.model_config = model_config
 
@@ -129,6 +129,8 @@ class MusicGenStrategy(MusicEngine):
             logger.warning(f"Duration {duration} not supported, using {duration}s")
 
         try:
+            import torch
+
             logger.info(f"Generating music: '{prompt}' ({duration}s)")
             logger.info("Using direct model.generate() with do_sample=True (proper sampling)")
 

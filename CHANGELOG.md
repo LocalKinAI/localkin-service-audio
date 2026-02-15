@@ -5,9 +5,12 @@ All notable changes to LocalKin Service Audio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.5] - 2026-02-14
+## [2.0.6] - 2026-02-14
 
 ### Fixed
+- **Startup crash on fresh install**: `kin -V` and all commands failed with import errors due to `musicgen_strategy.py` eagerly importing `torch` and `transformers` at module level
+  - Moved to lazy imports inside `load()` method (matching heartmula_strategy.py pattern)
+  - Guarded music imports in `__init__.py` with try/except
 - **Kokoro TTS in uv environments**: Fixed `No module named pip` error when downloading spacy model
   - Now tries `uv pip install` first, falls back to `pip`, then `spacy download`
 

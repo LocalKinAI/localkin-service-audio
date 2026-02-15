@@ -14,7 +14,7 @@ Inspired by Ollama's simplicity for local AI model management.
 import os
 from pathlib import Path
 
-__version__ = "2.0.5"
+__version__ = "2.0.6"
 __author__ = "LocalKin Team"
 __description__ = "Voice AI Platform - Local STT/TTS with Chinese Language Support"
 
@@ -54,10 +54,15 @@ from .templates import (
     get_model_template, list_available_templates, create_model_from_template
 )
 
-# Import music functionality
-from .music import (
-    MusicEngine, MusicGenStrategy, HeartMuLaStrategy
-)
+# Import music functionality (lazy — avoids loading torch/transformers at startup)
+try:
+    from .music import (
+        MusicEngine, MusicGenStrategy, HeartMuLaStrategy
+    )
+except ImportError:
+    MusicEngine = None
+    MusicGenStrategy = None
+    HeartMuLaStrategy = None
 
 __all__ = [
     # CLI
