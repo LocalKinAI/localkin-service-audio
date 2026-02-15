@@ -22,6 +22,7 @@ from .commands import (
     ps,
     add_model,
     list_templates,
+    music,
 )
 from .commands.serve import serve, web
 
@@ -78,6 +79,7 @@ audio.add_command(cache)
 audio.add_command(ps)
 audio.add_command(add_model)
 audio.add_command(list_templates)
+audio.add_command(music)
 
 # Top-level commands
 cli.add_command(web)

@@ -149,14 +149,24 @@ def pull(model_name: str, force: bool):
             print_info(f"Repository: {model_config.repo_id}")
 
         # Try to load the model (which triggers download)
-        from ...core import get_audio_engine
-        engine = get_audio_engine()
+        if model_config.engine == "heartmula":
+            # Music generation models use their own strategy
+            from ...music import HeartMuLaStrategy
 
-        with progress.spinner(f"Downloading {model_name}"):
-            if model_config.type.value == "stt":
-                success = engine.load_stt(model_name)
-            else:
-                success = engine.load_tts(model_name)
+            engine = HeartMuLaStrategy()
+            with progress.spinner(f"Setting up {model_name}"):
+                success = engine.load(model_config, device="auto")
+            if success:
+                engine.unload()
+        else:
+            from ...core import get_audio_engine
+            engine = get_audio_engine()
+
+            with progress.spinner(f"Downloading {model_name}"):
+                if model_config.type.value == "stt":
+                    success = engine.load_stt(model_name)
+                else:
+                    success = engine.load_tts(model_name)
 
         if success:
             print_success(f"Successfully pulled {model_name}")

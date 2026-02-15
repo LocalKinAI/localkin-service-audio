@@ -14,7 +14,7 @@ Inspired by Ollama's simplicity for local AI model management.
 import os
 from pathlib import Path
 
-__version__ = "2.0.3"
+__version__ = "2.0.4"
 __author__ = "LocalKin Team"
 __description__ = "Voice AI Platform - Local STT/TTS with Chinese Language Support"
 
@@ -54,6 +54,11 @@ from .templates import (
     get_model_template, list_available_templates, create_model_from_template
 )
 
+# Import music functionality
+from .music import (
+    MusicEngine, MusicGenStrategy, HeartMuLaStrategy
+)
+
 __all__ = [
     # CLI
     "main",
@@ -67,6 +72,8 @@ __all__ = [
     "create_ui_router",
     # Templates
     "get_model_template", "list_available_templates", "create_model_from_template",
+    # Music
+    "MusicEngine", "MusicGenStrategy", "HeartMuLaStrategy",
     # Utilities
     "get_sample_audio_path"
 ]

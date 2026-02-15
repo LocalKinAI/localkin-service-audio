@@ -5,6 +5,42 @@ All notable changes to LocalKin Service Audio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.4] - 2026-02-14
+
+### Fixed
+- **HeartMuLa MPS support**: Fixed `invalid type: 'torch.mps.FloatTensor'` crash when generating music on Apple Silicon
+  - HeartCodec now runs on CPU during detokenize (unified memory — no copy overhead)
+  - Patched heartlib's `_unload()` which had hardcoded `torch.cuda` calls that crash on MPS
+- **Dependency upgrades**: Bumped `torch>=2.6.0`, `torchaudio>=2.6.0`, removed `transformers<4.50` upper pin
+  - Fixes `torch.load` security check (CVE-2025-32434) that blocked MusicGen medium/large loading
+  - MusicGen small was unaffected (has safetensors), medium/large only had `.bin` weights
+- Updated stale Kokoro error message that still referenced `transformers<4.50`
+
+---
+
+## [2.1.0] - 2026-02-14
+
+### Added
+- **Music Generation**: New `kin audio music` command group with two engines
+  - **MusicGen** (Meta): Text-to-music with small/medium/large model sizes (5–30s)
+  - **HeartMuLa** (Open Source): Multilingual music generation with Chinese lyrics support, tag-based style control, and durations up to 240s
+- `kin audio music generate <prompt>` — generate music from text descriptions
+  - `--model musicgen:small|medium|large` or `--model heartmula:3b|7b`
+  - `--tags "piano,romantic,wedding"` — style tags (HeartMuLa)
+  - `--duration`, `--temperature`, `--device`, `--output`, `--play/--no-play`
+- `kin audio music models` — list available music models with requirements
+- **HeartMuLa auto-install**: `heartlib` is automatically installed from GitHub on first use (via `kin audio music generate --model heartmula:*` or `kin audio pull heartmula:3b`)
+- **HeartMuLa in model registry**: `heartmula:3b` and `heartmula:7b` now registered, enabling `kin audio pull heartmula:3b`
+- `HeartMuLaStrategy` exported from package (`from localkin_service_audio import HeartMuLaStrategy`)
+- Music generation unit tests in `tests/unit/test_music.py`
+
+### Fixed
+- `MusicGenStrategy.unload()` referenced non-existent `self.pipe` attribute (now uses `self.model`)
+- `test_music.py` integration test used wrong `ModelConfig` parameter names
+- HeartMuLa checkpoint downloads now use `$LOCALKIN_HOME/cache/heartmula/` instead of `~/.cache/heartmula`
+
+---
+
 ## [2.0.1] - 2026-02-05
 
 ### Added

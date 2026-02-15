@@ -10,6 +10,7 @@
 
 - **Multiple STT Engines**: Whisper, faster-whisper, whisper.cpp, SenseVoice, Paraformer
 - **Multiple TTS Engines**: Kokoro, CosyVoice, ChatTTS, F5-TTS, native OS
+- **Music Generation**: HeartMuLa (multilingual, tag-based), MusicGen
 - **Chinese Language Support**: Optimized models for Mandarin, Cantonese, and mixed Chinese-English
 - **Voice Cloning**: Zero-shot voice cloning with F5-TTS and CosyVoice
 - **MCP Integration**: Use with Claude Code and Claude Desktop
@@ -33,6 +34,10 @@ kin audio transcribe audio.wav
 
 # Text-to-speech
 kin audio tts "Hello world"
+
+# Generate music (with Chinese support!)
+kin audio music generate "在月光下弹钢琴"  # Chinese lyrics
+kin audio music generate "happy wedding" --tags "piano,romantic,wedding" --model heartmula:3b
 
 # Real-time listening (microphone)
 kin audio listen
@@ -180,6 +185,36 @@ kin audio tts "Hello world" --output speech.wav --no-play
 kin audio tts "你好世界" --model cosyvoice:300m --voice 中文女
 ```
 
+### Music Generation
+
+```bash
+# MusicGen — text-to-music (small/medium/large)
+kin audio music generate "calm piano melody"
+kin audio music generate "upbeat electronic" --duration 20 --model musicgen:medium
+kin audio music generate "ambient soundscape" -o ambient.wav --device mps
+
+# HeartMuLa — multilingual with Chinese lyrics support
+kin audio music generate "在月光下弹钢琴" --model heartmula:3b
+kin audio music generate "happy wedding day" --tags "piano,romantic,wedding" --model heartmula:3b --duration 30
+kin audio music generate "春天来了，鸟儿在唱歌" --tags "acoustic,happy,upbeat" -o spring.wav
+
+# List music models and requirements
+kin audio music models
+kin audio music models --verbose
+```
+
+**HeartMuLa style tags:** `piano`, `acoustic`, `electric`, `synthesizer`, `happy`, `sad`, `romantic`, `calm`, `upbeat`, `wedding`, `ambient`, `orchestral`, `rock`, `pop`, `jazz`, `folk`, `classical`, `cinematic`
+
+| Model | Sizes | VRAM | Languages | Duration |
+|-------|-------|------|-----------|----------|
+| MusicGen | small (2GB), medium (4GB), large (16GB) | 2–16 GB | English | 5–30s |
+| HeartMuLa | 3B (6GB), 7B (16GB) | 6–16 GB | en, zh, ja, ko, es | 5–240s |
+
+**HeartMuLa setup** — auto-installs on first use, or pull in advance:
+```bash
+kin audio pull heartmula:3b
+```
+
 ### Real-time Listening
 
 ```bash
@@ -215,6 +250,7 @@ kin audio models --search whisper
 
 # Pull a model
 kin audio pull whisper-cpp:base
+kin audio pull heartmula:3b
 
 # Remove a model
 kin audio rm whisper-cpp:base
@@ -302,7 +338,7 @@ kin web --port 5000
 
 ## Supported Models
 
-`kin audio models` shows all 28 models with real-time availability status:
+`kin audio models` shows all 30 models with real-time availability status:
 - **✅ Ready** — engine installed, usable now
 - **📦 Not installed** — strategy code exists, just needs `pip install`
 - **🔮 Planned** — future implementation
@@ -331,6 +367,13 @@ kin web --port 5000
 | `f5-tts` | F5-TTS | en, zh | Zero-shot voice cloning | Install needed |
 | `gpt-sovits` | GPT-SoVITS | zh, en, ja | Voice cloning with 5s audio | Planned |
 | `parler-tts` | Parler | English | Text-described voice | Planned |
+
+### Music Models (2)
+
+| Model | Engine | Languages | Features | Status |
+|-------|--------|-----------|----------|--------|
+| `musicgen:small/medium/large` | MusicGen (Meta) | English | Text-to-music, 5–30s | Install needed |
+| `heartmula:3b/7b` | HeartMuLa | en, zh, ja, ko, es | Chinese lyrics, tag control, up to 240s | Install needed |
 
 ### Kokoro Voice Reference
 
@@ -591,6 +634,18 @@ kin audio pull whisper-cpp:base
 kin info --verbose
 ```
 
+### PyTorch Version
+
+Requires **torch >= 2.6.0**. Older versions will fail to load models that only ship `.bin` weights (e.g. MusicGen medium/large) due to a `torch.load` security check (CVE-2025-32434).
+
+```bash
+# Check your version
+python -c "import torch; print(torch.__version__)"
+
+# Upgrade if needed (keep torchvision in sync)
+pip install "torch>=2.6.0" "torchaudio>=2.6.0" "torchvision>=0.21"
+```
+
 ### CUDA/GPU Issues
 
 ```bash
@@ -599,6 +654,18 @@ kin audio transcribe audio.wav --device cpu
 
 # Check PyTorch CUDA
 python -c "import torch; print(torch.cuda.is_available())"
+```
+
+### HeartMuLa on Apple Silicon (MPS)
+
+HeartMuLa 3B requires ~12-14GB. On a 16GB Mac, close memory-heavy apps before running. The codec runs on CPU automatically (shared unified memory, no performance impact).
+
+```bash
+# If you hit OOM, try shorter duration
+kin audio music generate "prompt" --model heartmula:3b --duration 5
+
+# Or force CPU (slower but more stable memory management)
+kin audio music generate "prompt" --model heartmula:3b --device cpu
 ```
 
 ### Chinese Model Dependencies
@@ -623,3 +690,5 @@ MIT License - see [LICENSE](LICENSE) file.
 - [FunASR](https://github.com/alibaba-damo-academy/FunASR)
 - [Kokoro TTS](https://github.com/hexgrad/kokoro)
 - [CosyVoice](https://github.com/FunAudioLLM/CosyVoice)
+- [MusicGen](https://github.com/facebookresearch/audiocraft)
+- [HeartMuLa](https://github.com/HeartMuLa/heartlib)

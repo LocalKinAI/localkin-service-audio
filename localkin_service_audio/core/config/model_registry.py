@@ -321,6 +321,29 @@ class ModelRegistry:
                 description="Parler TTS - describe voice with natural language",
                 tags=["english", "text-described"],
             ),
+            # Music Generation Models (HeartMuLa)
+            "heartmula:3b": ModelConfig(
+                name="heartmula:3b",
+                type=ModelType.TTS,
+                engine="heartmula",
+                model_size="3b",
+                repo_id="HeartMuLa/HeartMuLa-oss-3B",
+                languages=["en", "zh", "ja", "ko", "es"],
+                description="HeartMuLa 3B - multilingual music generation with lyrics & tags",
+                tags=["music", "multilingual", "chinese", "lyrics"],
+                hardware_requirements=HardwareRequirements(min_vram_gb=6),
+            ),
+            "heartmula:7b": ModelConfig(
+                name="heartmula:7b",
+                type=ModelType.TTS,
+                engine="heartmula",
+                model_size="7b",
+                repo_id="HeartMuLa/HeartMuLa-oss-7B",
+                languages=["en", "zh", "ja", "ko", "es"],
+                description="HeartMuLa 7B - higher quality multilingual music generation",
+                tags=["music", "multilingual", "chinese", "lyrics"],
+                hardware_requirements=HardwareRequirements(min_vram_gb=16),
+            ),
         }
 
         # Merge all models

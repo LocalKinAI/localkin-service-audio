@@ -148,7 +148,7 @@ class KokoroStrategy(TTSStrategy):
             if "kokoro" in err:
                 print("Kokoro not installed. Install with: pip install kokoro")
             elif "AlbertModel" in err:
-                print("Incompatible transformers version. Fix with: pip install 'transformers>=4.21,<4.50'")
+                print("Incompatible transformers version. Fix with: pip install 'transformers>=4.21.0'")
             else:
                 print(f"Kokoro dependency error: {e}")
                 print("Try: pip install kokoro>=0.9.2")

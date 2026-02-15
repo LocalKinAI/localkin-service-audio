@@ -14,6 +14,7 @@ from .cache import cache
 from .ps import ps
 from .add_model import add_model
 from .list_templates import list_templates
+from .music import music
 
 __all__ = [
     "transcribe",
@@ -33,4 +34,5 @@ __all__ = [
     "ps",
     "add_model",
     "list_templates",
+    "music",
 ]
