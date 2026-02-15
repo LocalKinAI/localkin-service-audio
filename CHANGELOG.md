@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - MusicGen small was unaffected (has safetensors), medium/large only had `.bin` weights
 - Updated stale Kokoro error message that still referenced `transformers<4.50`
 
+### Changed
+- README now recommends `uv` as primary installer (10-100x faster for heavy ML deps)
+- Added upgrade instructions for existing users (torch 2.4 → 2.6)
+
 ---
 
 ## [2.1.0] - 2026-02-14

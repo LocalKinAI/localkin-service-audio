@@ -57,19 +57,18 @@ kin web
 
 ## Installation
 
-### Using uv (recommended)
+### Using uv (recommended — 10x faster)
 
-[uv](https://github.com/astral-sh/uv) is 10-100x faster than pip with better dependency resolution.
+This project has heavy ML dependencies (~4GB: PyTorch, Whisper, transformers). [uv](https://github.com/astral-sh/uv) resolves and installs them **10-100x faster** than pip.
 
 ```bash
-# Install uv if you don't have it
+# Install uv (one-time)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Create a virtual environment and install
-uv venv
+# Install
 uv pip install localkin-service-audio
 
-# Or install from source (for development)
+# Or from source
 git clone https://github.com/LocalKinAI/localkin-service-audio.git
 cd localkin-service-audio
 uv sync
@@ -97,6 +96,18 @@ cd() { builtin cd "$@" && [ -f .venv/bin/activate ] && source .venv/bin/activate
 
 ```bash
 pip install localkin-service-audio
+```
+
+> pip works but is significantly slower due to dependency resolution with large ML packages. Expect 10-30 minutes on first install.
+
+### Upgrading
+
+```bash
+# Upgrade to latest version
+uv pip install --upgrade localkin-service-audio
+
+# If upgrading from v2.0.3 or earlier, also upgrade torch (required for v2.0.4+)
+uv pip install --upgrade torch torchaudio torchvision
 ```
 
 ### Optional Dependencies
