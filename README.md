@@ -657,6 +657,18 @@ python -c "import torch; print(torch.__version__)"
 pip install "torch>=2.6.0" "torchaudio>=2.6.0" "torchvision>=0.21"
 ```
 
+### numpy/pandas Binary Incompatibility
+
+If you see `numpy.dtype size changed, may indicate binary incompatibility`, pandas or scikit-learn was compiled against a different numpy version:
+
+```bash
+# Fix: force-reinstall the affected packages
+uv pip install --force-reinstall numpy pandas scikit-learn
+
+# Or nuke and rebuild the venv
+rm -rf .venv && uv venv && uv pip install localkin-service-audio
+```
+
 ### CUDA/GPU Issues
 
 ```bash

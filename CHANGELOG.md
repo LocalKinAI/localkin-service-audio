@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Guarded music imports in `__init__.py` with try/except
 - **Kokoro TTS in uv environments**: Fixed `No module named pip` error when downloading spacy model
   - Now tries `uv pip install` first, falls back to `pip`, then `spacy download`
+- Added troubleshooting for `numpy.dtype size changed` binary incompatibility (numpy/pandas/scikit-learn mismatch)
 
 ---
 
