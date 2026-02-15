@@ -5,6 +5,13 @@ All notable changes to LocalKin Service Audio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.9] - 2026-02-15
+
+### Fixed
+- **Chinese/Japanese TTS missing deps**: Added `cn2an`, `jieba`, `pypinyin`, `pypinyin-dict` to dependencies — required by misaki (kokoro's text processor) for Chinese voices but not declared in its own deps
+
+---
+
 ## [2.0.8] - 2026-02-15
 
 ### Fixed
