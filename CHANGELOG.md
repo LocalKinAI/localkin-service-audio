@@ -7,23 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.4] - 2026-02-14
 
-### Fixed
-- **HeartMuLa MPS support**: Fixed `invalid type: 'torch.mps.FloatTensor'` crash when generating music on Apple Silicon
-  - HeartCodec now runs on CPU during detokenize (unified memory — no copy overhead)
-  - Patched heartlib's `_unload()` which had hardcoded `torch.cuda` calls that crash on MPS
-- **Dependency upgrades**: Bumped `torch>=2.6.0`, `torchaudio>=2.6.0`, removed `transformers<4.50` upper pin
-  - Fixes `torch.load` security check (CVE-2025-32434) that blocked MusicGen medium/large loading
-  - MusicGen small was unaffected (has safetensors), medium/large only had `.bin` weights
-- Updated stale Kokoro error message that still referenced `transformers<4.50`
-
-### Changed
-- README now recommends `uv` as primary installer (10-100x faster for heavy ML deps)
-- Added upgrade instructions for existing users (torch 2.4 → 2.6)
-
----
-
-## [2.1.0] - 2026-02-14
-
 ### Added
 - **Music Generation**: New `kin audio music` command group with two engines
   - **MusicGen** (Meta): Text-to-music with small/medium/large model sizes (5–30s)
@@ -39,9 +22,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Music generation unit tests in `tests/unit/test_music.py`
 
 ### Fixed
+- **HeartMuLa MPS support**: Fixed `invalid type: 'torch.mps.FloatTensor'` crash when generating music on Apple Silicon
+  - HeartCodec now runs on CPU during detokenize (unified memory — no copy overhead)
+  - Patched heartlib's `_unload()` which had hardcoded `torch.cuda` calls that crash on MPS
+- **Dependency upgrades**: Bumped `torch>=2.6.0`, `torchaudio>=2.6.0`, removed `transformers<4.50` upper pin
+  - Fixes `torch.load` security check (CVE-2025-32434) that blocked MusicGen medium/large loading
+  - MusicGen small was unaffected (has safetensors), medium/large only had `.bin` weights
 - `MusicGenStrategy.unload()` referenced non-existent `self.pipe` attribute (now uses `self.model`)
 - `test_music.py` integration test used wrong `ModelConfig` parameter names
 - HeartMuLa checkpoint downloads now use `$LOCALKIN_HOME/cache/heartmula/` instead of `~/.cache/heartmula`
+- Updated stale Kokoro error message that still referenced `transformers<4.50`
+
+### Changed
+- README now recommends `uv` as primary installer (10-100x faster for heavy ML deps)
+- Added upgrade instructions for existing users (torch 2.4 → 2.6)
 
 ---
 
