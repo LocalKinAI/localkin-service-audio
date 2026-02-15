@@ -104,18 +104,37 @@ class KokoroStrategy(TTSStrategy):
 
     @staticmethod
     def _ensure_spacy_model():
-        """Ensure the spacy English model is available (needed by misaki/kokoro)."""
+        """Ensure the spacy English model is available (needed by misaki/kokoro).
+
+        spacy.cli.download calls pip internally, which fails in uv-managed
+        venvs (no pip installed).  We try ``uv pip`` first, then fall back
+        to ``pip``, then ``spacy download`` as a last resort.
+        """
         try:
             import spacy.util
-            if not spacy.util.is_package("en_core_web_sm"):
-                print("Downloading spacy English model (one-time setup)...")
-                import subprocess, sys
-                subprocess.check_call(
-                    [sys.executable, "-m", "spacy", "download", "en_core_web_sm"],
-                    stdout=subprocess.DEVNULL,
-                )
+            if spacy.util.is_package("en_core_web_sm"):
+                return  # Already installed
         except Exception:
-            pass  # Let kokoro handle the error downstream
+            return  # spacy itself not available, let kokoro handle it
+
+        print("Downloading spacy English model (one-time setup)...")
+        import shutil, subprocess, sys
+
+        # Try uv pip first (works in uv venvs), then pip, then spacy download
+        commands = [
+            ["uv", "pip", "install", "en-core-web-sm"],
+            [sys.executable, "-m", "pip", "install", "en-core-web-sm"],
+            [sys.executable, "-m", "spacy", "download", "en_core_web_sm"],
+        ]
+        for cmd in commands:
+            if cmd[0] != sys.executable and not shutil.which(cmd[0]):
+                continue
+            try:
+                subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                continue
+        print("Warning: Could not install spacy model. TTS may fail.")
 
     def load(self, model_config: ModelConfig, device: str = "auto") -> bool:
         """Load Kokoro TTS model."""

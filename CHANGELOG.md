@@ -5,6 +5,14 @@ All notable changes to LocalKin Service Audio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.5] - 2026-02-14
+
+### Fixed
+- **Kokoro TTS in uv environments**: Fixed `No module named pip` error when downloading spacy model
+  - Now tries `uv pip install` first, falls back to `pip`, then `spacy download`
+
+---
+
 ## [2.0.4] - 2026-02-14
 
 ### Added
