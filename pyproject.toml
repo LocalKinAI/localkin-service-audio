@@ -70,6 +70,8 @@ dependencies = [
     "jieba>=0.42.0",
     "pypinyin>=0.50.0",
     "pypinyin-dict>=0.8.0",
+    "pyopenjtalk>=0.3.0",         # Japanese TTS (misaki/ja.py)
+    "espeakng-loader>=0.2.0",     # French/Spanish/Italian/Hindi/Portuguese TTS
     # ML
     "torch>=2.6.0",
     "torchaudio>=2.6.0",

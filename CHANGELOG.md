@@ -8,14 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.9] - 2026-02-15
 
 ### Fixed
-- **Chinese/Japanese TTS missing deps**: Added `cn2an`, `jieba`, `pypinyin`, `pypinyin-dict` to dependencies — required by misaki (kokoro's text processor) for Chinese voices but not declared in its own deps
-
----
-
-## [2.0.8] - 2026-02-15
-
-### Fixed
-- **Chinese TTS missing dependency**: Added `ordered-set` to dependencies — required by misaki (kokoro's text processor) for Chinese voice pipelines but not declared in its own deps
+- **Multilingual TTS missing deps**: Added `pyopenjtalk` (Japanese), `espeakng-loader` (French, Spanish, Italian, Hindi, Portuguese), `cn2an`, `jieba`, `pypinyin`, `pypinyin-dict` (Chinese), and `ordered-set` to dependencies — required by misaki (kokoro's text processor) but not declared in its own deps
 
 ---
 

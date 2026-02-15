@@ -1947,6 +1947,7 @@ dependencies = [
     { name = "click" },
     { name = "cn2an" },
     { name = "ctranslate2" },
+    { name = "espeakng-loader" },
     { name = "fastapi" },
     { name = "faster-whisper" },
     { name = "huggingface-hub" },
@@ -1963,6 +1964,7 @@ dependencies = [
     { name = "openai-whisper" },
     { name = "ordered-set" },
     { name = "pydantic" },
+    { name = "pyopenjtalk" },
     { name = "pypinyin" },
     { name = "pypinyin-dict" },
     { name = "python-multipart" },
@@ -2039,6 +2041,7 @@ requires-dist = [
     { name = "click", specifier = ">=8.0.0" },
     { name = "cn2an", specifier = ">=0.5.0" },
     { name = "ctranslate2", specifier = ">=4.0.0" },
+    { name = "espeakng-loader", specifier = ">=0.2.0" },
     { name = "fastapi", specifier = ">=0.104.0" },
     { name = "faster-whisper", specifier = ">=1.0.0" },
     { name = "flake8", marker = "extra == 'dev'", specifier = ">=3.9.0" },
@@ -2059,6 +2062,7 @@ requires-dist = [
     { name = "ordered-set", specifier = ">=4.1.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=2.15.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
+    { name = "pyopenjtalk", specifier = ">=0.3.0" },
     { name = "pypinyin", specifier = ">=0.50.0" },
     { name = "pypinyin-dict", specifier = ">=0.8.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=6.0.0" },
@@ -6419,6 +6423,17 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/d7/4f/194e3e7c01861a5e46dfe9e1fa28ad01fd07190cb514e41a7dcf1f0b7031/pyobjc_framework_webkit-11.1-cp314-cp314-macosx_11_0_universal2.whl", hash = "sha256:13b774d4244734cb77bf3c3648149c163f62acaa105243d7c48bb3fd856b5628", size = 52248, upload-time = "2025-06-14T20:56:30.158Z" },
     { url = "https://files.pythonhosted.org/packages/31/09/28884e7c10d3a76a76c2c8f55369dd96a90f0283800c68f5c764e1fb8e2e/pyobjc_framework_webkit-11.1-cp314-cp314t-macosx_11_0_universal2.whl", hash = "sha256:c1c00d549ab1d50e3d7e8f5f71352b999d2c32dc2365c299f317525eb9bff916", size = 52725, upload-time = "2025-06-14T20:56:30.993Z" },
 ]
+
+[[package]]
+name = "pyopenjtalk"
+version = "0.4.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", version = "1.22.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "1.24.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/58/74/ccd31c696f047ba381f9b11a504bf1199756c3f30f3de64e3eeb83e10b4a/pyopenjtalk-0.4.1.tar.gz", hash = "sha256:d5ada46f7fc2b52c1c79c273eb9668ff6ad7ab276a8db9d8be119ef93440f0dc", size = 1397999, upload-time = "2025-04-08T06:27:46.528Z" }
 
 [[package]]
 name = "pyparsing"
