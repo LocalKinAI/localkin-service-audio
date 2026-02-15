@@ -106,11 +106,13 @@ class KokoroStrategy(TTSStrategy):
     def _ensure_spacy_model():
         """Ensure the spacy English model is available (needed by misaki/kokoro).
 
-        spacy.cli.download calls pip internally, which fails in uv-managed
-        venvs (no pip installed).  We try ``uv pip`` first, then fall back
-        to ``pip``, then ``spacy download`` as a last resort.
+        en-core-web-sm is NOT on PyPI — it's hosted on spacy's GitHub releases.
+        spacy.cli.download calls pip internally, which fails in uv venvs.
+        We build the direct wheel URL from the installed spacy version and
+        install via uv/pip.
         """
         try:
+            import spacy
             import spacy.util
             if spacy.util.is_package("en_core_web_sm"):
                 return  # Already installed
@@ -120,10 +122,18 @@ class KokoroStrategy(TTSStrategy):
         print("Downloading spacy English model (one-time setup)...")
         import shutil, subprocess, sys
 
+        # Build direct wheel URL from installed spacy version (e.g. 3.8.7 → 3.8.0)
+        major, minor = spacy.__version__.split(".")[:2]
+        model_ver = f"{major}.{minor}.0"
+        wheel_url = (
+            f"https://github.com/explosion/spacy-models/releases/download/"
+            f"en_core_web_sm-{model_ver}/en_core_web_sm-{model_ver}-py3-none-any.whl"
+        )
+
         # Try uv pip first (works in uv venvs), then pip, then spacy download
         commands = [
-            ["uv", "pip", "install", "en-core-web-sm"],
-            [sys.executable, "-m", "pip", "install", "en-core-web-sm"],
+            ["uv", "pip", "install", wheel_url],
+            [sys.executable, "-m", "pip", "install", wheel_url],
             [sys.executable, "-m", "spacy", "download", "en_core_web_sm"],
         ]
         for cmd in commands:

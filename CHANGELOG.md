@@ -5,6 +5,13 @@ All notable changes to LocalKin Service Audio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.7] - 2026-02-14
+
+### Fixed
+- **Spacy model download in uv environments**: `en-core-web-sm` is not on PyPI — previous install attempts all failed silently. Now downloads the wheel directly from spacy's GitHub releases using the correct URL for the installed spacy version.
+
+---
+
 ## [2.0.6] - 2026-02-14
 
 ### Fixed
