@@ -1929,7 +1929,7 @@ wheels = [
 
 [[package]]
 name = "localkin-service-audio"
-version = "2.0.7"
+version = "2.0.8"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -1947,6 +1947,7 @@ dependencies = [
     { name = "numpy", version = "1.22.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "1.24.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "openai-whisper" },
+    { name = "ordered-set" },
     { name = "pydantic" },
     { name = "python-multipart" },
     { name = "pyttsx3" },
@@ -2037,6 +2038,7 @@ requires-dist = [
     { name = "onnxruntime", marker = "extra == 'chinese'", specifier = ">=1.15.0" },
     { name = "onnxruntime", marker = "extra == 'cloning'", specifier = ">=1.15.0" },
     { name = "openai-whisper", specifier = "==20240930" },
+    { name = "ordered-set", specifier = ">=4.1.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=2.15.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=6.0.0" },
@@ -3014,6 +3016,15 @@ dependencies = [
     { name = "triton", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'linux2'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f5/77/952ca71515f81919bd8a6a4a3f89a27b09e73880cebf90957eda8f2f8545/openai-whisper-20240930.tar.gz", hash = "sha256:b7178e9c1615576807a300024f4daa6353f7e1a815dac5e38c33f1ef055dd2d2", size = 800544, upload-time = "2024-09-30T18:21:22.596Z" }
+
+[[package]]
+name = "ordered-set"
+version = "4.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/4c/ca/bfac8bc689799bcca4157e0e0ced07e70ce125193fc2e166d2e685b7e2fe/ordered-set-4.1.0.tar.gz", hash = "sha256:694a8e44c87657c59292ede72891eb91d34131f6531463aab3009191c77364a8", size = 12826, upload-time = "2022-01-26T14:38:56.6Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/33/55/af02708f230eb77084a299d7b08175cff006dea4f2721074b92cdb0296c0/ordered_set-4.1.0-py3-none-any.whl", hash = "sha256:046e1132c71fcf3330438a539928932caf51ddbc582496833e23de611de14562", size = 7634, upload-time = "2022-01-26T14:38:48.677Z" },
+]
 
 [[package]]
 name = "packaging"
