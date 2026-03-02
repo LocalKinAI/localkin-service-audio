@@ -50,25 +50,20 @@ def serve(
 
     try:
         import uvicorn
-        from ...api.server import app
+    except ImportError:
+        print_error("uvicorn not installed. Install with: pip install uvicorn")
+        raise click.Abort()
 
-        # Pre-load model if specified
-        if model_name:
-            from ...core import get_audio_engine
-            engine = get_audio_engine()
+    try:
+        from ...api.server import create_app
 
-            # Determine if STT or TTS based on model
-            from ...core.config import model_registry
-            model_config = model_registry.get(model_name)
+        if not model_name:
+            print_error("Model name required. Example: kin audio serve kokoro")
+            raise click.Abort()
 
-            if model_config:
-                if model_config.type.value == "stt":
-                    engine.load_stt(model_name)
-                else:
-                    engine.load_tts(model_name)
-                print_success(f"Loaded {model_name}")
+        app = create_app(model_name)
+        print_success(f"Loaded {model_name}")
 
-        # Run server
         uvicorn.run(
             app,
             host=host,
@@ -76,9 +71,6 @@ def serve(
             reload=reload,
         )
 
-    except ImportError:
-        print_error("uvicorn not installed. Install with: pip install uvicorn")
-        raise click.Abort()
     except Exception as e:
         print_error(f"Server failed: {e}")
         raise click.Abort()

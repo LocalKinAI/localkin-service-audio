@@ -60,10 +60,12 @@ class SenseVoiceStrategy(STTStrategy):
 
             print(f"Loading SenseVoice model '{model_size}'...")
 
-            # Initialize SenseVoice
+            # Initialize SenseVoice (use HuggingFace hub, ModelScope is China-only)
             self.model = AutoModel(
                 model=model_id,
                 trust_remote_code=True,
+                remote_code="model.py",
+                hub="hf",
                 device=self.device if self.device != "mps" else "cpu",  # FunASR doesn't support MPS
             )
 
@@ -129,9 +131,22 @@ class SenseVoiceStrategy(STTStrategy):
             # Extract text
             text = result.get("text", "") if isinstance(result, dict) else str(result)
 
-            # Extract emotion if available
+            # Parse SenseVoice rich tags: <|lang|><|EMOTION|><|Event|><|withitn/woitn|>text
+            import re
+            detected_language = None
             emotion = None
-            if detect_emotion and isinstance(result, dict):
+            tag_match = re.match(r'^(<\|[^|]+\|>)+', text)
+            if tag_match:
+                tags = re.findall(r'<\|([^|]+)\|>', tag_match.group())
+                for tag in tags:
+                    if len(tag) == 2 and tag.islower():  # language tag: zh, en, ja, etc.
+                        detected_language = tag
+                    elif tag.upper() in self.EMOTIONS:
+                        emotion = self.EMOTIONS[tag.upper()]
+                text = text[tag_match.end():].strip()
+
+            # Fallback emotion extraction from result dict
+            if not emotion and detect_emotion and isinstance(result, dict):
                 raw_emotion = result.get("emotion", result.get("emo_label"))
                 if raw_emotion:
                     emotion = self.EMOTIONS.get(str(raw_emotion).upper(), raw_emotion)
@@ -143,12 +158,11 @@ class SenseVoiceStrategy(STTStrategy):
                 if events:
                     audio_events = events if isinstance(events, list) else [events]
 
-            # Extract language
-            detected_language = None
-            if isinstance(result, dict):
-                detected_language = result.get("language", result.get("lang"))
-                if detected_language:
-                    detected_language = detected_language.lower()[:2]
+            # Extract language (fallback to result dict if not from tags)
+            if not detected_language and isinstance(result, dict):
+                dl = result.get("language", result.get("lang"))
+                if dl:
+                    detected_language = dl.lower()[:2]
 
             return TranscriptionResult(
                 text=text.strip(),

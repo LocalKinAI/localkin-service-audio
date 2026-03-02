@@ -71,22 +71,90 @@ class TTSResponse(BaseModel):
     duration: Optional[float] = None
 
 def load_whisper_model(model_name: str):
-    """Load a Whisper model from Hugging Face."""
+    """Load a Whisper STT model (HuggingFace or whisper-cpp)."""
     try:
+        if "whisper-cpp" in model_name:
+            # Use pywhispercpp for whisper-cpp models
+            from pywhispercpp.model import Model as WhisperModel
+            # Extract size: "whisper-cpp:base" -> "base"
+            size = model_name.split(":")[-1] if ":" in model_name else "base"
+            logger.info(f"Loading whisper-cpp model: {size}")
+            model = WhisperModel(size)
+            loaded_models[model_name] = {
+                "type": "whisper-cpp",
+                "model": model,
+            }
+            logger.info(f"Successfully loaded whisper-cpp model: {size}")
+            return model
+
+        # Check model registry for engine type
+        engine = None
+        model_info = find_model(model_name)
+        if not model_info:
+            from ..core.config import model_registry
+            reg_model = model_registry.get(model_name)
+            if reg_model:
+                engine = reg_model.engine
+                model_info = {"name": reg_model.name, "source": engine, "model_size": reg_model.model_size}
+
+        if not model_info:
+            raise ValueError(f"Model {model_name} not found")
+
+        # Moonshine (ONNX or PyTorch): engine="moonshine"
+        if engine == "moonshine":
+            from ..core.audio_processing.stt.moonshine_strategy import MoonshineStrategy
+            from ..core.types import ModelConfig as MC, ModelType
+            strategy = MoonshineStrategy()
+            size = model_info.get("model_size", "base")
+            mc = MC(name=model_name, type=ModelType.STT, engine="moonshine", model_size=size)
+            if not strategy.load(mc):
+                raise ValueError(f"Failed to load Moonshine model: {model_name}")
+            loaded_models[model_name] = {
+                "type": "moonshine",
+                "strategy": strategy,
+            }
+            logger.info(f"Successfully loaded Moonshine: {model_name}")
+            return strategy
+
+        # SenseVoice (FunASR): engine="sensevoice"
+        if engine == "sensevoice":
+            from ..core.audio_processing.stt.sensevoice_strategy import SenseVoiceStrategy
+            from ..core.types import ModelConfig as MC, ModelType
+            strategy = SenseVoiceStrategy()
+            size = model_info.get("model_size", "small")
+            mc = MC(name=model_name, type=ModelType.STT, engine="sensevoice", model_size=size)
+            if not strategy.load(mc):
+                raise ValueError(f"Failed to load SenseVoice model: {model_name}")
+            loaded_models[model_name] = {
+                "type": "sensevoice",
+                "strategy": strategy,
+            }
+            logger.info(f"Successfully loaded SenseVoice: {model_name}")
+            return strategy
+
+        # OpenAI Whisper (native): engine="whisper" or source="openai-whisper"
+        if engine == "whisper" or model_info.get("source") == "openai-whisper":
+            import whisper
+            size = model_info.get("model_size", "medium")
+            logger.info(f"Loading OpenAI Whisper model: {size}")
+            model = whisper.load_model(size)
+            loaded_models[model_name] = {
+                "type": "openai-whisper",
+                "model": model,
+            }
+            logger.info(f"Successfully loaded OpenAI Whisper: {size}")
+            return model
+
+        # HuggingFace transformers pipeline
         from transformers import pipeline
         import torch
 
-        model_info = find_model(model_name)
-        if not model_info or model_info.get("source") != "huggingface":
-            raise ValueError(f"Model {model_name} not found or not a Hugging Face model")
-
         repo_id = model_info.get("huggingface_repo")
         if not repo_id:
-            raise ValueError(f"No Hugging Face repo specified for {model_name}")
+            raise ValueError(f"Model {model_name} has no Hugging Face repo")
 
         logger.info(f"Loading Whisper model: {repo_id}")
 
-        # Load the model pipeline
         device = 0 if torch.cuda.is_available() else -1
         pipe = pipeline(
             "automatic-speech-recognition",
@@ -109,18 +177,20 @@ def load_whisper_model(model_name: str):
         raise
 
 def load_tts_model(model_name: str):
-    """Load a TTS model from Hugging Face."""
+    """Load a TTS model."""
     try:
-        from transformers import pipeline
-        import torch
-
         model_info = find_model(model_name)
-        if not model_info or model_info.get("source") != "huggingface":
+        source = model_info.get("source", "") if model_info else ""
+        repo_id = model_info.get("huggingface_repo", "") if model_info else ""
+
+        # Kokoro doesn't need huggingface repo
+        if "kokoro" in model_name.lower():
+            pass  # handled below
+        elif not model_info or source != "huggingface" or not repo_id:
             raise ValueError(f"Model {model_name} not found or not a Hugging Face model")
 
-        repo_id = model_info.get("huggingface_repo")
-        if not repo_id:
-            raise ValueError(f"No Hugging Face repo specified for {model_name}")
+        from transformers import pipeline
+        import torch
 
         logger.info(f"Loading TTS model: {repo_id}")
 
@@ -208,9 +278,8 @@ def load_tts_model(model_name: str):
 
             loaded_models[model_name] = {
                 "type": "kokoro",
-                "pipeline": pipeline,
+                "pipelines": {"a": pipeline},  # Lazy-load other languages on demand
                 "repo_id": repo_id,
-                "lang_code": 'a'  # Default language
             }
 
         elif model_name == "xtts-v2":
@@ -279,7 +348,13 @@ def create_app(model_name: str) -> FastAPI:
 
     model_info = find_model(model_name)
     if not model_info:
-        raise ValueError(f"Model {model_name} not found")
+        # Fallback to new model registry (supports short names like "kokoro")
+        from ..core.config import model_registry
+        reg_model = model_registry.get(model_name)
+        if reg_model:
+            model_info = {"name": reg_model.name, "type": reg_model.type.value, "source": reg_model.engine}
+        else:
+            raise ValueError(f"Model {model_name} not found")
 
     model_type = model_info.get("type")
 
@@ -334,7 +409,6 @@ def create_app(model_name: str) -> FastAPI:
                     load_whisper_model(model_name)
 
                 model_data = loaded_models[model_name]
-                pipe = model_data["pipeline"]
 
                 # Save uploaded file temporarily
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
@@ -343,12 +417,48 @@ def create_app(model_name: str) -> FastAPI:
                     temp_path = temp_file.name
 
                 try:
-                    # Run transcription
-                    result = pipe(
-                        temp_path,
-                        generate_kwargs={"language": language} if language else {},
-                        return_timestamps=False
-                    )
+                    if model_data["type"] in ("moonshine", "sensevoice"):
+                        strategy = model_data["strategy"]
+                        r = strategy.transcribe(temp_path, language=language)
+                        result = {"text": r.text, "language": r.language}
+
+                    elif model_data["type"] == "whisper-cpp":
+                        # Resample to 16kHz mono if needed
+                        import wave
+                        with wave.open(temp_path, "rb") as wf:
+                            sr = wf.getframerate()
+                        if sr != 16000:
+                            resampled = temp_path + ".16k.wav"
+                            import subprocess
+                            subprocess.run(
+                                ["ffmpeg", "-i", temp_path, "-ar", "16000", "-ac", "1", "-y", resampled],
+                                capture_output=True, timeout=10,
+                            )
+                            if os.path.exists(resampled):
+                                background_tasks.add_task(os.unlink, temp_path)
+                                temp_path = resampled
+
+                        # Use pywhispercpp
+                        model = model_data["model"]
+                        segments = model.transcribe(temp_path, language=language if language != "auto" else None)
+                        text = " ".join(seg.text.strip() for seg in segments)
+                        result = {"text": text}
+
+                    elif model_data["type"] == "openai-whisper":
+                        # OpenAI Whisper (native)
+                        model = model_data["model"]
+                        lang = language if language and language != "auto" else None
+                        r = model.transcribe(temp_path, language=lang)
+                        result = {"text": r["text"], "language": r.get("language")}
+
+                    else:
+                        # HuggingFace pipeline
+                        pipe = model_data["pipeline"]
+                        result = pipe(
+                            temp_path,
+                            generate_kwargs={"language": language} if language else {},
+                            return_timestamps=False
+                        )
 
                     # Clean up temp file
                     background_tasks.add_task(os.unlink, temp_path)
@@ -366,6 +476,17 @@ def create_app(model_name: str) -> FastAPI:
 
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Model loading failed: {str(e)}")
+
+        # OpenAI-compatible STT endpoint for backward compatibility with kin_listen
+        @app.post("/v1/audio/transcriptions")
+        async def openai_stt_compat(
+            background_tasks: BackgroundTasks,
+            file: UploadFile = File(...),
+            language: Optional[str] = None,
+            model: Optional[str] = None,
+        ):
+            """OpenAI-compatible STT endpoint. Maps to /transcribe."""
+            return await transcribe_audio(background_tasks, file, language)
 
     elif model_type == "tts":
         @app.post("/synthesize", response_model=TTSResponse)
@@ -433,14 +554,20 @@ def create_app(model_name: str) -> FastAPI:
                         import soundfile as sf
                         import numpy as np
 
-                        pipeline = model_data["pipeline"]
                         voice = request.speaker or 'af_heart'  # Default voice
+
+                        # Select pipeline by voice language prefix (z=Chinese, j=Japanese, a=English, etc.)
+                        lang_code = voice[0] if voice else 'a'
+                        pipelines = model_data["pipelines"]
+                        if lang_code not in pipelines:
+                            pipelines[lang_code] = KPipeline(lang_code=lang_code)
+                        pipeline = pipelines[lang_code]
 
                         # Generate speech using Kokoro
                         generator = pipeline(
                             request.text,
                             voice=voice,
-                            speed=1.0,  # You can add speed control to TTSRequest if needed
+                            speed=1.0,
                         )
 
                         # Collect all audio segments
@@ -596,6 +723,20 @@ def create_app(model_name: str) -> FastAPI:
 
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Model loading failed: {str(e)}")
+
+    # OpenAI-compatible TTS endpoint for backward compatibility with kin_speak
+    if model_type == "tts":
+        @app.post("/v1/audio/speech")
+        async def openai_tts_compat(
+            background_tasks: BackgroundTasks,
+            request: Dict[str, Any],
+        ):
+            """OpenAI-compatible TTS endpoint. Maps to /synthesize."""
+            tts_req = TTSRequest(
+                text=request.get("input", ""),
+                speaker=request.get("voice"),
+            )
+            return await synthesize_speech(background_tasks, tts_req)
 
     @app.post("/chat")
     async def chat(request: Dict[str, Any]):

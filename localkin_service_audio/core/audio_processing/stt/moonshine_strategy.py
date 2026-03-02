@@ -52,8 +52,10 @@ class MoonshineStrategy(STTStrategy):
 
             if self._use_onnx:
                 # ONNX version
+                from moonshine_onnx import load_tokenizer
                 model_name = model_size.replace("moonshine-", "")
                 self.model = MoonshineOnnxModel(model_name=model_name)
+                self._tokenizer = load_tokenizer()
             else:
                 # PyTorch version
                 self.model = Moonshine(model_size.replace("moonshine-", ""))
@@ -93,17 +95,19 @@ class MoonshineStrategy(STTStrategy):
 
             # Run transcription
             if self._use_onnx:
-                result = self.model.generate(audio_array)
+                # ONNX expects 2D input: (1, num_samples)
+                if audio_array.ndim == 1:
+                    audio_array = audio_array[np.newaxis, :]
+                tokens = self.model.generate(audio_array)
+                text = self._tokenizer.decode_batch(tokens)[0]
             else:
                 result = self.model.transcribe(audio_array)
-
-            # Handle result format
-            if isinstance(result, list):
-                text = " ".join(result)
-            elif isinstance(result, dict):
-                text = result.get("text", "")
-            else:
-                text = str(result)
+                if isinstance(result, list):
+                    text = " ".join(result)
+                elif isinstance(result, dict):
+                    text = result.get("text", "")
+                else:
+                    text = str(result)
 
             return TranscriptionResult(
                 text=text.strip(),

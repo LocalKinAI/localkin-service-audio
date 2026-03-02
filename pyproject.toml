@@ -47,8 +47,8 @@ requires-python = ">=3.10"
 dependencies = [
     # Core
     "requests>=2.25.0",
-    "click>=8.0.0",           # CLI framework (new in v2.0)
-    "rich>=10.0.0",           # Rich terminal output (new in v2.0)
+    "click>=8.0.0", # CLI framework (new in v2.0)
+    "rich>=10.0.0", # Rich terminal output (new in v2.0)
     "pydantic>=2.0.0",
     # Audio
     "sounddevice>=0.4.0",
@@ -70,8 +70,7 @@ dependencies = [
     "jieba>=0.42.0",
     "pypinyin>=0.50.0",
     "pypinyin-dict>=0.8.0",
-    "pyopenjtalk>=0.3.0",         # Japanese TTS (misaki/ja.py)
-    "espeakng-loader>=0.2.0",     # French/Spanish/Italian/Hindi/Portuguese TTS
+    "espeakng-loader>=0.2.0", # French/Spanish/Italian/Hindi/Portuguese TTS
     # ML
     "torch>=2.6.0",
     "torchaudio>=2.6.0",
@@ -273,3 +272,6 @@ exclude_lines = [
     "raise NotImplementedError",
     "if __name__ == .__main__.:",
 ]
+
+[tool.uv.extra-build-dependencies]
+openai-whisper = ["setuptools"]
