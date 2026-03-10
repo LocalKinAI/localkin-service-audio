@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Bare `except:` clauses**: Replaced all bare `except:` with `except Exception:` across 11 files to avoid catching `KeyboardInterrupt`/`SystemExit`
 - **HeartMuLa hardcoded path**: Removed fallback to `~/.cache/heartmula` — now consistently uses `LOCALKIN_HOME`
 - **Pytest warnings**: Registered `@pytest.mark.slow` custom marker in `pyproject.toml`
+- **Security**: Bumped `transformers>=4.53.0` (fixes 5 ReDoS CVEs) and `python-multipart>=0.0.22` (fixes arbitrary file write CVE)
 
 ### Removed
 - **Legacy v1.x code** (~2,500 lines deleted):

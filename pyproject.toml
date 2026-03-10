@@ -73,7 +73,7 @@ dependencies = [
     # ML
     "torch>=2.6.0",
     "torchaudio>=2.6.0",
-    "transformers>=4.21.0",
+    "transformers>=4.53.0",
     "huggingface-hub>=0.17.0",
     "sentencepiece>=0.2.1",
     # Compatibility
@@ -82,7 +82,7 @@ dependencies = [
     # API
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
-    "python-multipart>=0.0.6",
+    "python-multipart>=0.0.22",
 ]
 
 [project.optional-dependencies]
@@ -101,7 +101,7 @@ docs = [
 ]
 web = [
     "jinja2>=3.0.0",
-    "python-multipart>=0.0.6",
+    "python-multipart>=0.0.22",
     "websockets>=10.0",
 ]
 whisper = [
