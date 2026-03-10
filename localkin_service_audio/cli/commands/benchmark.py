@@ -146,10 +146,10 @@ def _get_audio_duration(audio_path: str) -> float:
         import librosa
         y, sr = librosa.load(audio_path, sr=None)
         return len(y) / sr
-    except:
+    except Exception:
         try:
             import wave
             with wave.open(audio_path, 'r') as f:
                 return f.getnframes() / float(f.getframerate())
-        except:
+        except Exception:
             return 0.0

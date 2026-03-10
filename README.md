@@ -6,6 +6,14 @@
 
 **Local Voice AI Platform** - Speech-to-Text and Text-to-Speech with Chinese language support, voice cloning, and Claude integration via MCP.
 
+## What's New in v2.0.10
+
+- **12 new models** (29 → 40 total): Whisper large-v3-turbo, Parakeet v3, Canary v2/Qwen, CosyVoice2, Orpheus TTS, Qwen3-TTS, Dia
+- **Removed**: ~2,500 lines of legacy v1.x code — fully migrated to v2.0 `ModelRegistry` and `AudioEngine`
+- **Fixed**: Build failure (#1), bare `except:` clauses, version mismatch, HeartMuLa hardcoded path
+
+See [CHANGELOG.md](CHANGELOG.md) for full history.
+
 ## Features
 
 - **Multiple STT Engines**: Whisper, faster-whisper, whisper.cpp, SenseVoice, Paraformer
@@ -349,31 +357,39 @@ kin web --port 5000
 
 ## Supported Models
 
-`kin audio models` shows all 30 models with real-time availability status:
+`kin audio models` shows all 40 models with real-time availability status:
 - **✅ Ready** — engine installed, usable now
 - **📦 Not installed** — strategy code exists, just needs `pip install`
 - **🔮 Planned** — future implementation
 
-### STT Models (20)
+### STT Models (24)
 
 | Model | Engine | Languages | Features | Status |
 |-------|--------|-----------|----------|--------|
 | `whisper:tiny/base/small/medium/large-v3` | OpenAI Whisper | Multilingual | Standard reference | Ready |
+| `whisper:large-v3-turbo` | OpenAI Whisper | Multilingual | 6x faster than large-v3, 809M params | Ready |
 | `faster-whisper:tiny/base/large-v3/turbo/distil-large-v3` | CTranslate2 | Multilingual | 4x faster, GPU | Ready |
+| `faster-whisper:large-v3-turbo` | CTranslate2 | Multilingual | CTranslate2 turbo variant | Ready |
 | `whisper-cpp:tiny/base/small/medium` | whisper.cpp | Multilingual | Fast CPU inference | Ready |
 | `moonshine:tiny/base` | Moonshine | English | 5x real-time, ~20MB | Install needed |
-| `sensevoice:small` | FunASR | zh, en, ja, ko | 15x faster, emotion detection | Install needed |
-| `paraformer:zh` | FunASR | Chinese | Fast Chinese ASR | Install needed |
-| `parakeet:1.1b` | NVIDIA NeMo | English | >2000x real-time | Planned |
-| `canary:1b` | NVIDIA NeMo | Multilingual | #1 HuggingFace leaderboard | Planned |
+| `sensevoice:small` | FunASR (Alibaba) | zh, en, ja, ko | 15x faster, emotion detection | Install needed |
+| `paraformer:zh` | FunASR (Alibaba) | Chinese | Fast Chinese ASR | Install needed |
+| `parakeet:0.6b` | NVIDIA NeMo | 25 languages | 10x faster than Whisper turbo | Install needed |
+| `parakeet:1.1b` | NVIDIA NeMo | English | >2000x real-time | Install needed |
+| `canary:1b-v2` | NVIDIA NeMo | 25 languages | Transcription + translation | Install needed |
+| `canary-qwen:2.5b` | NVIDIA NeMo | English | #1 HuggingFace ASR leaderboard, STT + understanding | Install needed |
 
-### TTS Models (8)
+### TTS Models (14)
 
 | Model | Engine | Languages | Features | Status |
 |-------|--------|-----------|----------|--------|
 | `native` | pyttsx3 | System | No download needed | Ready |
 | `kokoro` / `kokoro:82m` | Kokoro | en, es, fr, hi, it, ja, pt, zh | 54 voices, multilingual | Ready |
-| `cosyvoice:300m` | CosyVoice | zh, en, ja, ko, yue | Voice cloning, streaming | Install needed |
+| `cosyvoice:300m` | CosyVoice (Alibaba) | zh, en, ja, ko, yue | Voice cloning, streaming | Install needed |
+| `cosyvoice2:0.5b` | CosyVoice2 (Alibaba) | 9 langs + 18 Chinese dialects | 30-50% fewer errors than v1 | Install needed |
+| `qwen3-tts:0.6b/1.7b` | Qwen3-TTS (Alibaba) | 10 langs (zh, en, ja, ko, de, fr...) | 97ms latency, 3s voice cloning, voice design | Install needed |
+| `orpheus:150m/1b/3b` | Orpheus | English | Best emotional expressiveness, GGUF | Install needed |
+| `dia:1.6b` | Dia | English | Multi-speaker dialogue, nonverbal sounds | Install needed |
 | `chattts` | ChatTTS | zh, en | Conversational, emotion | Install needed |
 | `f5-tts` | F5-TTS | en, zh | Zero-shot voice cloning | Install needed |
 | `gpt-sovits` | GPT-SoVITS | zh, en, ja | Voice cloning with 5s audio | Planned |

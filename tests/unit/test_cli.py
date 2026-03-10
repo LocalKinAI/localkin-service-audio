@@ -365,7 +365,9 @@ class TestAddModelCommand:
 
     def test_add_model_with_template(self, runner):
         """Test add-model with valid template."""
-        with patch("localkin_service_audio.core.config_legacy.save_models_config", return_value=True):
+        import sys
+        add_model_mod = sys.modules["localkin_service_audio.cli.commands.add_model"]
+        with patch.object(add_model_mod, "_save_models_json", return_value=True):
             result = runner.invoke(
                 cli,
                 ["audio", "add-model", "--template", "whisper_stt", "--name", "test-whisper"],

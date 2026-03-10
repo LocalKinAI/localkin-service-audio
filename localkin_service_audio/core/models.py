@@ -102,7 +102,7 @@ def run_ollama_model(model_name, port=8000):
         try:
             response = requests.get(f"{OLLAMA_API_URL}/api/tags", timeout=5)
             response.raise_for_status()
-        except:
+        except Exception:
             print("❌ Ollama is not running. Please start Ollama first:")
             print("   brew services start ollama  # macOS")
             print("   ollama serve                 # Linux/Windows")
@@ -133,10 +133,10 @@ def run_huggingface_model(model_name: str, port: int = 8000):
     """Runs a Hugging Face model as an API server."""
     try:
         from ..api.server import run_server
-        from .config import find_model
+        from .config import model_registry
 
-        model_info = find_model(model_name)
-        if not model_info or model_info.get("source") != "huggingface":
+        reg_model = model_registry.get(model_name)
+        if not reg_model or reg_model.engine not in ("huggingface", "kokoro", "cosyvoice", "chattts", "f5-tts"):
             print(f"❌ Model '{model_name}' not found or not a Hugging Face model")
             return False
 
@@ -145,7 +145,7 @@ def run_huggingface_model(model_name: str, port: int = 8000):
         cached_models = [m["name"] for m in cache_info["cached_models"]]
         if model_name not in cached_models:
             print(f"📥 Model '{model_name}' not found in cache. Pulling it first...")
-            success = pull_model(model_name, "huggingface", model_info.get("huggingface_repo"))
+            success = pull_model(model_name, "huggingface", reg_model.repo_id)
             if not success:
                 print(f"❌ Failed to pull model '{model_name}'")
                 return False

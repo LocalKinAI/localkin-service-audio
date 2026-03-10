@@ -147,13 +147,7 @@ def info(verbose: bool):
 
 def main():
     """Entry point for the CLI."""
-    # Try the new Click CLI first
-    try:
-        cli()
-    except click.exceptions.UsageError:
-        # Fall back to legacy argparse CLI for backward compatibility
-        from .cli import main as legacy_main
-        legacy_main()
+    cli()
 
 
 if __name__ == "__main__":

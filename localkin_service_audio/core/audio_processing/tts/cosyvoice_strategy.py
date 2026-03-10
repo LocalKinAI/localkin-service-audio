@@ -275,7 +275,7 @@ class CosyVoiceStrategy(TTSStrategy):
         try:
             import librosa
             return librosa.effects.time_stretch(audio, rate=speed)
-        except:
+        except Exception:
             return audio
 
     @classmethod

@@ -5,6 +5,43 @@ All notable changes to LocalKin Service Audio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.10] - 2026-03-10
+
+### Fixed
+- **Build failure**: Moved `openai-whisper` to optional dependency to resolve #1 build failure on systems without Rust/ffmpeg
+- **Version mismatch**: Synced `__init__.py` version with `pyproject.toml` (was stuck at 2.0.9)
+- **Bare `except:` clauses**: Replaced all bare `except:` with `except Exception:` across 11 files to avoid catching `KeyboardInterrupt`/`SystemExit`
+- **HeartMuLa hardcoded path**: Removed fallback to `~/.cache/heartmula` — now consistently uses `LOCALKIN_HOME`
+- **Pytest warnings**: Registered `@pytest.mark.slow` custom marker in `pyproject.toml`
+
+### Removed
+- **Legacy v1.x code** (~2,500 lines deleted):
+  - `cli/cli_legacy.py` — old argparse CLI replaced by Click CLI in v2.0
+  - `core/config_legacy.py` — replaced by `ModelRegistry` singleton
+  - `core/audio_processing/stt_legacy.py` — replaced by STT strategy pattern
+  - `core/audio_processing/tts_legacy.py` — replaced by TTS strategy pattern
+- Legacy re-exports from `core/__init__.py` and `core/audio_processing/__init__.py`
+- Legacy CLI fallback in `cli/main.py`
+
+### Added
+- **12 new models** in model registry (29 → 40 total):
+  - **STT**: `whisper:large-v3-turbo`, `faster-whisper:large-v3-turbo` (6x faster than large-v3, MIT)
+  - **STT**: `parakeet:0.6b` (NVIDIA, 10x faster than Whisper turbo, 25 languages)
+  - **STT**: `canary:1b-v2` (NVIDIA, 25 languages, transcription + translation)
+  - **STT**: `canary-qwen:2.5b` (NVIDIA, #1 HuggingFace ASR leaderboard, speech understanding)
+  - **TTS**: `cosyvoice2:0.5b` (Alibaba, 30-50% fewer errors than v1, 9 langs + 18 Chinese dialects)
+  - **TTS**: `qwen3-tts:0.6b`, `qwen3-tts:1.7b` (Alibaba, 97ms latency, voice design, 10 languages)
+  - **TTS**: `orpheus:3b`, `orpheus:1b`, `orpheus:150m` (best emotional TTS, Llama-based, GGUF)
+  - **TTS**: `dia:1.6b` (multi-speaker dialogue in one pass, laughter/coughing)
+
+### Changed
+- **Web UI (`ui/routes.py`)**: Migrated from legacy `get_models()`/`find_model()` to `model_registry` API; transcription uses `AudioEngine` instead of legacy `transcribe_audio()`
+- **API server (`api/server.py`)**: Uses `model_registry` instead of legacy `find_model()`
+- **Add-model command**: Self-contained models.json read/write, no longer depends on `config_legacy`
+- **Package exports**: Top-level `__init__.py` now exports v2.0 API (`AudioEngine`, `model_registry`) instead of legacy functions
+
+---
+
 ## [2.0.9] - 2026-02-15
 
 ### Fixed

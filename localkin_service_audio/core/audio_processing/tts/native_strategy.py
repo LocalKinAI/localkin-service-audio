@@ -127,7 +127,7 @@ class NativeStrategy(TTSStrategy):
                     language=lang,
                     gender=getattr(v, 'gender', None),
                 ))
-        except:
+        except Exception:
             pass
 
         return voices

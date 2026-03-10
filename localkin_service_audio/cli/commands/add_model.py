@@ -1,9 +1,34 @@
 """
 Add-model command - Add a new model to LocalKin Audio.
 """
+import json
+import os
 import click
 
 from ..utils import print_header, print_success, print_error, print_info, print_warning
+
+MODELS_CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'core', 'models.json')
+
+
+def _load_models_json():
+    """Load models and metadata from models.json."""
+    try:
+        with open(MODELS_CONFIG_PATH, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+            return config.get("models", []), config.get("metadata", {})
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print_error(f"Failed to load models.json: {e}")
+        return [], {}
+
+
+def _save_models_json(models, metadata=None):
+    """Save models and metadata to models.json."""
+    config = {"models": models}
+    if metadata:
+        config["metadata"] = metadata
+    with open(MODELS_CONFIG_PATH, 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+    return True
 
 
 @click.command("add-model")
@@ -40,9 +65,7 @@ def add_model(template_name, repo, model_name, description, model_type, model_li
 
     print_header("Add Model")
 
-    from ...core.config_legacy import get_models, get_config_metadata, save_models_config
-
-    current_models = get_models()
+    current_models, metadata = _load_models_json()
     current_names = [m.get("name") for m in current_models]
 
     # Check for duplicate
@@ -109,8 +132,7 @@ def add_model(template_name, repo, model_name, description, model_type, model_li
 
     # Save
     current_models.append(model)
-    metadata = get_config_metadata()
-    if save_models_config(current_models, metadata):
+    if _save_models_json(current_models, metadata):
         print_success(f"Model '{model_name}' added successfully!")
         print(f"\n  Type:   {model.get('type', 'N/A').upper()}")
         print(f"  Source: {model.get('source', 'N/A')}")

@@ -106,7 +106,7 @@ class ChatTTSStrategy(TTSStrategy):
                         spk_emb = torch.tensor(
                             [float(x) for x in bytes.fromhex(voice)]
                         )
-                except:
+                except Exception:
                     pass
 
             # Use saved speaker if available

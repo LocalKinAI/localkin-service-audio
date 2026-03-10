@@ -464,7 +464,6 @@ class HeartMuLaStrategy(MusicEngine):
         # Check common checkpoint locations
         possible_paths = [
             _default_home() / "cache" / "heartmula",
-            Path.home() / ".cache" / "heartmula",
             Path("/tmp/heartmula"),
             Path("./ckpt"),
             Path("./models/heartmula"),

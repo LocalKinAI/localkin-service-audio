@@ -16,12 +16,27 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 import uvicorn
 
-from ..core import find_model
+from ..core.config import model_registry
 from ..ui import create_ui_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _find_model_dict(model_name: str) -> Optional[Dict[str, Any]]:
+    """Find a model and return its info as a dict (bridge from legacy API)."""
+    reg_model = model_registry.get(model_name)
+    if reg_model:
+        return {
+            "name": reg_model.name,
+            "type": reg_model.type.value,
+            "source": reg_model.engine,
+            "engine": reg_model.engine,
+            "huggingface_repo": reg_model.repo_id,
+            "model_size": reg_model.model_size,
+        }
+    return None
 
 # Cache configuration - use settings for LOCALKIN_HOME support
 from pathlib import Path
@@ -88,17 +103,10 @@ def load_whisper_model(model_name: str):
             return model
 
         # Check model registry for engine type
-        engine = None
-        model_info = find_model(model_name)
-        if not model_info:
-            from ..core.config import model_registry
-            reg_model = model_registry.get(model_name)
-            if reg_model:
-                engine = reg_model.engine
-                model_info = {"name": reg_model.name, "source": engine, "model_size": reg_model.model_size}
-
+        model_info = _find_model_dict(model_name)
         if not model_info:
             raise ValueError(f"Model {model_name} not found")
+        engine = model_info.get("engine")
 
         # Moonshine (ONNX or PyTorch): engine="moonshine"
         if engine == "moonshine":
@@ -179,7 +187,7 @@ def load_whisper_model(model_name: str):
 def load_tts_model(model_name: str):
     """Load a TTS model."""
     try:
-        model_info = find_model(model_name)
+        model_info = _find_model_dict(model_name)
         source = model_info.get("source", "") if model_info else ""
         repo_id = model_info.get("huggingface_repo", "") if model_info else ""
 
@@ -346,15 +354,9 @@ def create_app(model_name: str) -> FastAPI:
         version="1.0.0"
     )
 
-    model_info = find_model(model_name)
+    model_info = _find_model_dict(model_name)
     if not model_info:
-        # Fallback to new model registry (supports short names like "kokoro")
-        from ..core.config import model_registry
-        reg_model = model_registry.get(model_name)
-        if reg_model:
-            model_info = {"name": reg_model.name, "type": reg_model.type.value, "source": reg_model.engine}
-        else:
-            raise ValueError(f"Model {model_name} not found")
+        raise ValueError(f"Model {model_name} not found")
 
     model_type = model_info.get("type")
 
@@ -779,7 +781,7 @@ def run_server(model_name: str, host: str = "0.0.0.0", port: int = 8000):
         logger.info(f"   GET  /models     - Loaded models info")
         logger.info(f"   GET  /docs       - Interactive API documentation")
 
-        model_info = find_model(model_name)
+        model_info = _find_model_dict(model_name)
         if model_info:
             model_type = model_info.get("type")
             if model_type == "stt":

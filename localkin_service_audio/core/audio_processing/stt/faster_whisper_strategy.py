@@ -159,7 +159,7 @@ class FasterWhisperStrategy(STTStrategy):
             import contextlib
             with contextlib.closing(wave.open(audio_path, 'r')) as f:
                 return f.getnframes() / float(f.getframerate())
-        except:
+        except Exception:
             return 0
 
     @classmethod

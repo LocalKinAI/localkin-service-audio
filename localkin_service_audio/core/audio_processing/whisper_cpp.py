@@ -42,7 +42,7 @@ class WhisperCppSTT:
             )
             if result.returncode == 0:
                 return result.stdout.strip()
-        except:
+        except Exception:
             pass
 
         # Check common installation locations
@@ -339,7 +339,7 @@ def get_whisper_cpp_engines() -> Dict[str, bool]:
         return {
             "whisper_cpp": status["executable_found"]
         }
-    except:
+    except Exception:
         return {"whisper_cpp": False}
 
 
@@ -354,5 +354,5 @@ def get_whisper_cpp_models() -> list:
         stt = WhisperCppSTT()
         models = stt.get_available_models()
         return list(models.keys())
-    except:
+    except Exception:
         return []

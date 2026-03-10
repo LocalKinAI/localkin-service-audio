@@ -14,16 +14,16 @@ Inspired by Ollama's simplicity for local AI model management.
 import os
 from pathlib import Path
 
-__version__ = "2.0.9"
+__version__ = "2.0.10"
 __author__ = "LocalKin Team"
 __description__ = "Voice AI Platform - Local STT/TTS with Chinese Language Support"
 
 def get_sample_audio_path():
     """Get the path to the included sample audio file for testing.
-    
+
     Returns:
         str: Absolute path to the sample.wav file
-        
+
     Example:
         >>> import localkin_service_audio as lsa
         >>> sample_path = lsa.get_sample_audio_path()
@@ -38,9 +38,9 @@ from .cli import main
 
 # Import core functionality
 from .core import (
-    get_models, find_model, find_models_by_type,
+    AudioEngine, get_audio_engine, transcribe, synthesize,
+    model_registry, ModelRegistry,
     list_local_models, pull_model,
-    transcribe_audio, synthesize_speech
 )
 
 # Import API functionality
@@ -68,9 +68,9 @@ __all__ = [
     # CLI
     "main",
     # Core functionality
-    "get_models", "find_model", "find_models_by_type",
+    "AudioEngine", "get_audio_engine", "transcribe", "synthesize",
+    "model_registry", "ModelRegistry",
     "list_local_models", "pull_model",
-    "transcribe_audio", "synthesize_speech",
     # API
     "create_app", "run_server",
     # UI
