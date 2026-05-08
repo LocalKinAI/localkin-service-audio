@@ -364,11 +364,13 @@ kin web --port 5000
 
 ### STT Models (24)
 
+> **Tip:** If you need Voice Activity Detection (VAD) — for example to skip silence in long meetings or podcasts — use a `faster-whisper:*` model. It's the only engine here with built-in VAD. The HTTP `/transcribe` endpoint forwards `enable_vad`, `chunk_length_s`, and `response_format=markdown|srt|vtt` directly to it (see [API docs](#endpoints)).
+
 | Model | Engine | Languages | Features | Status |
 |-------|--------|-----------|----------|--------|
 | `whisper:tiny/base/small/medium/large-v3` | OpenAI Whisper | Multilingual | Standard reference | Ready |
 | `whisper:large-v3-turbo` | OpenAI Whisper | Multilingual | 6x faster than large-v3, 809M params | Ready |
-| `faster-whisper:tiny/base/large-v3/turbo/distil-large-v3` | CTranslate2 | Multilingual | 4x faster, GPU | Ready |
+| `faster-whisper:tiny/base/large-v3/turbo/distil-large-v3` | CTranslate2 | Multilingual | 4x faster, GPU, **native VAD** | Ready |
 | `faster-whisper:large-v3-turbo` | CTranslate2 | Multilingual | CTranslate2 turbo variant | Ready |
 | `whisper-cpp:tiny/base/small/medium` | whisper.cpp | Multilingual | Fast CPU inference | Ready |
 | `moonshine:tiny/base` | Moonshine | English | 5x real-time, ~20MB | Install needed |

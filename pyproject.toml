@@ -88,6 +88,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=6.0.0",
+    "httpx>=0.24.0",  # required by fastapi.testclient
     "black>=21.0.0",
     "flake8>=3.9.0",
     "mypy>=0.900",
@@ -173,6 +174,7 @@ localkin_service_audio = [
 [tool.uv]
 dev-dependencies = [
     "pytest>=6.0.0",
+    "httpx>=0.24.0",  # required by fastapi.testclient
     "black>=21.0.0",
     "flake8>=3.9.0",
     "mypy>=0.900",
