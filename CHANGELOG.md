@@ -5,6 +5,61 @@ All notable changes to LocalKin Service Audio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.11] - 2026-04-26
+
+### Added — Transcription Controls (resolves #2)
+
+The `/transcribe` and `/v1/audio/transcriptions` endpoints now accept four
+new query parameters that give callers explicit control over segmentation,
+output shape, and VRAM usage:
+
+- **`enable_vad`** (`bool`, default `True`) — Apply Voice Activity
+  Detection to skip silence between speech. Currently honored by
+  `faster-whisper`; ignored by engines that don't expose VAD.
+- **`timestamps`** (`bool`, default `False`) — Include segment-level
+  start/end times in JSON responses. Default `False` preserves the
+  v2.0.x response shape for existing callers.
+- **`response_format`** (`json` | `text` | `markdown` | `srt` | `vtt`,
+  default `json`) — Output format. `markdown` produces a structured
+  document with metadata and timestamped segment list. `srt` and `vtt`
+  emit standard subtitle formats.
+- **`chunk_length_s`** (`int`, optional) — Override the chunk length
+  used for long audio. Honored by `faster-whisper` and the HuggingFace
+  pipeline; ignored elsewhere. Useful for VRAM tuning.
+
+Example:
+
+```bash
+# Markdown transcript with timestamps
+curl -X POST 'http://localhost:8000/transcribe?response_format=markdown' \
+  -F 'file=@meeting.wav'
+
+# SRT subtitles
+curl -X POST 'http://localhost:8000/transcribe?response_format=srt' \
+  -F 'file=@video.wav' > captions.srt
+
+# Tighter chunks for low-VRAM GPUs
+curl -X POST 'http://localhost:8000/transcribe?chunk_length_s=15&enable_vad=true' \
+  -F 'file=@long_audio.wav'
+```
+
+### Fixed
+- **`faster-whisper` engine wired into the API**: Models with
+  `engine="faster-whisper"` (e.g. `faster-whisper:base`, `:large-v3`,
+  `:turbo`) were registered but the API server fell through to the
+  HuggingFace pipeline, causing failures. Added a dedicated load path
+  in `load_whisper_model()` that uses `FasterWhisperStrategy`.
+
+### Internal
+- New module `localkin_service_audio/api/transcription_format.py` with
+  pure-Python formatters (`to_markdown`, `to_srt`, `to_vtt`) — engine
+  agnostic, fully unit tested.
+- New helpers in `server.py`: `_run_stt()` dispatches transcription to
+  the right engine and returns a unified `(text, language, segments,
+  duration)` tuple; `_build_transcription_response()` formats the HTTP
+  response. Removes per-engine inline branching from the route handler.
+- 22 new unit tests in `tests/unit/test_transcription_format.py`.
+
 ## [2.0.10] - 2026-03-10
 
 ### Fixed

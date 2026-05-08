@@ -518,10 +518,39 @@ kin audio serve --port 8000
 
 **POST /transcribe** - Transcribe audio
 ```bash
+# Basic
 curl -X POST "http://localhost:8000/transcribe" \
   -F "file=@audio.wav" \
-  -F "model=whisper-cpp:base" \
   -F "language=en"
+```
+
+Optional query parameters (added in v2.0.11):
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| `language` | string | auto | BCP-47 language code, e.g. `en`, `zh` |
+| `enable_vad` | bool | `true` | Skip silence via VAD (faster-whisper only) |
+| `timestamps` | bool | `false` | Include segment timings in JSON response |
+| `response_format` | enum | `json` | `json` \| `text` \| `markdown` \| `srt` \| `vtt` |
+| `chunk_length_s` | int | engine default | VRAM tuning for long audio |
+
+```bash
+# Markdown transcript with timestamps
+curl -X POST 'http://localhost:8000/transcribe?response_format=markdown' \
+  -F 'file=@meeting.wav'
+
+# SRT subtitles for video captioning
+curl -X POST 'http://localhost:8000/transcribe?response_format=srt' \
+  -F 'file=@video.wav' > captions.srt
+
+# Low-VRAM long-audio: VAD + smaller chunks
+curl -X POST 'http://localhost:8000/transcribe?chunk_length_s=15&enable_vad=true' \
+  -F 'file=@long.wav'
+
+# JSON with segment timestamps (no shape change to existing callers
+# unless you opt in with timestamps=true)
+curl -X POST 'http://localhost:8000/transcribe?timestamps=true' \
+  -F 'file=@audio.wav'
 ```
 
 **POST /synthesize** - Synthesize speech

@@ -10,7 +10,7 @@ from typing import Optional, List, Dict, Any
 import json
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
-from fastapi.responses import Response, JSONResponse, FileResponse
+from fastapi.responses import Response, JSONResponse, FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -18,6 +18,13 @@ import uvicorn
 
 from ..core.config import model_registry
 from ..ui import create_ui_router
+from .transcription_format import (
+    FormatSegment,
+    SUPPORTED_FORMATS,
+    to_markdown,
+    to_srt,
+    to_vtt,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -71,10 +78,20 @@ class TranscriptionRequest(BaseModel):
     language: Optional[str] = None
     task: str = "transcribe"
 
+
+class TranscriptionSegment(BaseModel):
+    """A single transcription segment with timing information."""
+    start: float
+    end: float
+    text: str
+
+
 class TranscriptionResponse(BaseModel):
     text: str
     language: Optional[str] = None
     confidence: Optional[float] = None
+    duration: Optional[float] = None
+    segments: Optional[List[TranscriptionSegment]] = None
 
 class TTSRequest(BaseModel):
     text: str
@@ -140,6 +157,22 @@ def load_whisper_model(model_name: str):
             logger.info(f"Successfully loaded SenseVoice: {model_name}")
             return strategy
 
+        # faster-whisper (CTranslate2): engine="faster-whisper"
+        if engine == "faster-whisper":
+            from ..core.audio_processing.stt.faster_whisper_strategy import FasterWhisperStrategy
+            from ..core.types import ModelConfig as MC, ModelType
+            strategy = FasterWhisperStrategy()
+            size = model_info.get("model_size", "base")
+            mc = MC(name=model_name, type=ModelType.STT, engine="faster-whisper", model_size=size)
+            if not strategy.load(mc):
+                raise ValueError(f"Failed to load faster-whisper model: {model_name}")
+            loaded_models[model_name] = {
+                "type": "faster-whisper",
+                "strategy": strategy,
+            }
+            logger.info(f"Successfully loaded faster-whisper: {model_name}")
+            return strategy
+
         # OpenAI Whisper (native): engine="whisper" or source="openai-whisper"
         if engine == "whisper" or model_info.get("source") == "openai-whisper":
             import whisper
@@ -197,14 +230,12 @@ def load_tts_model(model_name: str):
         elif not model_info or source != "huggingface" or not repo_id:
             raise ValueError(f"Model {model_name} not found or not a Hugging Face model")
 
-        from transformers import pipeline
-        import torch
-
-        logger.info(f"Loading TTS model: {repo_id}")
+        logger.info(f"Loading TTS model: {model_name}")
 
         # Load TTS pipeline based on model type
         if "speecht5" in model_name.lower():
-            from transformers import SpeechT5Processor, SpeechT5ForTextToSpeech, SpeechT5HifiGan
+            from transformers import pipeline, SpeechT5Processor, SpeechT5ForTextToSpeech, SpeechT5HifiGan
+            import torch
             import torchaudio
 
             processor = SpeechT5Processor.from_pretrained(repo_id)
@@ -346,6 +377,210 @@ def load_tts_model(model_name: str):
         logger.error(f"Failed to load TTS model {model_name}: {e}")
         raise
 
+
+# --------------------------------------------------------------------------
+# Transcription helpers (engine-agnostic dispatch + response building)
+# --------------------------------------------------------------------------
+
+def _resample_to_16k_mono(temp_path: str, background_tasks: BackgroundTasks) -> str:
+    """Resample audio to 16kHz mono via ffmpeg if it isn't already.
+
+    Returns the path to use for transcription. The original temp file is
+    queued for background deletion if a new file was produced.
+    """
+    import wave
+    import subprocess
+
+    try:
+        with wave.open(temp_path, "rb") as wf:
+            sr = wf.getframerate()
+    except wave.Error:
+        # Not a parseable WAV — let the caller try anyway.
+        return temp_path
+
+    if sr == 16000:
+        return temp_path
+
+    resampled = temp_path + ".16k.wav"
+    subprocess.run(
+        ["ffmpeg", "-i", temp_path, "-ar", "16000", "-ac", "1", "-y", resampled],
+        capture_output=True,
+        timeout=30,
+    )
+    if os.path.exists(resampled):
+        background_tasks.add_task(os.unlink, temp_path)
+        return resampled
+    return temp_path
+
+
+def _run_stt(
+    model_data: Dict[str, Any],
+    temp_path: str,
+    *,
+    language: Optional[str],
+    enable_vad: bool,
+    chunk_length_s: Optional[int],
+    want_segments: bool,
+    background_tasks: BackgroundTasks,
+):
+    """Dispatch transcription to the right engine.
+
+    Returns ``(text, detected_language, segments_or_None, duration_or_None)``.
+    ``segments`` is a list of :class:`FormatSegment` ready for response
+    formatting, or ``None`` when no timing data is available.
+    """
+    mtype = model_data["type"]
+    norm_lang = language if language and language != "auto" else None
+
+    # ---- Strategy-based engines (TranscriptionResult contract) ------------
+    if mtype in ("moonshine", "sensevoice"):
+        strategy = model_data["strategy"]
+        r = strategy.transcribe(temp_path, language=norm_lang)
+        segs = _segments_from_result(r) if want_segments else None
+        return r.text, r.language, segs, getattr(r, "duration", None)
+
+    if mtype == "faster-whisper":
+        strategy = model_data["strategy"]
+        kwargs: Dict[str, Any] = {"enable_vad": enable_vad}
+        if chunk_length_s is not None:
+            kwargs["chunk_length"] = chunk_length_s
+        r = strategy.transcribe(temp_path, language=norm_lang, **kwargs)
+        segs = _segments_from_result(r) if want_segments else None
+        return r.text, r.language, segs, getattr(r, "duration", None)
+
+    # ---- whisper-cpp (pywhispercpp) --------------------------------------
+    if mtype == "whisper-cpp":
+        path = _resample_to_16k_mono(temp_path, background_tasks)
+        model = model_data["model"]
+        segments = model.transcribe(path, language=norm_lang)
+        text_parts = []
+        fmt_segs: List[FormatSegment] = []
+        for seg in segments:
+            seg_text = getattr(seg, "text", "") or ""
+            text_parts.append(seg_text.strip())
+            if want_segments:
+                # pywhispercpp t0/t1 are centiseconds (1/100s).
+                start = getattr(seg, "t0", 0) / 100.0
+                end = getattr(seg, "t1", 0) / 100.0
+                fmt_segs.append(FormatSegment(start=start, end=end, text=seg_text))
+        text = " ".join(p for p in text_parts if p)
+        # Replace the path that the caller will background-delete.
+        if path != temp_path:
+            return text, language, (fmt_segs if want_segments else None), None
+        return text, language, (fmt_segs if want_segments else None), None
+
+    # ---- OpenAI Whisper (native) -----------------------------------------
+    if mtype == "openai-whisper":
+        model = model_data["model"]
+        r = model.transcribe(temp_path, language=norm_lang)
+        text = r["text"]
+        detected = r.get("language")
+        segs: Optional[List[FormatSegment]] = None
+        if want_segments:
+            segs = []
+            for seg in r.get("segments") or []:
+                segs.append(
+                    FormatSegment(
+                        start=float(seg.get("start", 0.0)),
+                        end=float(seg.get("end", 0.0)),
+                        text=str(seg.get("text", "")),
+                    )
+                )
+            if not segs:
+                segs = None
+        return text, detected, segs, None
+
+    # ---- HuggingFace transformers pipeline -------------------------------
+    pipe = model_data["pipeline"]
+    pipe_kwargs: Dict[str, Any] = {}
+    if language:
+        pipe_kwargs["generate_kwargs"] = {"language": language}
+    if chunk_length_s is not None:
+        pipe_kwargs["chunk_length_s"] = chunk_length_s
+    pipe_kwargs["return_timestamps"] = want_segments
+    result = pipe(temp_path, **pipe_kwargs)
+
+    text = result["text"]
+    detected = result.get("language")
+    segs = None
+    if want_segments and isinstance(result, dict):
+        segs = []
+        for chunk in result.get("chunks") or []:
+            ts = chunk.get("timestamp") or (None, None)
+            start = float(ts[0]) if ts and ts[0] is not None else 0.0
+            end = float(ts[1]) if ts and ts[1] is not None else start
+            segs.append(FormatSegment(start=start, end=end, text=str(chunk.get("text", ""))))
+        if not segs:
+            segs = None
+    return text, detected, segs, None
+
+
+def _segments_from_result(r) -> Optional[List[FormatSegment]]:
+    """Convert a strategy ``TranscriptionResult.segments`` to FormatSegments."""
+    raw = getattr(r, "segments", None)
+    if not raw:
+        return None
+    return [
+        FormatSegment(start=float(s.start), end=float(s.end), text=str(s.text))
+        for s in raw
+    ]
+
+
+def _build_transcription_response(
+    *,
+    text: str,
+    language: Optional[str],
+    segments: Optional[List[FormatSegment]],
+    duration: Optional[float],
+    model_name: str,
+    response_format: str,
+    include_timestamps: bool,
+):
+    """Build the HTTP response in the requested format."""
+    if response_format == "text":
+        return PlainTextResponse(text.strip() + "\n")
+
+    if response_format == "markdown":
+        body = to_markdown(
+            text,
+            segments,
+            language=language,
+            duration=duration,
+            model=model_name,
+        )
+        return PlainTextResponse(body, media_type="text/markdown; charset=utf-8")
+
+    if response_format == "srt":
+        if not segments:
+            raise HTTPException(
+                status_code=422,
+                detail="response_format='srt' requires segment timestamps, "
+                "but the engine did not return any. Try a Whisper-family "
+                "model (whisper, faster-whisper, whisper-cpp).",
+            )
+        return PlainTextResponse(to_srt(segments), media_type="application/x-subrip")
+
+    if response_format == "vtt":
+        if not segments:
+            raise HTTPException(
+                status_code=422,
+                detail="response_format='vtt' requires segment timestamps, "
+                "but the engine did not return any.",
+            )
+        return PlainTextResponse(to_vtt(segments), media_type="text/vtt; charset=utf-8")
+
+    # Default JSON. Keep the v2.0.x shape for back-compat unless the caller
+    # explicitly opts in to timestamps.
+    body: Dict[str, Any] = {"text": text, "language": language}
+    if duration is not None:
+        body["duration"] = duration
+    if include_timestamps and segments:
+        body["segments"] = [
+            {"start": s.start, "end": s.end, "text": s.text} for s in segments
+        ]
+    return JSONResponse(body)
+
+
 def create_app(model_name: str) -> FastAPI:
     """Create FastAPI application for the specified model."""
     app = FastAPI(
@@ -397,87 +632,87 @@ def create_app(model_name: str) -> FastAPI:
         }
 
     if model_type == "stt":
-        @app.post("/transcribe", response_model=TranscriptionResponse)
+        @app.post("/transcribe")
         async def transcribe_audio(
             background_tasks: BackgroundTasks,
             file: UploadFile = File(...),
             language: Optional[str] = None,
-            task: str = "transcribe"
+            task: str = "transcribe",
+            enable_vad: bool = True,
+            timestamps: bool = False,
+            response_format: str = "json",
+            chunk_length_s: Optional[int] = None,
         ):
-            """Transcribe audio file to text."""
+            """Transcribe audio to text.
+
+            Query parameters:
+              - language: BCP-47 code (e.g. ``en``, ``zh``). Default: auto-detect.
+              - enable_vad: Apply Voice Activity Detection to skip silence.
+                Currently honored by faster-whisper; ignored by engines that
+                don't expose VAD. Default: True.
+              - timestamps: Include segment-level timestamps in JSON output.
+                Default: False (back-compat: original ``{"text", "language"}``
+                shape is preserved).
+              - response_format: ``json`` (default), ``text``, ``markdown``,
+                ``srt``, or ``vtt``. Non-JSON formats automatically include
+                segment timestamps when the engine produces them.
+              - chunk_length_s: Override chunk length for VRAM tuning. Honored
+                by faster-whisper and the HuggingFace pipeline; ignored
+                elsewhere.
+            """
+            if response_format not in SUPPORTED_FORMATS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"response_format must be one of "
+                        f"{sorted(SUPPORTED_FORMATS)}, got {response_format!r}"
+                    ),
+                )
+            want_segments = timestamps or response_format != "json"
+
             try:
-                # Load model if not loaded
                 if model_name not in loaded_models:
                     load_whisper_model(model_name)
 
                 model_data = loaded_models[model_name]
 
-                # Save uploaded file temporarily
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
                     content = await file.read()
                     temp_file.write(content)
                     temp_path = temp_file.name
 
                 try:
-                    if model_data["type"] in ("moonshine", "sensevoice"):
-                        strategy = model_data["strategy"]
-                        r = strategy.transcribe(temp_path, language=language)
-                        result = {"text": r.text, "language": r.language}
-
-                    elif model_data["type"] == "whisper-cpp":
-                        # Resample to 16kHz mono if needed
-                        import wave
-                        with wave.open(temp_path, "rb") as wf:
-                            sr = wf.getframerate()
-                        if sr != 16000:
-                            resampled = temp_path + ".16k.wav"
-                            import subprocess
-                            subprocess.run(
-                                ["ffmpeg", "-i", temp_path, "-ar", "16000", "-ac", "1", "-y", resampled],
-                                capture_output=True, timeout=10,
-                            )
-                            if os.path.exists(resampled):
-                                background_tasks.add_task(os.unlink, temp_path)
-                                temp_path = resampled
-
-                        # Use pywhispercpp
-                        model = model_data["model"]
-                        segments = model.transcribe(temp_path, language=language if language != "auto" else None)
-                        text = " ".join(seg.text.strip() for seg in segments)
-                        result = {"text": text}
-
-                    elif model_data["type"] == "openai-whisper":
-                        # OpenAI Whisper (native)
-                        model = model_data["model"]
-                        lang = language if language and language != "auto" else None
-                        r = model.transcribe(temp_path, language=lang)
-                        result = {"text": r["text"], "language": r.get("language")}
-
-                    else:
-                        # HuggingFace pipeline
-                        pipe = model_data["pipeline"]
-                        result = pipe(
-                            temp_path,
-                            generate_kwargs={"language": language} if language else {},
-                            return_timestamps=False
-                        )
-
-                    # Clean up temp file
-                    background_tasks.add_task(os.unlink, temp_path)
-
-                    return TranscriptionResponse(
-                        text=result["text"],
-                        language=language or result.get("language"),
-                        confidence=result.get("confidence")
+                    text, detected_lang, fmt_segments, duration = _run_stt(
+                        model_data,
+                        temp_path,
+                        language=language,
+                        enable_vad=enable_vad,
+                        chunk_length_s=chunk_length_s,
+                        want_segments=want_segments,
+                        background_tasks=background_tasks,
                     )
-
-                except Exception as e:
-                    # Clean up temp file on error
+                    # Refresh path in case _run_stt resampled it (whisper-cpp).
                     background_tasks.add_task(os.unlink, temp_path)
-                    raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
 
+                    return _build_transcription_response(
+                        text=text,
+                        language=language or detected_lang,
+                        segments=fmt_segments,
+                        duration=duration,
+                        model_name=model_name,
+                        response_format=response_format,
+                        include_timestamps=timestamps,
+                    )
+                except HTTPException:
+                    background_tasks.add_task(os.unlink, temp_path)
+                    raise
+                except Exception as e:
+                    background_tasks.add_task(os.unlink, temp_path)
+                    raise HTTPException(status_code=500, detail=f"Transcription failed: {e}")
+            except HTTPException:
+                raise
             except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Model loading failed: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"Model loading failed: {e}")
 
         # OpenAI-compatible STT endpoint for backward compatibility with kin_listen
         @app.post("/v1/audio/transcriptions")
@@ -486,9 +721,21 @@ def create_app(model_name: str) -> FastAPI:
             file: UploadFile = File(...),
             language: Optional[str] = None,
             model: Optional[str] = None,
+            enable_vad: bool = True,
+            timestamps: bool = False,
+            response_format: str = "json",
+            chunk_length_s: Optional[int] = None,
         ):
             """OpenAI-compatible STT endpoint. Maps to /transcribe."""
-            return await transcribe_audio(background_tasks, file, language)
+            return await transcribe_audio(
+                background_tasks,
+                file,
+                language=language,
+                enable_vad=enable_vad,
+                timestamps=timestamps,
+                response_format=response_format,
+                chunk_length_s=chunk_length_s,
+            )
 
     elif model_type == "tts":
         @app.post("/synthesize", response_model=TTSResponse)
