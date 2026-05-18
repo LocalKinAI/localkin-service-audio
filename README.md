@@ -6,24 +6,36 @@
 
 **Local Voice AI Platform** - Speech-to-Text and Text-to-Speech with Chinese language support, voice cloning, and Claude integration via MCP.
 
-## What's New in v2.0.10
+## What's New in v2.0.12
 
-- **12 new models** (29 → 40 total): Whisper large-v3-turbo, Parakeet v3, Canary v2/Qwen, CosyVoice2, Orpheus TTS, Qwen3-TTS, Dia
-- **Removed**: ~2,500 lines of legacy v1.x code — fully migrated to v2.0 `ModelRegistry` and `AudioEngine`
-- **Fixed**: Build failure (#1), bare `except:` clauses, version mismatch, HeartMuLa hardcoded path
+- **🎙️ Engine-agnostic VAD** — new `POST /vad` endpoint backed by [TEN-VAD](https://huggingface.co/TEN-framework/ten-vad) (731 KB native macOS arm64 binary, ~0.016 RTF on M1, ~100–300 ms faster speech↔silence transitions than Silero). Install with `pip install 'localkin-service-audio[vad]'`.
+- **🧪 +12 new tests** for the VAD module + `/vad` endpoint integration (187 tests total, all passing).
+
+## What was added in v2.0.11
+
+- **Transcription controls on `/transcribe`** (resolves #2): four new query parameters — `enable_vad`, `timestamps`, `response_format` (json/text/markdown/srt/vtt), and `chunk_length_s` for VRAM tuning.
+- **`faster-whisper` engine** wired into the API server — entries like `faster-whisper:base`, `:large-v3`, `:turbo` now load through `FasterWhisperStrategy` (was falling through to the HuggingFace pipeline before).
+- **+15 new endpoint integration tests** using FastAPI `TestClient` + monkeypatched `loaded_models`.
+
+## What was added in v2.0.10
+
+- **12 new models** (29 → 40 total): Whisper large-v3-turbo, Parakeet v3, Canary v2/Qwen, CosyVoice2, Orpheus TTS, Qwen3-TTS, Dia.
+- **Removed** ~2,500 lines of legacy v1.x code — fully migrated to v2.0 `ModelRegistry` and `AudioEngine`.
 
 See [CHANGELOG.md](CHANGELOG.md) for full history.
 
 ## Features
 
-- **Multiple STT Engines**: Whisper, faster-whisper, whisper.cpp, SenseVoice, Paraformer
-- **Multiple TTS Engines**: Kokoro, CosyVoice, ChatTTS, F5-TTS, native OS
+- **Multiple STT Engines**: Whisper, faster-whisper, whisper.cpp, SenseVoice, Paraformer, Moonshine, Parakeet (NeMo), Canary, Canary-Qwen
+- **Multiple TTS Engines**: Kokoro, CosyVoice, ChatTTS, F5-TTS, SpeechT5, Bark, native OS (pyttsx3)
 - **Music Generation**: HeartMuLa (multilingual, tag-based), MusicGen
+- **Voice Activity Detection**: Engine-agnostic `/vad` endpoint via TEN-VAD; or built-in Silero VAD inside `faster-whisper`
 - **Chinese Language Support**: Optimized models for Mandarin, Cantonese, and mixed Chinese-English
 - **Voice Cloning**: Zero-shot voice cloning with F5-TTS and CosyVoice
 - **MCP Integration**: Use with Claude Code and Claude Desktop
 - **WebSocket Streaming**: Real-time transcription and synthesis
-- **REST API**: FastAPI-based server with OpenAPI docs
+- **REST API**: FastAPI-based server with OpenAPI docs; OpenAI-compatible `/v1/audio/transcriptions`
+- **Subtitle Output**: Direct SRT / WebVTT generation from `/transcribe?response_format=srt|vtt`
 
 ## Quick Start
 
@@ -364,7 +376,10 @@ kin web --port 5000
 
 ### STT Models (24)
 
-> **Tip:** If you need Voice Activity Detection (VAD) — for example to skip silence in long meetings or podcasts — use a `faster-whisper:*` model. It's the only engine here with built-in VAD. The HTTP `/transcribe` endpoint forwards `enable_vad`, `chunk_length_s`, and `response_format=markdown|srt|vtt` directly to it (see [API docs](#endpoints)).
+> **Tip — Voice Activity Detection has two paths since v2.0.12:**
+>
+> 1. **Inline with transcription** — use a `faster-whisper:*` model and pass `enable_vad=true` to `/transcribe`. Silero VAD is bundled inside the engine; transitions are merged into the resulting transcript.
+> 2. **Standalone, engine-agnostic** — call `POST /vad` (always available, no model required). Backed by [TEN-VAD](https://huggingface.co/TEN-framework/ten-vad) — 731 KB native macOS arm64 binary, faster transitions than Silero. Returns raw speech segments so you can chunk audio before transcription or use it for diarization-lite workflows. See the [/vad endpoint docs](#endpoints).
 
 | Model | Engine | Languages | Features | Status |
 |-------|--------|-----------|----------|--------|
