@@ -563,6 +563,42 @@ curl -X POST "http://localhost:8000/synthesize" \
   --output speech.wav
 ```
 
+**POST /vad** - Detect speech segments (no transcription)
+
+Engine-agnostic Voice Activity Detection via [TEN-VAD](https://huggingface.co/TEN-framework/ten-vad)
+(731 KB native macOS arm64 binary, ~0.016 RTF on M1, ~100-300 ms faster
+transitions than Silero). Useful for chunking long audio before
+transcription, or for VAD-only workflows.
+
+```bash
+# Install the optional VAD extra first
+pip install 'localkin-service-audio[vad]'
+
+curl -X POST "http://localhost:8000/vad" \
+  -F "file=@meeting.wav"
+
+# Output:
+# {
+#   "backend": "ten-vad",
+#   "duration": 132.4,
+#   "speech_segments": [
+#     {"start": 1.2, "end": 5.8, "duration": 4.6},
+#     ...
+#   ],
+#   "total_speech_duration": 48.3
+# }
+```
+
+Tunable parameters (all optional query strings):
+
+| Param | Default | Effect |
+|---|---|---|
+| `backend` | `ten-vad` | VAD backend (currently only one supported) |
+| `threshold` | `0.5` | 0.0-1.0 speech-probability cutoff |
+| `min_speech_duration_ms` | `200` | Drop speech runs shorter than this |
+| `min_silence_duration_ms` | `200` | Merge runs separated by less silence |
+| `speech_pad_ms` | `100` | Pad each kept segment by this much |
+
 **GET /models** - List models
 ```bash
 curl "http://localhost:8000/models"

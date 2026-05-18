@@ -631,6 +631,97 @@ def create_app(model_name: str) -> FastAPI:
             "model_info": model_info
         }
 
+    # --- Engine-agnostic VAD endpoint (always available) -----------------
+    @app.post("/vad")
+    async def detect_speech_endpoint(
+        background_tasks: BackgroundTasks,
+        file: UploadFile = File(...),
+        backend: str = "ten-vad",
+        threshold: float = 0.5,
+        min_speech_duration_ms: int = 200,
+        min_silence_duration_ms: int = 200,
+        speech_pad_ms: int = 100,
+    ):
+        """Detect speech segments without transcribing.
+
+        Returns a list of ``{"start": float, "end": float}`` spans in
+        seconds, plus the total audio duration. Useful for chunking long
+        audio before sending to /transcribe, or for diarization-lite
+        workflows.
+
+        Query parameters:
+          - ``backend``: VAD backend. Currently only ``ten-vad`` is
+            wired up. Install with ``pip install ten-vad`` (or the
+            ``[vad]`` extra).
+          - ``threshold``: 0.0-1.0 speech probability cutoff. Lower =
+            more sensitive.
+          - ``min_speech_duration_ms``: drop speech runs shorter than
+            this. Default 200 ms.
+          - ``min_silence_duration_ms``: merge speech runs separated
+            by silence shorter than this. Default 200 ms.
+          - ``speech_pad_ms``: pad each kept segment by this much on
+            each side. Default 100 ms.
+        """
+        from ..core.audio_processing.vad import (
+            SUPPORTED_VAD_BACKENDS,
+            detect_speech,
+        )
+
+        if backend not in SUPPORTED_VAD_BACKENDS:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"backend must be one of {sorted(SUPPORTED_VAD_BACKENDS)}, "
+                    f"got {backend!r}"
+                ),
+            )
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
+            content = await file.read()
+            temp_file.write(content)
+            temp_path = temp_file.name
+
+        try:
+            try:
+                segments = detect_speech(
+                    temp_path,
+                    backend=backend,
+                    threshold=threshold,
+                    min_speech_duration_ms=min_speech_duration_ms,
+                    min_silence_duration_ms=min_silence_duration_ms,
+                    speech_pad_ms=speech_pad_ms,
+                )
+            except ImportError as e:
+                raise HTTPException(
+                    status_code=503,
+                    detail=(
+                        f"VAD backend {backend!r} not installed. Install "
+                        f"with: pip install 'localkin-service-audio[vad]'. "
+                        f"Original error: {e}"
+                    ),
+                )
+
+            # Compute total duration for context.
+            try:
+                import wave
+                import contextlib
+                with contextlib.closing(wave.open(temp_path, "r")) as wf:
+                    duration = wf.getnframes() / float(wf.getframerate())
+            except wave.Error:
+                duration = None
+
+            return {
+                "backend": backend,
+                "duration": duration,
+                "speech_segments": [
+                    {"start": s.start, "end": s.end, "duration": s.duration}
+                    for s in segments
+                ],
+                "total_speech_duration": sum(s.duration for s in segments),
+            }
+        finally:
+            background_tasks.add_task(os.unlink, temp_path)
+
     if model_type == "stt":
         @app.post("/transcribe")
         async def transcribe_audio(

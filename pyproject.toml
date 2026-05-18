@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "localkin-service-audio"
-version = "2.0.11"
+version = "2.0.12"
 description = "Voice AI Platform - Local STT/TTS with Chinese Language Support"
 readme = "README.md"
 license = "MIT"
@@ -108,6 +108,11 @@ web = [
 whisper = [
     "openai-whisper>=20240930",
     "setuptools>=45",  # openai-whisper build dependency (pkg_resources)
+]
+vad = [
+    # TEN-VAD: 731KB native binary, ships macOS arm64. Much faster
+    # speech↔silence transitions than Silero (~100-300ms shorter).
+    "ten-vad>=1.0.6",
 ]
 tts = [
     "TTS>=0.22.0",

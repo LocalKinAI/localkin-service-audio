@@ -5,6 +5,68 @@ All notable changes to LocalKin Service Audio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.12] - 2026-05-17
+
+### Added — TEN-VAD backend + `/vad` endpoint
+
+The project gained an **engine-agnostic Voice Activity Detection** path
+based on [TEN-VAD](https://huggingface.co/TEN-framework/ten-vad). TEN-VAD
+is 731 KB, ships a native macOS arm64 binary, runs at ~0.016 RTF on M1,
+and detects speech↔silence transitions ~100–300 ms faster than Silero
+(which faster-whisper's internal `vad_filter` continues to use — this
+addition is **additive**, not a replacement).
+
+New module:
+  - `localkin_service_audio/core/audio_processing/vad.py` with
+    `TenVADBackend`, `SpeechSegment`, `detect_speech()` and the
+    `SUPPORTED_VAD_BACKENDS` constant.
+
+New HTTP endpoint (always available, regardless of which model the
+server is started with):
+
+```
+POST /vad
+  ?backend=ten-vad                  # currently only backend
+  &threshold=0.5                    # 0.0–1.0 speech probability cutoff
+  &min_speech_duration_ms=200       # drop bursts shorter than this
+  &min_silence_duration_ms=200      # merge runs separated by less
+  &speech_pad_ms=100                # pad each kept segment
+
+Returns:
+  {
+    "backend": "ten-vad",
+    "duration": 132.4,
+    "speech_segments": [
+      {"start": 1.2, "end": 5.8, "duration": 4.6},
+      ...
+    ],
+    "total_speech_duration": 48.3
+  }
+```
+
+New optional dependency: `pip install 'localkin-service-audio[vad]'`
+(or just `pip install ten-vad`).
+
+Tests: 12 new unit + integration tests in
+`tests/unit/test_vad.py` cover the backend, the top-level helper, the
+HTTP endpoint, and parameter pass-through. All 187 tests pass.
+
+### Common workflow: chunk long audio before transcription
+
+```bash
+# 1) Find speech segments
+SEGMENTS=$(curl -sX POST 'http://localhost:8000/vad' \
+  -F 'file=@meeting.wav' | jq '.speech_segments')
+
+# 2) Transcribe each (faster, skips silence, frees VRAM between chunks)
+echo "$SEGMENTS" | jq -c '.[]' | while read -r seg; do
+  start=$(echo "$seg" | jq .start)
+  end=$(echo "$seg" | jq .end)
+  ffmpeg -ss "$start" -to "$end" -i meeting.wav chunk.wav -y
+  curl -sX POST 'http://localhost:8000/transcribe' -F 'file=@chunk.wav'
+done
+```
+
 ## [2.0.11] - 2026-04-26
 
 ### Added — Transcription Controls (resolves #2)
