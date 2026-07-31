@@ -86,6 +86,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# SenseVoice STT. The server has supported `sensevoice:*` models for a while,
+# but these two were never declared — so `kin audio serve sensevoice:small`
+# started, answered /health with {"status":"healthy"}, and then failed every
+# single /transcribe with "funasr not installed". The model weights were
+# already on disk; only the runtime was missing.
+#
+# Kept optional rather than moved into the core dependency list: funasr pulls
+# in modelscope and a sizeable dependency tree, and anyone running only the
+# Whisper family should not have to download it.
+#
+#   uv pip install --project . -e ".[sensevoice]"
+sensevoice = [
+    "funasr>=1.1.0",
+    "modelscope>=1.18.0",
+]
 dev = [
     "pytest>=6.0.0",
     "httpx>=0.24.0",  # required by fastapi.testclient
