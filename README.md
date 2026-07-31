@@ -791,13 +791,28 @@ kin audio music generate "prompt" --model heartmula:3b --device cpu
 
 ### Chinese Model Dependencies
 
+SenseVoice and Paraformer run on FunASR, which is an optional extra — it pulls
+in modelscope and a sizeable tree, so a Whisper-only install shouldn't have to
+download it.
+
 ```bash
-# Install FunASR for Chinese models
+# Install the extra (declared in pyproject.toml)
+uv pip install --project . -e ".[sensevoice]"
+
+# Or plain pip
 pip install funasr modelscope
 
 # Then use Chinese models
 kin audio transcribe audio.wav --model sensevoice:small
+
+# Or serve them
+kin audio serve sensevoice:small --port 8000
 ```
+
+> Without the extra, the server still starts and `/health` still reports
+> `{"status": "healthy"}` — the failure only shows up on the first
+> `/transcribe`, as `funasr not installed`. The model weights are downloaded
+> separately and being present is not enough on its own.
 
 ## License
 

@@ -5,6 +5,30 @@ All notable changes to LocalKin Service Audio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed — `sensevoice:*` models started healthy and then failed every request
+
+`kin audio serve sensevoice:small` came up cleanly and answered `/health` with
+`{"status": "healthy"}`, then returned `funasr not installed` on every single
+`/transcribe`. The server has supported `sensevoice:*` for a while and the model
+weights were already on disk — only the runtime was missing from the dependency
+list, and nothing checked for it until the first request arrived.
+
+Declared as an optional extra rather than a core dependency, since funasr pulls
+in modelscope and a sizeable tree that a Whisper-only install shouldn't have to
+download:
+
+```bash
+uv pip install --project . -e ".[sensevoice]"
+```
+
+The health check still doesn't verify the backend imports, so the same class of
+failure remains possible for other optional engines. Worth fixing at the
+`/health` level rather than one model family at a time.
+
+---
+
 ## [2.0.12] - 2026-05-17
 
 ### Added — TEN-VAD backend + `/vad` endpoint
