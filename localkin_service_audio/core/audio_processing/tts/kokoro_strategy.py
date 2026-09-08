@@ -210,7 +210,7 @@ class KokoroStrategy(TTSStrategy):
         start_time = time.time()
 
         try:
-            voice_id = voice or self._current_voice or "af_heart"
+            voice_id = voice or self._current_voice or self._default_voice_for(text)
 
             # Get the right pipeline for this voice's language
             pipeline = self._get_pipeline(voice_id)
@@ -234,7 +234,18 @@ class KokoroStrategy(TTSStrategy):
             if audio_segments:
                 audio = np.concatenate(audio_segments)
             else:
-                audio = np.array([], dtype=np.float32)
+                # Kokoro voices are single-language: an English pipeline fed
+                # Chinese yields no segments at all, and returning an empty
+                # array here surfaced as HTTP 200 with a 44-byte WAV — the
+                # caller hears silence and has nothing to debug. Fail loudly
+                # instead, naming the voice, since the fix is almost always
+                # to pass one that matches the text.
+                raise RuntimeError(
+                    f"Kokoro produced no audio for voice {voice_id!r} "
+                    f"({len(text)} chars). Voices are single-language — pass a "
+                    f"speaker matching the text's language "
+                    f"(e.g. zf_xiaoxiao for Chinese, af_heart for English)."
+                )
 
             return AudioResult(
                 audio=audio,
@@ -247,6 +258,37 @@ class KokoroStrategy(TTSStrategy):
 
         except Exception as e:
             raise RuntimeError(f"Synthesis failed: {e}")
+
+    # Default voice per detected language, used when the caller names none.
+    # Without this the default was always af_heart, so an unattributed
+    # Chinese request was narrated by an English pipeline: short strings came
+    # back mispronounced, long ones came back empty.
+    DEFAULT_VOICE_BY_LANG = {
+        "zh": "zf_xiaoxiao",
+        "ja": "jf_alpha",
+        "en": "af_heart",
+    }
+
+    @staticmethod
+    def _detect_lang(text: str) -> str:
+        """Rough script detection — enough to pick a pipeline.
+
+        Kana before Han: Japanese text contains kanji too, so testing Han
+        first would route every Japanese string to the Chinese pipeline.
+        """
+        for ch in text:
+            if "\u3040" <= ch <= "\u30ff":
+                return "ja"
+        for ch in text:
+            if "\u4e00" <= ch <= "\u9fff":
+                return "zh"
+        return "en"
+
+    def _default_voice_for(self, text: str) -> str:
+        lang = self._detect_lang(text)
+        want = self.DEFAULT_VOICE_BY_LANG.get(lang, "af_heart")
+        # Fall back to English if this build doesn't ship that voice.
+        return want if want in self.VOICES else "af_heart"
 
     # Voice prefix -> ISO language code
     VOICE_LANG_MAP = {
