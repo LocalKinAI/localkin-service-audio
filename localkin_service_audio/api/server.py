@@ -97,6 +97,11 @@ class TTSRequest(BaseModel):
     text: str
     speaker: Optional[str] = None
     language: Optional[str] = None
+    # Playback rate, 1.0 = the voice's natural pace. Kokoro renders at
+    # this rate rather than time-stretching afterwards, so 1.2 is not
+    # chipmunked — it just talks the way people do when they are in a
+    # hurry. Clamped server-side so a typo can't request 0 or 50.
+    speed: Optional[float] = 1.0
 
 class TTSResponse(BaseModel):
     audio_path: str
@@ -903,11 +908,15 @@ def create_app(model_name: str) -> FastAPI:
                             pipelines[lang_code] = KPipeline(lang_code=lang_code)
                         pipeline = pipelines[lang_code]
 
-                        # Generate speech using Kokoro
+                        # Generate speech using Kokoro. `speed` used to be
+                        # hard-coded here, so every client's speed setting
+                        # was silently ignored on this path.
+                        speed = request.speed if request.speed else 1.0
+                        speed = max(0.5, min(2.0, float(speed)))
                         generator = pipeline(
                             request.text,
                             voice=voice,
-                            speed=1.0,
+                            speed=speed,
                         )
 
                         # Collect all audio segments
@@ -1075,6 +1084,7 @@ def create_app(model_name: str) -> FastAPI:
             tts_req = TTSRequest(
                 text=request.get("input", ""),
                 speaker=request.get("voice"),
+                speed=request.get("speed") or 1.0,
             )
             return await synthesize_speech(background_tasks, tts_req)
 
