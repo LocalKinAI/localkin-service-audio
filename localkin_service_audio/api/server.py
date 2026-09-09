@@ -92,6 +92,13 @@ class TranscriptionResponse(BaseModel):
     confidence: Optional[float] = None
     duration: Optional[float] = None
     segments: Optional[List[TranscriptionSegment]] = None
+    # SenseVoice hears more than words: an emotion label (happy / sad /
+    # angry / neutral / surprised / fearful) and audio events (laughter,
+    # applause, BGM…). The strategy extracted them from day one; the
+    # route dropped them on the floor. Present only when the engine
+    # produced them.
+    emotion: Optional[str] = None
+    audio_events: Optional[List[str]] = None
 
 class TTSRequest(BaseModel):
     text: str
@@ -430,7 +437,9 @@ def _run_stt(
 ):
     """Dispatch transcription to the right engine.
 
-    Returns ``(text, detected_language, segments_or_None, duration_or_None)``.
+    Returns ``(text, detected_language, segments_or_None, duration_or_None, extras)``.
+    ``extras`` carries engine-specific fields worth surfacing (SenseVoice's
+    ``emotion`` and ``audio_events``); ``{}`` from engines that have none.
     ``segments`` is a list of :class:`FormatSegment` ready for response
     formatting, or ``None`` when no timing data is available.
     """
@@ -442,7 +451,11 @@ def _run_stt(
         strategy = model_data["strategy"]
         r = strategy.transcribe(temp_path, language=norm_lang)
         segs = _segments_from_result(r) if want_segments else None
-        return r.text, r.language, segs, getattr(r, "duration", None)
+        extras = {
+            "emotion": getattr(r, "emotion", None),
+            "audio_events": getattr(r, "audio_events", None) or None,
+        }
+        return r.text, r.language, segs, getattr(r, "duration", None), extras
 
     if mtype == "faster-whisper":
         strategy = model_data["strategy"]
@@ -451,7 +464,7 @@ def _run_stt(
             kwargs["chunk_length"] = chunk_length_s
         r = strategy.transcribe(temp_path, language=norm_lang, **kwargs)
         segs = _segments_from_result(r) if want_segments else None
-        return r.text, r.language, segs, getattr(r, "duration", None)
+        return r.text, r.language, segs, getattr(r, "duration", None), {}
 
     # ---- whisper-cpp (pywhispercpp) --------------------------------------
     if mtype == "whisper-cpp":
@@ -471,8 +484,8 @@ def _run_stt(
         text = " ".join(p for p in text_parts if p)
         # Replace the path that the caller will background-delete.
         if path != temp_path:
-            return text, language, (fmt_segs if want_segments else None), None
-        return text, language, (fmt_segs if want_segments else None), None
+            return text, language, (fmt_segs if want_segments else None), None, {}
+        return text, language, (fmt_segs if want_segments else None), None, {}
 
     # ---- OpenAI Whisper (native) -----------------------------------------
     if mtype == "openai-whisper":
@@ -493,7 +506,7 @@ def _run_stt(
                 )
             if not segs:
                 segs = None
-        return text, detected, segs, None
+        return text, detected, segs, None, {}
 
     # ---- HuggingFace transformers pipeline -------------------------------
     pipe = model_data["pipeline"]
@@ -540,6 +553,7 @@ def _build_transcription_response(
     model_name: str,
     response_format: str,
     include_timestamps: bool,
+    extras: Optional[Dict[str, Any]] = None,
 ):
     """Build the HTTP response in the requested format."""
     if response_format == "text":
@@ -583,6 +597,11 @@ def _build_transcription_response(
         body["segments"] = [
             {"start": s.start, "end": s.end, "text": s.text} for s in segments
         ]
+    # Engine extras (SenseVoice emotion / audio events) ride along in
+    # JSON only; the text formats have nowhere honest to put them.
+    for k, v in (extras or {}).items():
+        if v:
+            body[k] = v
     return JSONResponse(body)
 
 
@@ -778,7 +797,7 @@ def create_app(model_name: str) -> FastAPI:
                     temp_path = temp_file.name
 
                 try:
-                    text, detected_lang, fmt_segments, duration = _run_stt(
+                    text, detected_lang, fmt_segments, duration, extras = _run_stt(
                         model_data,
                         temp_path,
                         language=language,
@@ -798,6 +817,7 @@ def create_app(model_name: str) -> FastAPI:
                         model_name=model_name,
                         response_format=response_format,
                         include_timestamps=timestamps,
+                        extras=extras,
                     )
                 except HTTPException:
                     background_tasks.add_task(os.unlink, temp_path)
