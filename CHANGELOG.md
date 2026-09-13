@@ -27,6 +27,44 @@ The health check still doesn't verify the backend imports, so the same class of
 failure remains possible for other optional engines. Worth fixing at the
 `/health` level rather than one model family at a time.
 
+### Fixed — Kokoro with no voice and Chinese text returned silence (library and CLI)
+
+`KokoroStrategy` defaulted a missing voice to an English one. An English
+pipeline fed Chinese yields no segments at all, which were concatenated into an
+empty array and returned as a successful result: silence, with nothing to
+debug. The strategy now picks a default by the text's language — `zf_xiaoxiao`
+for Chinese, `jf_alpha` for Japanese (kana is checked before Han, since Japanese
+text is full of kanji), `af_heart` otherwise — and raises, naming the voice,
+when synthesis produces no audio.
+
+**Not yet fixed on `POST /synthesize`.** The HTTP route has its own inline
+Kokoro branch that still defaults a missing `speaker` to `af_heart` and still
+returns an empty WAV with HTTP 200. Clients that always send a `speaker`
+matching the text's language — KinClaw Mac does — are unaffected. The route
+should call the strategy rather than duplicate it.
+
+### Fixed — `POST /synthesize` ignored `speed`
+
+The Kokoro branch passed `speed=1.0` whatever the request said, and
+`TTSRequest` had no field to carry anything else, so every client's speed
+setting did nothing. `TTSRequest` gains `speed` (default 1.0, clamped to
+0.5–2.0), and `/v1/audio/speech` maps its own `speed` onto it. Kokoro renders at
+the rate rather than time-stretching afterwards, so 1.3 is brisk rather than
+chipmunked: the same sentence is 4.92s at 1.0 and 4.03s at 1.3.
+
+### Added — `/transcribe` returns SenseVoice's emotion and audio events
+
+SenseVoice labels the emotion in each utterance (`happy` / `sad` / `angry` /
+`neutral` / `surprised` / `fearful`) and flags audio events such as laughter.
+The strategy has extracted both from the start; the route threw them away. The
+JSON response now includes `emotion` and `audio_events` when the engine produced
+them. JSON only — the text, SRT and VTT formats have nowhere honest to put them
+— and engines without them are unaffected.
+
+Treat the label as a hint, not a measurement. Flat or synthetic speech is
+mislabelled often enough to matter: a tired-sounding synthetic "今天好累"
+came back `happy`.
+
 ---
 
 ## [2.0.12] - 2026-05-17
