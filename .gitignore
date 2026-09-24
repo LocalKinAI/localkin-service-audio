@@ -63,6 +63,8 @@ external/
 test_audio.wav
 speech.wav
 !audio.wav
+# Bundled default reference voices for clone-only TTS models
+!localkin_service_audio/assets/voices/*.wav
 
 # Model files (if downloaded locally)
 *.bin

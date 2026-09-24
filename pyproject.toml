@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "localkin-service-audio"
-version = "2.0.12"
+version = "2.1.0"
 description = "Voice AI Platform - Local STT/TTS with Chinese Language Support"
 readme = "README.md"
 license = "MIT"
@@ -129,6 +129,15 @@ vad = [
     # speech↔silence transitions than Silero (~100-300ms shorter).
     "ten-vad>=1.0.6",
 ]
+# Apple Silicon: ~46 models through mlx-audio (Qwen3-ASR/TTS, VoxCPM2,
+# FireRedASR2, Parakeet, Chatterbox, IndexTTS, ...). Pulls transformers 5.x
+# and numpy 2.x; the full test suite and Kokoro/SenseVoice/faster-whisper
+# were checked against that set.
+#
+#   uv pip install --project . -e ".[mlx]"
+mlx = [
+    "mlx-audio>=0.5.5; sys_platform == 'darwin' and platform_machine == 'arm64'",
+]
 tts = [
     "TTS>=0.22.0",
 ]
@@ -188,10 +197,17 @@ localkin_service_audio = [
     "ui/templates/*",
     "ui/static/*",
     "samples/*",
+    "assets/voices/*",
     "README.md"
 ]
 
 [tool.uv]
+# openai-whisper ships only an sdist whose setup.py imports pkg_resources,
+# which setuptools 81 removed; without this cap `uv lock` fails to build it.
+build-constraint-dependencies = ["setuptools<81"]
+# Coqui TTS (the `tts` extra) pins numpy==1.22 on Python 3.10; mlx-audio needs
+# numpy>=1.26. They can't share an environment, so resolve them separately.
+conflicts = [[{ extra = "mlx" }, { extra = "tts" }]]
 dev-dependencies = [
     "pytest>=6.0.0",
     "httpx>=0.24.0",  # required by fastapi.testclient
