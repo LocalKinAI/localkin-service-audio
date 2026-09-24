@@ -170,8 +170,7 @@ class TestMusicGenStrategy:
             assert isinstance(result, AudioResult)
             assert result.audio is not None
             assert result.sample_rate > 0
-            assert result.duration > 0
-            assert result.duration <= 11  # Allow 1s tolerance
+            assert 9 <= result.duration <= 11  # Allow 1s tolerance
             assert result.model == "musicgen-small"
             
             # Cleanup
@@ -179,6 +178,10 @@ class TestMusicGenStrategy:
             
         except ImportError:
             pytest.skip("transformers not installed")
+        except AssertionError:
+            # A wrong result is a failure, not an unsupported environment.
+            # Skipping here hid MusicGen being written at half its sample rate.
+            raise
         except Exception as e:
             # Some test environments might not support the model
             pytest.skip(f"Model generation failed: {e}")
@@ -230,6 +233,8 @@ class TestMusicGenerationIntegration:
             
         except ImportError:
             pytest.skip("transformers not installed")
+        except AssertionError:
+            raise
         except Exception as e:
             pytest.skip(f"Model generation failed: {e}")
 

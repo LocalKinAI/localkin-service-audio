@@ -61,11 +61,14 @@ class SenseVoiceStrategy(STTStrategy):
             print(f"Loading SenseVoice model '{model_size}'...")
 
             # Initialize SenseVoice (use HuggingFace hub, ModelScope is China-only)
+            # SenseVoiceSmall is built into funasr (>=1.1), so no remote code.
+            # trust_remote_code also made funasr `pip install -r` the repo's
+            # requirements.txt (numpy<=1.26.4, gradio) into whatever pip was
+            # on PATH — downgrading numpy, or failing outright in a uv venv.
             self.model = AutoModel(
                 model=model_id,
-                trust_remote_code=True,
-                remote_code="model.py",
                 hub="hf",
+                disable_update=True,
                 device=self.device if self.device != "mps" else "cpu",  # FunASR doesn't support MPS
             )
 

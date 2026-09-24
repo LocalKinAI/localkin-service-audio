@@ -130,11 +130,14 @@ class KokoroStrategy(TTSStrategy):
             f"en_core_web_sm-{model_ver}/en_core_web_sm-{model_ver}-py3-none-any.whl"
         )
 
-        # Try uv pip first (works in uv venvs), then pip, then spacy download
+        # Try uv pip first (works in uv venvs), then pip. --python pins the
+        # running interpreter: bare `uv pip install` targets whatever venv uv
+        # discovers (./.venv, $VIRTUAL_ENV), so from any other environment it
+        # installed the model somewhere this process can't see. Not
+        # `spacy download`: it needs the same pip/uv and sys.exit()s without.
         commands = [
-            ["uv", "pip", "install", wheel_url],
+            ["uv", "pip", "install", "--python", sys.executable, wheel_url],
             [sys.executable, "-m", "pip", "install", wheel_url],
-            [sys.executable, "-m", "spacy", "download", "en_core_web_sm"],
         ]
         for cmd in commands:
             if cmd[0] != sys.executable and not shutil.which(cmd[0]):
@@ -144,7 +147,27 @@ class KokoroStrategy(TTSStrategy):
                 return
             except (subprocess.CalledProcessError, FileNotFoundError):
                 continue
-        print("Warning: Could not install spacy model. TTS may fail.")
+        # Neither uv on PATH nor pip in the venv — the usual state of a uv
+        # venv run from a service or cron job. The model is a pure-Python
+        # wheel, so unpacking it into site-packages is a complete install.
+        try:
+            KokoroStrategy._unpack_wheel(wheel_url)
+            return
+        except Exception as e:
+            print(f"Warning: Could not install spacy model ({e}). TTS may fail.")
+
+    @staticmethod
+    def _unpack_wheel(url: str) -> None:
+        import importlib
+        import io
+        import sysconfig
+        import urllib.request
+        import zipfile
+
+        with urllib.request.urlopen(url, timeout=120) as resp:
+            data = resp.read()
+        zipfile.ZipFile(io.BytesIO(data)).extractall(sysconfig.get_paths()["purelib"])
+        importlib.invalidate_caches()
 
     def load(self, model_config: ModelConfig, device: str = "auto") -> bool:
         """Load Kokoro TTS model."""
@@ -167,11 +190,20 @@ class KokoroStrategy(TTSStrategy):
 
             self.model_config = model_config
             self._is_loaded = True
-            self._current_voice = "af_heart"  # Default voice
+            # No default voice here: synthesize() picks one from the text's
+            # language. Pinning af_heart at load made that fallback
+            # unreachable, so Chinese text still went to the English pipeline.
+            self._current_voice = None
 
             print(f"Kokoro TTS loaded")
             return True
 
+        except SystemExit as e:
+            # misaki calls spacy.cli.download, which exits the process on
+            # failure; a failed load must not take the server down with it.
+            self.load_error = f"Kokoro setup exited ({e}): the spaCy English model could not be installed"
+            print(self.load_error)
+            return False
         except ImportError as e:
             err = str(e)
             if "kokoro" in err:

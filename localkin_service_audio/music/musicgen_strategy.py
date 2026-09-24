@@ -166,8 +166,10 @@ class MusicGenStrategy(MusicEngine):
             if audio_np.dtype != np.float32:
                 audio_np = audio_np.astype(np.float32)
 
-            # MusicGen outputs at 16kHz by default
-            sampling_rate = 16000
+            # MusicGen's EnCodec decodes at 32 kHz. This was hard-coded to
+            # 16 kHz, so every clip was written at half speed, an octave low,
+            # and reported twice its real length.
+            sampling_rate = self.model.config.audio_encoder.sampling_rate
 
             actual_duration = len(audio_np) / sampling_rate
             logger.info(f"Generated {actual_duration:.2f}s of audio at {sampling_rate}Hz")
