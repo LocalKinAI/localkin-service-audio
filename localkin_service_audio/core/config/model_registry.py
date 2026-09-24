@@ -250,57 +250,6 @@ class ModelRegistry:
                 hardware_requirements=HardwareRequirements(min_vram_gb=2),
             ),
 
-            # NVIDIA Models
-            "parakeet:0.6b": ModelConfig(
-                name="parakeet:0.6b",
-                type=ModelType.STT,
-                engine="parakeet",
-                model_size="0.6b",
-                repo_id="nvidia/parakeet-tdt-0.6b-v3",
-                languages=["en", "fr", "de", "es", "pt", "it", "nl", "pl", "ru", "uk",
-                           "cs", "sk", "hu", "ro", "bg", "hr", "sl", "sr", "da", "fi",
-                           "sv", "no", "el", "lt", "lv"],
-                description="Parakeet TDT 0.6B v3 - 10x faster than Whisper turbo, 25 langs",
-                tags=["multilingual", "nvidia", "ultra-fast"],
-                hardware_requirements=HardwareRequirements(min_vram_gb=2),
-            ),
-            "parakeet:1.1b": ModelConfig(
-                name="parakeet:1.1b",
-                type=ModelType.STT,
-                engine="parakeet",
-                model_size="1.1b",
-                repo_id="nvidia/parakeet-tdt-1.1b",
-                languages=["en"],
-                description="Parakeet TDT 1.1B - NVIDIA fastest ASR (>2000x RT)",
-                tags=["english", "nvidia", "ultra-fast"],
-                hardware_requirements=HardwareRequirements(min_vram_gb=4),
-            ),
-            "canary:1b-v2": ModelConfig(
-                name="canary:1b-v2",
-                type=ModelType.STT,
-                engine="canary",
-                model_size="1b",
-                repo_id="nvidia/canary-1b-v2",
-                languages=["en", "fr", "de", "es", "pt", "it", "nl", "pl", "ru", "uk",
-                           "cs", "sk", "hu", "ro", "bg", "hr", "sl", "sr", "da", "fi",
-                           "sv", "no", "el", "lt", "lv"],
-                features=["translation"],
-                description="Canary 1B v2 - transcription + translation, 25 languages",
-                tags=["multilingual", "nvidia", "accurate", "translation"],
-                hardware_requirements=HardwareRequirements(min_vram_gb=4),
-            ),
-            "canary-qwen:2.5b": ModelConfig(
-                name="canary-qwen:2.5b",
-                type=ModelType.STT,
-                engine="canary",
-                model_size="2.5b",
-                repo_id="nvidia/canary-qwen-2.5b",
-                languages=["en"],
-                features=["summarization", "question_answering"],
-                description="Canary-Qwen 2.5B - #1 HuggingFace ASR leaderboard, STT + understanding",
-                tags=["english", "nvidia", "accurate", "speech-understanding"],
-                hardware_requirements=HardwareRequirements(min_vram_gb=8),
-            ),
         }
 
         # TTS Models
@@ -322,31 +271,6 @@ class ModelRegistry:
                 description="Kokoro TTS - high-quality multilingual neural TTS",
                 tags=["multilingual", "neural", "quality"],
             ),
-            # Chinese TTS
-            "cosyvoice:300m": ModelConfig(
-                name="cosyvoice:300m",
-                type=ModelType.TTS,
-                engine="cosyvoice",
-                model_size="300m-sft",
-                repo_id="iic/CosyVoice-300M-SFT",
-                languages=["zh", "en", "ja", "ko", "yue"],
-                features=["voice_cloning", "streaming", "cross_lingual"],
-                voices=["中文女", "中文男", "日语男", "粤语女", "英文女", "英文男"],
-                description="CosyVoice 300M - Alibaba SOTA Chinese TTS",
-                tags=["chinese", "voice-cloning", "streaming", "sota"],
-            ),
-            "cosyvoice2:0.5b": ModelConfig(
-                name="cosyvoice2:0.5b",
-                type=ModelType.TTS,
-                engine="cosyvoice",
-                model_size="0.5b",
-                repo_id="FunAudioLLM/CosyVoice2-0.5B",
-                languages=["zh", "en", "ja", "ko", "yue", "de", "fr", "ru", "es", "it"],
-                features=["voice_cloning", "streaming", "cross_lingual"],
-                voices=["中文女", "中文男", "日语男", "粤语女", "英文女", "英文男"],
-                description="CosyVoice2 0.5B - 30-50% fewer errors than v1, 9 langs + 18 Chinese dialects",
-                tags=["chinese", "voice-cloning", "streaming", "sota", "alibaba"],
-            ),
             "chattts": ModelConfig(
                 name="chattts",
                 type=ModelType.TTS,
@@ -357,16 +281,6 @@ class ModelRegistry:
                 description="ChatTTS - conversational TTS for dialogue",
                 tags=["chinese", "english", "conversational", "emotional"],
             ),
-            "gpt-sovits": ModelConfig(
-                name="gpt-sovits",
-                type=ModelType.TTS,
-                engine="gpt-sovits",
-                repo_id="lj1995/GPT-SoVITS",
-                languages=["zh", "en", "ja"],
-                features=["voice_cloning", "fine_tuning"],
-                description="GPT-SoVITS - voice cloning with 5s audio",
-                tags=["chinese", "japanese", "voice-cloning"],
-            ),
             "f5-tts": ModelConfig(
                 name="f5-tts",
                 type=ModelType.TTS,
@@ -376,89 +290,6 @@ class ModelRegistry:
                 features=["voice_cloning", "zero_shot"],
                 description="F5-TTS - zero-shot voice cloning",
                 tags=["voice-cloning", "zero-shot"],
-            ),
-            # Orpheus TTS - Llama-based emotional TTS
-            "orpheus:3b": ModelConfig(
-                name="orpheus:3b",
-                type=ModelType.TTS,
-                engine="orpheus",
-                model_size="3b",
-                repo_id="canopylabs/orpheus-3b-0.1-ft",
-                languages=["en"],
-                features=["emotion", "streaming", "voice_cloning"],
-                description="Orpheus 3B - best emotional expressiveness, Llama-based, GGUF available",
-                tags=["english", "emotional", "expressive", "streaming"],
-                hardware_requirements=HardwareRequirements(min_vram_gb=8),
-            ),
-            "orpheus:1b": ModelConfig(
-                name="orpheus:1b",
-                type=ModelType.TTS,
-                engine="orpheus",
-                model_size="1b",
-                repo_id="canopylabs/orpheus-1b-0.1-ft",
-                languages=["en"],
-                features=["emotion", "streaming"],
-                description="Orpheus 1B - expressive TTS, lighter variant",
-                tags=["english", "emotional", "expressive"],
-                hardware_requirements=HardwareRequirements(min_vram_gb=4),
-            ),
-            "orpheus:150m": ModelConfig(
-                name="orpheus:150m",
-                type=ModelType.TTS,
-                engine="orpheus",
-                model_size="150m",
-                repo_id="canopylabs/orpheus-tts-0.1-finetune-prod",
-                languages=["en"],
-                features=["emotion"],
-                description="Orpheus 150M - expressive TTS, runs on CPU",
-                tags=["english", "emotional", "lightweight", "cpu"],
-            ),
-            # Qwen3-TTS - Alibaba multilingual with voice design
-            "qwen3-tts:0.6b": ModelConfig(
-                name="qwen3-tts:0.6b",
-                type=ModelType.TTS,
-                engine="qwen3-tts",
-                model_size="0.6b",
-                repo_id="Qwen/Qwen3-TTS-12Hz-0.6B-Base",
-                languages=["zh", "en", "ja", "ko", "de", "fr", "ru", "pt", "es", "it"],
-                features=["voice_cloning", "streaming"],
-                description="Qwen3-TTS 0.6B - 97ms latency, 3s voice cloning, 10 languages",
-                tags=["multilingual", "chinese", "fast", "streaming", "alibaba"],
-            ),
-            "qwen3-tts:1.7b": ModelConfig(
-                name="qwen3-tts:1.7b",
-                type=ModelType.TTS,
-                engine="qwen3-tts",
-                model_size="1.7b",
-                repo_id="Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-                languages=["zh", "en", "ja", "ko", "de", "fr", "ru", "pt", "es", "it"],
-                features=["voice_cloning", "voice_design", "streaming"],
-                description="Qwen3-TTS 1.7B - voice design via natural language, 10 languages",
-                tags=["multilingual", "chinese", "voice-cloning", "voice-design", "alibaba"],
-                hardware_requirements=HardwareRequirements(min_vram_gb=4),
-            ),
-            # Dia - dialogue-focused TTS
-            "dia:1.6b": ModelConfig(
-                name="dia:1.6b",
-                type=ModelType.TTS,
-                engine="dia",
-                model_size="1.6b",
-                repo_id="nari-labs/Dia-1.6B",
-                languages=["en"],
-                features=["dialogue", "multi_speaker", "nonverbal"],
-                description="Dia 1.6B - multi-speaker dialogue in one pass, laughter/coughing",
-                tags=["english", "dialogue", "multi-speaker", "expressive"],
-                hardware_requirements=HardwareRequirements(min_vram_gb=10),
-            ),
-            "parler-tts": ModelConfig(
-                name="parler-tts",
-                type=ModelType.TTS,
-                engine="parler",
-                repo_id="parler-tts/parler-tts-large-v1",
-                languages=["en"],
-                features=["text_described_voice"],
-                description="Parler TTS - describe voice with natural language",
-                tags=["english", "text-described"],
             ),
             # Music Generation Models (HeartMuLa)
             "heartmula:3b": ModelConfig(
@@ -488,6 +319,10 @@ class ModelRegistry:
         # Merge all models
         self._models.update(stt_models)
         self._models.update(tts_models)
+
+        # Current open models, each runnable via mlx-audio and/or torch
+        from .catalog import catalog_models
+        self._models.update(catalog_models())
 
     def _load_external_models(self):
         """Load models from external config files."""

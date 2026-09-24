@@ -345,6 +345,7 @@ class TestModelTypes:
         assert sensevoice is not None
         assert "emotion" in sensevoice.features
 
-        cosyvoice = registry.get("cosyvoice:300m")
+        # The 300M SFT build has preset voices only; cloning is v2/v3.
+        cosyvoice = registry.get("cosyvoice3:0.5b")
         assert cosyvoice is not None
         assert "voice_cloning" in cosyvoice.features

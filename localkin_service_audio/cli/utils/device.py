@@ -89,12 +89,12 @@ def recommend_models(hardware: Optional[HardwareProfile] = None) -> Dict[str, Li
                 "whisper:large-v3",
                 "faster-whisper:large-v3",
                 "sensevoice:small",
-                "canary:1b",
+                "faster-whisper:large-v3-turbo",
             ]
             recommendations["tts"] = [
                 "cosyvoice:300m",
                 "f5-tts",
-                "gpt-sovits",
+                "cosyvoice2:0.5b",
                 "kokoro",
             ]
             recommendations["reason"] = f"High-end GPU detected ({hardware.gpu_name}, {hardware.vram_gb:.1f}GB VRAM)"
@@ -126,33 +126,41 @@ def recommend_models(hardware: Optional[HardwareProfile] = None) -> Dict[str, Li
 
     elif hardware.device == DeviceType.MPS:
         # Apple Silicon
+        # mlx-audio models run on Metal; see core/config/mlx_audio_models.py
         if hardware.ram_gb >= 32:
             recommendations["stt"] = [
-                "whisper:medium",
-                "whisper-cpp:medium",
+                "qwen3-asr:1.7b",
+                "fireredasr2:aed",
                 "sensevoice:small",
+                "whisper-mlx:large-v3-turbo",
             ]
             recommendations["tts"] = [
+                "qwen3-tts:1.7b",
+                "voxcpm2",
+                "fish-speech:s2-pro",
                 "kokoro",
-                "cosyvoice:300m",
             ]
             recommendations["reason"] = f"Apple Silicon with {hardware.ram_gb:.0f}GB unified memory"
         elif hardware.ram_gb >= 16:
             recommendations["stt"] = [
-                "whisper-cpp:small",
-                "faster-whisper:small",
+                "qwen3-asr:0.6b",
+                "nemotron-asr:0.6b",
+                "sensevoice:small",
+                "whisper-mlx:large-v3-turbo",
             ]
             recommendations["tts"] = [
+                "qwen3-tts:0.6b",
                 "kokoro",
-                "native",
+                "voxcpm2",
             ]
             recommendations["reason"] = f"Apple Silicon with {hardware.ram_gb:.0f}GB unified memory"
         else:
             recommendations["stt"] = [
-                "whisper-cpp:tiny",
+                "qwen3-asr:0.6b",
                 "whisper-cpp:base",
             ]
             recommendations["tts"] = [
+                "kokoro",
                 "native",
             ]
             recommendations["reason"] = f"Apple Silicon with limited memory ({hardware.ram_gb:.0f}GB)"

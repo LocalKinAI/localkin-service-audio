@@ -121,8 +121,8 @@ def create_server() -> "Server":
                         },
                         "model": {
                             "type": "string",
-                            "description": "Voice cloning model (cosyvoice:300m, f5-tts)",
-                            "default": "cosyvoice:300m"
+                            "description": "Voice cloning model (cosyvoice3:0.5b, qwen3-tts:0.6b-base, f5-tts)",
+                            "default": "cosyvoice3:0.5b"
                         },
                         "output_path": {
                             "type": "string",
@@ -203,7 +203,7 @@ def create_server() -> "Server":
                     arguments["reference_audio"],
                     arguments["text"],
                     arguments.get("reference_text"),
-                    arguments.get("model", "cosyvoice:300m"),
+                    arguments.get("model", "cosyvoice3:0.5b"),
                     arguments.get("output_path"),
                 )
             elif name == "list_models":
@@ -311,7 +311,7 @@ async def _clone_voice(
     reference_audio: str,
     text: str,
     reference_text: Optional[str] = None,
-    model: str = "cosyvoice:300m",
+    model: str = "cosyvoice3:0.5b",
     output_path: Optional[str] = None,
 ) -> dict:
     """Clone voice and synthesize text."""

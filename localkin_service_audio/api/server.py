@@ -33,7 +33,9 @@ logger = logging.getLogger(__name__)
 
 def _find_model_dict(model_name: str) -> Optional[Dict[str, Any]]:
     """Find a model and return its info as a dict (bridge from legacy API)."""
-    reg_model = model_registry.get(model_name)
+    from ..core.config.backends import resolve_backend
+
+    reg_model = resolve_backend(model_registry.get(model_name))
     if reg_model:
         return {
             "name": reg_model.name,
@@ -42,8 +44,51 @@ def _find_model_dict(model_name: str) -> Optional[Dict[str, Any]]:
             "engine": reg_model.engine,
             "huggingface_repo": reg_model.repo_id,
             "model_size": reg_model.model_size,
+            "backend": reg_model.backend,
         }
     return None
+
+# Module each engine imports when its model loads. Models load lazily on the
+# first request, so /health used to say "healthy" for a server whose backend
+# wasn't installed and then failed every request (sensevoice without funasr).
+# Each entry lists alternatives; any one importable is enough.
+_ENGINE_MODULES = {
+    "sensevoice": ["funasr"],
+    "funasr": ["funasr"],
+    "faster-whisper": ["faster_whisper"],
+    "whisper": ["whisper"],
+    "whisper-cpp": ["pywhispercpp"],
+    "moonshine": ["moonshine_onnx", "moonshine"],
+    "kokoro": ["kokoro"],
+    "mlx-audio": ["mlx_audio"],
+}
+
+
+def _missing_backend(model_info: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Name the backend module this model needs but can't import, if any.
+
+    Uses find_spec so the check doesn't pay for importing torch-sized
+    packages. It sees whether the package is installed, not whether its own
+    dependencies are.
+    """
+    import importlib.util
+
+    engine = (model_info or {}).get("engine")
+    if engine == "isolated":
+        # Builds its own environment on first load; that needs uv.
+        from ..core.audio_processing.isolated import find_uv
+        return None if find_uv() else "uv (https://docs.astral.sh/uv/)"
+    alternatives = _ENGINE_MODULES.get(engine)
+    if not alternatives:
+        return None
+    for module in alternatives:
+        try:
+            if importlib.util.find_spec(module) is not None:
+                return None
+        except (ImportError, ValueError):
+            continue
+    return " or ".join(alternatives)
+
 
 # Cache configuration - use settings for LOCALKIN_HOME support
 from pathlib import Path
@@ -109,10 +154,51 @@ class TTSRequest(BaseModel):
     # chipmunked — it just talks the way people do when they are in a
     # hurry. Clamped server-side so a typo can't request 0 or 50.
     speed: Optional[float] = 1.0
+    # Style/emotion instruction ("用开心的语气") or, for voice-design models,
+    # a description of the voice. Ignored by models that don't take one.
+    instruct: Optional[str] = None
 
 class TTSResponse(BaseModel):
     audio_path: str
     duration: Optional[float] = None
+
+def _load_via_strategy(model_name: str, model_type):
+    """Load any registry model that has an AudioEngine strategy.
+
+    Returns the loaded strategy, or None when the engine has none. Covers
+    every mlx-audio model plus the torch strategies (CosyVoice, ChatTTS,
+    F5, Paraformer) this server used to have no route for.
+    """
+    from ..core.audio_processing.engine import AudioEngine
+    from ..core.types import ModelType
+
+    engine = AudioEngine()
+    config = engine._resolve_config(model_name, model_type)
+    if model_type == ModelType.STT:
+        strategy_class = engine._get_stt_strategy_class(config.engine)
+    else:
+        strategy_class = engine._get_tts_strategy_class(config.engine)
+    if strategy_class is None:
+        return None
+
+    strategy = strategy_class()
+    try:
+        ok = strategy.load(config)
+    except SystemExit as e:
+        # misaki (Kokoro) calls spacy.cli.download, which exits on failure
+        raise RuntimeError(
+            f"Loading {model_name} exited during setup. For Kokoro this is the "
+            "spaCy English model failing to download; install it manually: "
+            "python -m spacy download en_core_web_sm"
+        ) from e
+    if not ok:
+        reason = getattr(strategy, "load_error", None) or "see server log"
+        raise RuntimeError(f"Failed to load {model_name}: {reason}")
+
+    loaded_models[model_name] = {"type": config.engine, "strategy": strategy}
+    logger.info(f"Successfully loaded {model_name} ({config.engine})")
+    return strategy
+
 
 def load_whisper_model(model_name: str):
     """Load a Whisper STT model (HuggingFace or whisper-cpp)."""
@@ -185,6 +271,13 @@ def load_whisper_model(model_name: str):
             logger.info(f"Successfully loaded faster-whisper: {model_name}")
             return strategy
 
+        # Anything else with a strategy (mlx-audio, Paraformer, ...)
+        if engine != "whisper":
+            from ..core.types import ModelType
+            strategy = _load_via_strategy(model_name, ModelType.STT)
+            if strategy is not None:
+                return strategy
+
         # OpenAI Whisper (native): engine="whisper" or source="openai-whisper"
         if engine == "whisper" or model_info.get("source") == "openai-whisper":
             import whisper
@@ -236,10 +329,15 @@ def load_tts_model(model_name: str):
         source = model_info.get("source", "") if model_info else ""
         repo_id = model_info.get("huggingface_repo", "") if model_info else ""
 
-        # Kokoro doesn't need huggingface repo
-        if "kokoro" in model_name.lower():
-            pass  # handled below
-        elif not model_info or source != "huggingface" or not repo_id:
+        # Registry models with a strategy: Kokoro, every mlx-audio model,
+        # CosyVoice, ChatTTS, F5. Going through the strategy gives the HTTP
+        # route the same voice defaulting and empty-audio checks as the CLI.
+        if model_info:
+            from ..core.types import ModelType
+            if _load_via_strategy(model_name, ModelType.TTS) is not None:
+                return
+
+        if not model_info or source != "huggingface" or not repo_id:
             raise ValueError(f"Model {model_name} not found or not a Hugging Face model")
 
         logger.info(f"Loading TTS model: {model_name}")
@@ -254,11 +352,18 @@ def load_tts_model(model_name: str):
             model = SpeechT5ForTextToSpeech.from_pretrained(repo_id)
             vocoder = SpeechT5HifiGan.from_pretrained("microsoft/speecht5_hifigan")
 
+            # SpeechT5 has no built-in voice; it needs a 512-d x-vector. Draw
+            # one from a fixed seed at load time — it used to be re-drawn per
+            # request, so the same text came back in a different voice each call.
+            generator = torch.Generator().manual_seed(0)
+            speaker_embeddings = torch.randn(1, 512, generator=generator, dtype=torch.float32) * 0.1
+
             loaded_models[model_name] = {
                 "type": "speecht5",
                 "processor": processor,
                 "model": model,
                 "vocoder": vocoder,
+                "speaker_embeddings": speaker_embeddings,
                 "repo_id": repo_id
             }
 
@@ -279,58 +384,6 @@ def load_tts_model(model_name: str):
                 "model": model,
                 "repo_id": repo_id,
                 "device": device
-            }
-
-        elif "kokoro" in model_name.lower():
-            # Kokoro models use the kokoro library
-            try:
-                from kokoro import KPipeline
-                import soundfile as sf
-            except ImportError as e:
-                if "_lzma" in str(e):
-                    raise ImportError(
-                        "Kokoro TTS requires LZMA compression support which is missing from your Python installation. "
-                        "Try using system Python instead: /usr/bin/python3, or reinstall Python with LZMA support."
-                    )
-                elif "AlbertModel" in str(e):
-                    raise ImportError(
-                        "Kokoro TTS failed to import required transformers components. "
-                        "This may be due to missing LZMA support. Try using system Python: /usr/bin/python3"
-                    )
-                else:
-                    raise ImportError(f"kokoro package is required for Kokoro models. Install with: pip install kokoro>=0.9.2. Error: {e}")
-
-            # Kokoro supports multiple languages - default to English ('a')
-            try:
-                pipeline = KPipeline(lang_code='a')  # 'a' for American English
-            except SystemExit as e:
-                # Handle spaCy download failures (kokoro tries to download en_core_web_sm)
-                if "pip" in str(e).lower() or "spacy" in str(e).lower():
-                    raise RuntimeError(
-                        "Kokoro TTS requires spaCy English model (en_core_web_sm) but it failed to download. "
-                        "Try installing it manually: "
-                        "python -m spacy download en_core_web_sm"
-                    )
-                else:
-                    raise e
-            except Exception as e:
-                if "_lzma" in str(e):
-                    raise RuntimeError(
-                        "Kokoro TTS requires LZMA compression support. "
-                        "Try using system Python instead: /usr/bin/python3"
-                    )
-                elif "spacy" in str(e).lower() or "en_core_web_sm" in str(e).lower():
-                    raise RuntimeError(
-                        "Kokoro TTS requires spaCy English model. "
-                        "Install it with: python -m spacy download en_core_web_sm"
-                    )
-                else:
-                    raise RuntimeError(f"Failed to initialize Kokoro TTS pipeline: {e}")
-
-            loaded_models[model_name] = {
-                "type": "kokoro",
-                "pipelines": {"a": pipeline},  # Lazy-load other languages on demand
-                "repo_id": repo_id,
             }
 
         elif model_name == "xtts-v2":
@@ -447,7 +500,8 @@ def _run_stt(
     norm_lang = language if language and language != "auto" else None
 
     # ---- Strategy-based engines (TranscriptionResult contract) ------------
-    if mtype in ("moonshine", "sensevoice"):
+    # faster-whisper also has a strategy but takes VAD/chunk options below.
+    if "strategy" in model_data and mtype != "faster-whisper":
         strategy = model_data["strategy"]
         r = strategy.transcribe(temp_path, language=norm_lang)
         segs = _segments_from_result(r) if want_segments else None
@@ -605,8 +659,49 @@ def _build_transcription_response(
     return JSONResponse(body)
 
 
-def create_app(model_name: str) -> FastAPI:
-    """Create FastAPI application for the specified model."""
+def _emotion_extras(emotion_model: str, audio_path: str) -> Dict[str, Any]:
+    """Emotion and audio events from a sidecar model (SenseVoice).
+
+    Lets a more accurate recogniser own the transcript while clients that
+    read ``emotion`` keep getting it. Never fails the transcription: on any
+    error the response just lacks the fields.
+    """
+    try:
+        if emotion_model not in loaded_models:
+            load_whisper_model(emotion_model)
+        r = loaded_models[emotion_model]["strategy"].transcribe(audio_path)
+        return {"emotion": getattr(r, "emotion", None),
+                "audio_events": getattr(r, "audio_events", None) or None}
+    except Exception as e:
+        logger.warning(f"Emotion sidecar {emotion_model} failed: {e}")
+        return {}
+
+
+def _warm_up(model_name: str, model_type: str, emotion_model: Optional[str]) -> None:
+    """Run one tiny request so the first real one doesn't pay for kernel
+    compilation (about 3 s for Qwen3-TTS on MLX). Best effort."""
+    try:
+        strategies = [loaded_models.get(n, {}).get("strategy") for n in (model_name, emotion_model) if n]
+        if model_type == "tts" and strategies[0] is not None:
+            strategies[0].synthesize("你好。")
+        elif model_type == "stt":
+            import numpy as np
+            silence = np.zeros(16000, dtype=np.float32)
+            for strategy in strategies:
+                if strategy is not None:
+                    strategy.transcribe(silence)
+    except Exception as e:
+        logger.warning(f"Warm-up skipped: {e}")
+
+
+def create_app(model_name: str, emotion_model: Optional[str] = None, preload: bool = False) -> FastAPI:
+    """Create FastAPI application for the specified model.
+
+    ``emotion_model`` (e.g. ``sensevoice:small``) adds emotion and audio
+    events to /transcribe when the main model doesn't produce them.
+    ``preload`` loads the model(s) now instead of on the first request, which
+    for large models can take longer than a client's timeout.
+    """
     app = FastAPI(
         title=f"LocalKin Service Audio - {model_name} API",
         description=f"API server for {model_name} model",
@@ -631,6 +726,7 @@ def create_app(model_name: str) -> FastAPI:
                 "GET /": "This information",
                 "GET /health": "Health check",
                 "GET /models": "Loaded models info",
+                "GET /voices": "Voices of the TTS model (TTS models)",
                 "POST /transcribe": "Speech to text (STT models)",
                 "POST /synthesize": "Text to speech (TTS models)",
                 "POST /chat": "Conversational interface (LLM models)"
@@ -639,12 +735,31 @@ def create_app(model_name: str) -> FastAPI:
 
     @app.get("/health")
     async def health():
-        """Health check endpoint."""
-        return {
+        """Health check endpoint.
+
+        Returns 503 when the model's backend isn't installed, since every
+        request would fail. Other load errors still only show up on the
+        first request.
+        """
+        missing = None if model_name in loaded_models else _missing_backend(model_info)
+        if missing:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "unhealthy",
+                    "model": model_name,
+                    "loaded": False,
+                    "error": f"backend module not installed: {missing}",
+                },
+            )
+        body = {
             "status": "healthy",
             "model": model_name,
             "loaded": model_name in loaded_models
         }
+        if emotion_model:
+            body["emotion_model"] = emotion_model
+        return body
 
     @app.get("/models")
     async def get_models():
@@ -806,6 +921,8 @@ def create_app(model_name: str) -> FastAPI:
                         want_segments=want_segments,
                         background_tasks=background_tasks,
                     )
+                    if emotion_model and not (extras or {}).get("emotion"):
+                        extras = {**(extras or {}), **_emotion_extras(emotion_model, temp_path)}
                     # Refresh path in case _run_stt resampled it (whisper-cpp).
                     background_tasks.add_task(os.unlink, temp_path)
 
@@ -882,9 +999,7 @@ def create_app(model_name: str) -> FastAPI:
                         model = model_data["model"]
                         vocoder = model_data["vocoder"]
 
-                        # Use default speaker embeddings (512-dimensional for SpeechT5 speaker embeddings)
-                        # Create a neutral speaker embedding with some random variation
-                        speaker_embeddings = torch.randn(1, 512, dtype=torch.float32) * 0.1
+                        speaker_embeddings = model_data["speaker_embeddings"]
 
                         inputs = processor(text=request.text, return_tensors="pt")
 
@@ -913,45 +1028,27 @@ def create_app(model_name: str) -> FastAPI:
                             headers={"Content-Disposition": "attachment; filename=speech.wav"}
                         )
 
-                    elif model_data["type"] == "kokoro":
-                        # Kokoro specific implementation
-                        from kokoro import KPipeline
+                    elif "strategy" in model_data:
                         import soundfile as sf
-                        import numpy as np
 
-                        voice = request.speaker or 'af_heart'  # Default voice
-
-                        # Select pipeline by voice language prefix (z=Chinese, j=Japanese, a=English, etc.)
-                        lang_code = voice[0] if voice else 'a'
-                        pipelines = model_data["pipelines"]
-                        if lang_code not in pipelines:
-                            pipelines[lang_code] = KPipeline(lang_code=lang_code)
-                        pipeline = pipelines[lang_code]
-
-                        # Generate speech using Kokoro. `speed` used to be
-                        # hard-coded here, so every client's speed setting
-                        # was silently ignored on this path.
+                        # Clamped so a typo can't request 0 or 50.
                         speed = request.speed if request.speed else 1.0
                         speed = max(0.5, min(2.0, float(speed)))
-                        generator = pipeline(
+                        # speaker=None lets the strategy pick a voice matching
+                        # the text's language; a mismatched voice raises
+                        # instead of returning a silent WAV.
+                        extra = {
+                            k: v for k, v in
+                            (("language", request.language), ("instruct", request.instruct))
+                            if v
+                        }
+                        result = model_data["strategy"].synthesize(
                             request.text,
-                            voice=voice,
+                            voice=request.speaker,
                             speed=speed,
+                            **extra,
                         )
-
-                        # Collect all audio segments
-                        audio_segments = []
-                        for gs, ps, audio in generator:
-                            audio_segments.append(audio)
-
-                        # Concatenate all audio segments
-                        if audio_segments:
-                            final_audio = np.concatenate(audio_segments)
-                        else:
-                            final_audio = np.array([])
-
-                        # Save to WAV file
-                        sf.write(output_path, final_audio, 24000)  # Kokoro uses 24kHz
+                        sf.write(output_path, result.audio, result.sample_rate)
 
                         # Read the audio file and return it directly
                         with open(output_path, 'rb') as f:
@@ -1084,14 +1181,47 @@ def create_app(model_name: str) -> FastAPI:
                             detail=f"TTS implementation for {model_data['type']} not yet implemented"
                         )
 
+                except HTTPException:
+                    if os.path.exists(output_path):
+                        background_tasks.add_task(os.unlink, output_path)
+                    raise
                 except Exception as e:
                     # Clean up temp file on error
                     if os.path.exists(output_path):
                         background_tasks.add_task(os.unlink, output_path)
                     raise HTTPException(status_code=500, detail=f"Synthesis failed: {str(e)}")
 
+            except HTTPException:
+                raise
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Model loading failed: {str(e)}")
+
+    if model_type == "tts":
+        @app.get("/voices")
+        async def list_voices():
+            """Voices of this TTS model, for a client's voice picker.
+
+            ``multilingual`` means every voice reads every language the model
+            supports, so a client shouldn't split mixed-language text between
+            voices the way single-language Kokoro voices need.
+            """
+            if model_name not in loaded_models:
+                load_tts_model(model_name)
+            strategy = loaded_models[model_name].get("strategy")
+            voices = strategy.list_voices() if strategy else []
+            from ..core.config.backends import resolve_backend
+
+            cfg = resolve_backend(model_registry.get(model_name))
+            params = (cfg.parameters if cfg else None) or {}
+            return {
+                "model": model_name,
+                "multilingual": bool(cfg and "cross_lingual" in cfg.features),
+                "default_voice": (params.get("defaults") or {}).get("voice"),
+                "voices": [
+                    {"id": v.id, "name": v.name, "language": v.language, "gender": v.gender}
+                    for v in voices
+                ],
+            }
 
     # OpenAI-compatible TTS endpoint for backward compatibility with kin_speak
     if model_type == "tts":
@@ -1130,6 +1260,17 @@ def create_app(model_name: str) -> FastAPI:
         logger.info("🌐 Web UI routes enabled")
     except ImportError:
         logger.info("ℹ️  Web UI not available (ui module not found)")
+
+    if preload:
+        logger.info(f"Preloading {model_name}...")
+        if model_type == "stt":
+            load_whisper_model(model_name)
+        elif model_type == "tts":
+            load_tts_model(model_name)
+        if emotion_model:
+            logger.info(f"Preloading emotion sidecar {emotion_model}...")
+            load_whisper_model(emotion_model)
+        _warm_up(model_name, model_type, emotion_model)
 
     return app
 

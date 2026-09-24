@@ -4,6 +4,7 @@ AudioEngine - Unified facade for audio processing operations.
 This is the main entry point for STT/TTS operations, following the
 Facade pattern from ollamadiffuser's InferenceEngine.
 """
+import dataclasses
 from typing import Optional, Dict, Any, Union, List, Type
 import numpy as np
 
@@ -85,11 +86,9 @@ class AudioEngine:
         self.register_tts_strategy("pyttsx3", NativeStrategy)
         self.register_tts_strategy("kokoro", KokoroStrategy)
 
-        # Chinese TTS
-        from .tts.cosyvoice_strategy import CosyVoiceStrategy
+        # Chinese TTS (CosyVoice runs in an isolated env; see isolated.py)
         from .tts.chattts_strategy import ChatTTSStrategy
 
-        self.register_tts_strategy("cosyvoice", CosyVoiceStrategy)
         self.register_tts_strategy("chattts", ChatTTSStrategy)
 
         # Voice Cloning
@@ -97,6 +96,23 @@ class AudioEngine:
 
         self.register_tts_strategy("f5-tts", F5TTSStrategy)
         self.register_tts_strategy("f5", F5TTSStrategy)
+
+        # ==================== mlx-audio (Apple Silicon) ====================
+        # One strategy per direction covers every family mlx-audio ships;
+        # registry entries with engine="mlx-audio" name the repo to load.
+        from .stt.mlx_audio_strategy import MLXAudioSTTStrategy
+        from .tts.mlx_audio_strategy import MLXAudioTTSStrategy
+
+        self.register_stt_strategy("mlx-audio", MLXAudioSTTStrategy)
+        self.register_tts_strategy("mlx-audio", MLXAudioTTSStrategy)
+
+        # ==================== Isolated environments (any platform) ====================
+        # Models whose packages conflict run as workers in their own
+        # uv-built virtualenvs; see isolated.py.
+        from .isolated import IsolatedSTTStrategy, IsolatedTTSStrategy
+
+        self.register_stt_strategy("isolated", IsolatedSTTStrategy)
+        self.register_tts_strategy("isolated", IsolatedTTSStrategy)
 
     @classmethod
     def register_stt_strategy(cls, engine_name: str, strategy_class: Type[STTStrategy]):
@@ -128,22 +144,12 @@ class AudioEngine:
         Returns:
             True if loaded successfully
         """
-        # Parse model name
-        engine, model_size = self._parse_model_name(model_name)
+        config = self._resolve_config(model_name, ModelType.STT, **kwargs)
 
         # Get strategy class
-        strategy_class = self._get_stt_strategy_class(engine)
+        strategy_class = self._get_stt_strategy_class(config.engine)
         if not strategy_class:
-            raise ValueError(f"Unknown STT engine: {engine}")
-
-        # Create model config
-        config = ModelConfig(
-            name=model_name,
-            type=ModelType.STT,
-            engine=engine,
-            model_size=model_size,
-            **kwargs
-        )
+            raise ValueError(f"Unknown STT engine: {config.engine}")
 
         # Unload existing model if different
         if self._stt_strategy and self._stt_model_name != model_name:
@@ -210,29 +216,19 @@ class AudioEngine:
 
         Args:
             model_name: Model name in format "engine:variant" or just "engine"
-                        e.g., "kokoro", "cosyvoice:300m-sft"
+                        e.g., "kokoro", "cosyvoice:300m"
             device: Device to use
             **kwargs: Additional model configuration
 
         Returns:
             True if loaded successfully
         """
-        # Parse model name
-        engine, model_size = self._parse_model_name(model_name)
+        config = self._resolve_config(model_name, ModelType.TTS, **kwargs)
 
         # Get strategy class
-        strategy_class = self._get_tts_strategy_class(engine)
+        strategy_class = self._get_tts_strategy_class(config.engine)
         if not strategy_class:
-            raise ValueError(f"Unknown TTS engine: {engine}")
-
-        # Create model config
-        config = ModelConfig(
-            name=model_name,
-            type=ModelType.TTS,
-            engine=engine,
-            model_size=model_size,
-            **kwargs
-        )
+            raise ValueError(f"Unknown TTS engine: {config.engine}")
 
         # Unload existing model if different
         if self._tts_strategy and self._tts_model_name != model_name:
@@ -379,6 +375,31 @@ class AudioEngine:
             parts = model_name.split(":", 1)
             return parts[0].lower(), parts[1]
         return model_name.lower(), None
+
+    def _resolve_config(self, model_name: str, model_type: ModelType, **kwargs) -> ModelConfig:
+        """Registry entry for ``model_name``, else one parsed from the name.
+
+        The name alone used to decide the engine, so any entry whose engine
+        differs from its prefix never loaded: "cosyvoice2:0.5b" looked for a
+        "cosyvoice2" engine, and every mlx-audio model would too. The
+        registry also carries the repo and parameters the strategy needs,
+        and for multi-backend models, which backend this machine uses.
+        """
+        from ..config import model_registry
+        from ..config.backends import resolve_backend
+
+        registered = resolve_backend(model_registry.get(model_name))
+        if registered is not None and registered.type == model_type:
+            return dataclasses.replace(registered, **kwargs) if kwargs else registered
+
+        engine, model_size = self._parse_model_name(model_name)
+        return ModelConfig(
+            name=model_name,
+            type=model_type,
+            engine=engine,
+            model_size=model_size,
+            **kwargs
+        )
 
     def _get_stt_strategy_class(self, engine: str) -> Optional[Type[STTStrategy]]:
         """Get STT strategy class for engine name."""

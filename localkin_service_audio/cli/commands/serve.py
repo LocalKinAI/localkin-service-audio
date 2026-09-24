@@ -25,11 +25,24 @@ from ..utils import print_success, print_error, print_info, print_header
     is_flag=True,
     help="Enable auto-reload for development."
 )
+@click.option(
+    "--emotion",
+    "emotion_model",
+    default=None,
+    help="Sidecar model for emotion/audio events on /transcribe, e.g. sensevoice:small."
+)
+@click.option(
+    "--preload/--no-preload",
+    default=True,
+    help="Load the model before accepting requests (default) or on the first request."
+)
 def serve(
     model_name: Optional[str],
     host: str,
     port: int,
-    reload: bool
+    reload: bool,
+    emotion_model: Optional[str],
+    preload: bool,
 ):
     """
     Start the API server.
@@ -41,11 +54,13 @@ def serve(
         kin audio serve --port 8001
 
         kin audio serve kokoro --port 8001
+
+        kin audio serve qwen3-asr:1.7b --emotion sensevoice:small
     """
     print_header("API Server")
     print_info(f"Starting server on http://{host}:{port}")
 
-    if model_name:
+    if model_name and preload:
         print_info(f"Pre-loading model: {model_name}")
 
     try:
@@ -61,8 +76,9 @@ def serve(
             print_error("Model name required. Example: kin audio serve kokoro")
             raise click.Abort()
 
-        app = create_app(model_name)
-        print_success(f"Loaded {model_name}")
+        app = create_app(model_name, emotion_model=emotion_model, preload=preload)
+        if preload:
+            print_success(f"Loaded {model_name}")
 
         uvicorn.run(
             app,

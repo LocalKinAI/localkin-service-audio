@@ -48,15 +48,15 @@ def _check_engine_installed(engine: str) -> bool:
         "native": "pyttsx3",
         "pyttsx3": "pyttsx3",
         "kokoro": "kokoro",
-        "cosyvoice": "cosyvoice",
         "chattts": "ChatTTS",
         "f5-tts": "f5_tts",
         "f5": "f5_tts",
-        "parler": "parler_tts",
-        "gpt-sovits": "GPT_SoVITS",
-        "parakeet": "nemo",
-        "canary": "nemo",
+        "mlx-audio": "mlx_audio",
     }
+    if engine == "isolated":
+        # Builds its own environment on first use; only uv is needed.
+        from ...core.audio_processing.isolated import find_uv
+        return find_uv() is not None
     pkg = engine_imports.get(engine)
     if not pkg:
         return False
@@ -67,8 +67,10 @@ def _check_engine_installed(engine: str) -> bool:
         return False
 
 
-# Engines with NO strategy implementation (future work)
-_PLANNED_ENGINES = {"parakeet", "canary", "gpt-sovits", "parler"}
+# Engines with NO strategy implementation (future work). Empty since every
+# registry entry now has one — test_every_registry_model_has_an_implementation
+# keeps it that way.
+_PLANNED_ENGINES: set = set()
 
 # Cache so we only probe imports once per session
 _engine_status_cache: dict = {}
@@ -108,7 +110,11 @@ def print_model_table(models: list, show_status: bool = True):
 
     counts = {"ready": 0, "install": 0, "planned": 0}
 
+    from ...core.config.backends import resolve_backend
+
     for model in models:
+        # Multi-backend models show the backend this machine would use.
+        model = resolve_backend(model) if hasattr(model, "backends") else model
         name = getattr(model, 'name', str(model))
         model_type = getattr(model, 'type', 'N/A')
         if hasattr(model_type, 'value'):

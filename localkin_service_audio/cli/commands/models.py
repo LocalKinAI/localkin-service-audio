@@ -117,13 +117,15 @@ def models(
 )
 def pull(model_name: str, force: bool):
     """
-    Download a model.
+    Download a model (and build its environment if it runs isolated).
 
     Examples:
 
         kin audio pull whisper:large-v3
 
-        kin audio pull cosyvoice:300m --force
+        kin audio pull qwen3-tts:1.7b
+
+        LOCALKIN_BACKEND=torch kin audio pull qwen3-asr:1.7b
     """
     print_header("Pull Model")
     print_info(f"Pulling model: {model_name}")
@@ -133,7 +135,9 @@ def pull(model_name: str, force: bool):
         from ..utils.progress import progress
 
         # Check if model exists in registry
-        model_config = model_registry.get(model_name)
+        from ...core.config.backends import resolve_backend
+
+        model_config = resolve_backend(model_registry.get(model_name))
         if not model_config:
             print_error(f"Model '{model_name}' not found in registry.")
             print_info("Use 'kin audio models' to see available models.")
@@ -143,6 +147,8 @@ def pull(model_name: str, force: bool):
         # Actual download depends on the engine
         print_info(f"Model: {model_config.name}")
         print_info(f"Engine: {model_config.engine}")
+        if model_config.backend:
+            print_info(f"Backend: {model_config.backend} (set LOCALKIN_BACKEND=mlx|torch to choose)")
         print_info(f"Type: {model_config.type.value}")
 
         if model_config.repo_id:
@@ -165,8 +171,10 @@ def pull(model_name: str, force: bool):
             with progress.spinner(f"Downloading {model_name}"):
                 if model_config.type.value == "stt":
                     success = engine.load_stt(model_name)
+                    engine.unload_stt()
                 else:
                     success = engine.load_tts(model_name)
+                    engine.unload_tts()
 
         if success:
             print_success(f"Successfully pulled {model_name}")

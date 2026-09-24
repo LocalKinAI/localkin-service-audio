@@ -141,6 +141,13 @@ class ModelConfig:
     # Voices (for TTS)
     voices: Optional[List[str]] = None
 
+    # Alternative ways to run the same model, keyed by backend name ("mlx",
+    # "torch"). Each value overrides fields above (engine, repo_id,
+    # parameters, ...). resolve_backend() picks one for this machine and
+    # records it in `backend`.
+    backends: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    backend: Optional[str] = None
+
     @property
     def supports_chinese(self) -> bool:
         return "zh" in self.languages or "chinese" in self.tags
