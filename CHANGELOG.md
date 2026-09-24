@@ -7,65 +7,187 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed — `sensevoice:*` models started healthy and then failed every request
+## [2.1.0] - 2026-09-23
 
-`kin audio serve sensevoice:small` came up cleanly and answered `/health` with
-`{"status": "healthy"}`, then returned `funasr not installed` on every single
-`/transcribe`. The server has supported `sensevoice:*` for a while and the model
-weights were already on disk — only the runtime was missing from the dependency
-list, and nothing checked for it until the first request arrived.
+50 current open models — the ones people actually download and star — under
+one name each, runnable on a Mac (MLX) or anywhere else (torch, in an
+environment built on first use). Every model the CLI lists now loads, the HTTP
+server serves all of them, and a benchmark on real speech picked the new
+defaults. It also fixes a long list of bugs found by running the project on a
+clean machine instead of a developer's.
 
-Declared as an optional extra rather than a core dependency, since funasr pulls
-in modelscope and a sizeable tree that a Whisper-only install shouldn't have to
-download:
+### Benchmark (Mac Studio M3 Ultra, MLX)
 
-```bash
-uv pip install --project . -e ".[sensevoice]"
-```
+Speech-to-text on FLEURS dev — real read speech — 60 Mandarin, 30 Cantonese
+and 30 English utterances; CER for Chinese, WER for English, numbers
+normalised to characters before scoring. Speed is processing time / audio
+length.
 
-The health check still doesn't verify the backend imports, so the same class of
-failure remains possible for other optional engines. Worth fixing at the
-`/health` level rather than one model family at a time.
+| Model | Mandarin | Cantonese | English | Speed |
+|---|---|---|---|---|
+| `fun-asr:nano` | **8.6** | 8.0 | 5.8 | **0.012** |
+| `confucius4:r2t2` | 9.2 | 7.0 | 4.4 | 0.018 |
+| `fireredasr2:aed` | 9.2 | 9.3 | 11.0 | 0.077 |
+| `qwen3-asr:1.7b` | 9.4 | **6.6** | **3.9** | 0.018 |
+| `glm-asr:nano` | 9.5 | 17.4 | 8.0 | 0.019 |
+| `qwen3-asr:0.6b` | 9.6 | 7.9 | 4.6 | 0.012 |
+| `sensevoice:small` | 10.5 | 8.7 | 8.2 | 0.05 |
+| `whisper-mlx:large-v3-turbo` | 11.1 | 12.4 | 5.3 | 0.036 |
 
-### Fixed — Kokoro with no voice and Chinese text returned silence (library and CLI)
+Text-to-speech: five Chinese sentences (everyday speech, polyphones and
+numbers, Chinese–English code-switching, dates, a long sentence).
+Transcribing the output back with `qwen3-asr:1.7b` found it word-perfect
+except where noted.
 
-`KokoroStrategy` defaulted a missing voice to an English one. An English
-pipeline fed Chinese yields no segments at all, which were concatenated into an
-empty array and returned as a successful result: silence, with nothing to
-debug. The strategy now picks a default by the text's language — `zf_xiaoxiao`
-for Chinese, `jf_alpha` for Japanese (kana is checked before Han, since Japanese
-text is full of kanji), `af_heart` otherwise — and raises, naming the voice,
-when synthesis produces no audio.
+| Model | Speed | Output | Notes |
+|---|---|---|---|
+| `qwen3-tts:0.6b` | 0.19 | 24 kHz | preset voices, `instruct` for tone |
+| `qwen3-tts:1.7b` | 0.21 | 24 kHz | |
+| `spark-tts:0.5b` | 0.21 | 16 kHz | one character wrong on code-switching |
+| `longcat-audiodit:1b` | 0.40 | 24 kHz | one character wrong on the date |
+| `voxcpm2` | 0.48 | 48 kHz | |
+| `fish-speech:s2-pro` | 0.52 | 44.1 kHz | |
+| `kokoro` | 0.06 | 24 kHz | **35% CER on the iPhone/email sentence** — its Chinese voice can't say English words |
+| `cosyvoice3:0.5b` | 2.1 | 24 kHz | torch backend on CPU — CosyVoice has no MPS path |
 
-**Not yet fixed on `POST /synthesize`.** The HTTP route has its own inline
-Kokoro branch that still defaults a missing `speaker` to `af_heart` and still
-returns an empty WAV with HTTP 200. Clients that always send a `speaker`
-matching the text's language — KinClaw Mac does — are unaffected. The route
-should call the strategy rather than duplicate it.
+Recommended defaults: **`qwen3-asr:1.7b`** (best overall, `fun-asr:nano` if
+only Mandarin matters) and **`qwen3-tts:0.6b`**. Keep `sensevoice:small` where
+you need its emotion and audio-event labels.
 
-### Fixed — `POST /synthesize` ignored `speed`
+### Added
 
-The Kokoro branch passed `speed=1.0` whatever the request said, and
-`TTSRequest` had no field to carry anything else, so every client's speed
-setting did nothing. `TTSRequest` gains `speed` (default 1.0, clamped to
-0.5–2.0), and `/v1/audio/speech` maps its own `speed` onto it. Kokoro renders at
-the rate rather than time-stretching afterwards, so 1.3 is brisk rather than
-chipmunked: the same sentence is 4.92s at 1.0 and 4.03s at 1.3.
+- **Model catalog** (`core/config/catalog.py`): 16 STT and 34 TTS models, each
+  with an `mlx` and/or `torch` backend.
+  - STT: Qwen3-ASR 0.6B/1.7B, Fun-ASR-Nano, FireRedASR2, GLM-ASR-Nano,
+    Confucius4-R2T2, MOSS-Transcribe-Diarize, Nemotron 3.5, Voxtral Realtime,
+    VibeVoice-ASR, Parakeet v3/v2/1.1B, Canary 1B v2, Canary-Qwen, Whisper on MLX.
+  - TTS: Qwen3-TTS (CustomVoice 0.6B/1.7B, VoiceDesign, Base 0.6B/1.7B),
+    VoxCPM2, CosyVoice3/2/300M, IndexTTS-2/2.5, Fish Audio S2 Pro, Spark-TTS,
+    LongCat-AudioDiT, Breeze-TTS-2, Confucius4-TTS, MOSS-TTS, Ming-Omni,
+    Chatterbox, OmniVoice, OuteTTS, Higgs Audio v2, Voxtral TTS, VibeVoice,
+    CSM, Dia, Orpheus, KittenTTS, Soprano, Pocket TTS, Irodori.
+- **Backend selection** (`core/config/backends.py`): mlx on Apple Silicon when
+  mlx-audio is installed, torch otherwise. `LOCALKIN_BACKEND=mlx|torch` forces
+  one.
+- **mlx backend**: one STT and one TTS strategy drive every family
+  mlx-audio 0.5.5 ships (`[mlx]` extra). `generate` kwargs are filtered against
+  each model's signature, and language is spelled the way each model wants.
+- **torch backend in isolated environments**: the official packages can't
+  share one — qwen-tts pins transformers 4.57, chatterbox-tts torch 2.6 and
+  numpy<2, IndexTTS torch 2.8, CosyVoice has no package, FireRedASR2 needs
+  Python 3.11 — so each family runs as a worker in its own uv-built venv under
+  `~/.localkin-service-audio/envs/`, created on first use.
+  `LOCALKIN_AUTO_INSTALL=0` refuses to build; `kin audio pull <model>` builds
+  ahead of time.
+- **Bundled reference voices** (`assets/voices/`, Kokoro-generated,
+  Apache-2.0): models without preset voices clone one when the caller gives no
+  `ref_audio`, so the voice is the same on every call.
+- `POST /synthesize` takes `instruct` — tone ("用开心的语气") on Qwen3-TTS
+  CustomVoice, a voice description on the VoiceDesign models.
+- **Emotion sidecar**: `kin audio serve qwen3-asr:1.7b --emotion sensevoice:small`
+  takes the transcript from Qwen3-ASR and `emotion` / `audio_events` from
+  SenseVoice, so clients that read the emotion keep working with the more
+  accurate recogniser. A sidecar failure never fails the transcription.
+- **`serve` preloads and warms up** the model before accepting requests
+  (`--no-preload` for the old lazy behaviour). It used to print "Pre-loading"
+  and load nothing, so the first request after a restart waited 1–2 minutes
+  for Qwen3 to load — past a 15 s client timeout — and then ~3 s more for MLX
+  kernel compilation; it now answers in under a second.
+- **`GET /voices`** on TTS servers lists the model's voices (id, display name,
+  native language, gender) and whether they are `multilingual` — each reads
+  every language the model supports, so clients shouldn't split mixed-language
+  text between voices as single-language Kokoro voices require. Qwen3-TTS
+  reports its nine speakers, including the Beijing (Dylan) and Sichuan (Eric)
+  dialect voices.
+- **Kokoro voice ids work on Qwen3-TTS**: `zf_xiaoxiao`, `zm_yunxi`,
+  `af_heart`... map by language and gender to the nearest Qwen3 speaker, and
+  unknown names (OpenAI's `alloy`) fall back to the default voice, so a client
+  written for Kokoro can switch models without changes.
+- `/transcribe` returns SenseVoice's `emotion` and `audio_events` in JSON.
+  Treat the label as a hint: a tired-sounding synthetic "今天好累" came back
+  `happy`.
+- `POST /synthesize` honours `speed` (0.5–2.0); `/v1/audio/speech` maps its
+  own `speed` onto it. Kokoro renders at the rate; the catalog models are
+  time-stretched after synthesis (WSOLA, pitch unchanged), because most ignore
+  a speed argument — Qwen3-TTS takes one on both MLX and torch and does
+  nothing with it.
 
-### Added — `/transcribe` returns SenseVoice's emotion and audio events
+### Fixed
 
-SenseVoice labels the emotion in each utterance (`happy` / `sad` / `angry` /
-`neutral` / `surprised` / `fearful`) and flags audio events such as laughter.
-The strategy has extracted both from the start; the route threw them away. The
-JSON response now includes `emotion` and `audio_events` when the engine produced
-them. JSON only — the text, SRT and VTT formats have nowhere honest to put them
-— and engines without them are unaffected.
+- **Twelve listed models never loaded.** Parakeet, Canary, Canary-Qwen,
+  Orpheus, Qwen3-TTS, Dia, Parler and GPT-SoVITS had no implementation and
+  failed with `Unknown engine`; they are catalog entries that run now (see
+  Removed for the rest). Tests fail if any registry entry lacks a strategy or
+  `kin audio recommend` suggests one that can't load — it suggested
+  `canary:1b` and `gpt-sovits`.
+- **`AudioEngine` ignored the registry.** The engine came from the name's
+  prefix, so `cosyvoice2:0.5b` looked for a `cosyvoice2` engine. Names now
+  resolve through the registry, which also supplies repo and parameters.
+- **The HTTP server served only a few engines.** CosyVoice, ChatTTS and F5-TTS
+  had no route and Paraformer fell through to a transformers pipeline that
+  can't load it; any model with a strategy is now served.
+- **CosyVoice never loaded**: wrong import, no v2/v3 support, a hard-coded
+  22.05 kHz rate (v2/v3 are 24 kHz), the v1-only instruct API. It now runs from
+  the official repo's `AutoModel` in an isolated environment.
+- **SenseVoice ran `pip install` on load.** `trust_remote_code=True` made
+  funasr `pip install -r` the model repo's requirements (`numpy<=1.26.4`,
+  `gradio`) into whatever pip was on PATH — downgrading numpy, or failing
+  outright in a uv venv. SenseVoice is built into funasr, so no remote code.
+- **SenseVoice started "healthy" and failed every request**: funasr and
+  modelscope were never declared. Added the `[sensevoice]` extra, and
+  `/health` now returns 503 naming the missing backend package (or `uv`, for
+  isolated models).
+- **Kokoro read Chinese in an English voice.** With no speaker it defaulted
+  to `af_heart`, which reads Chinese as "Chinese letter, Chinese letter…" or
+  returns silence. It now picks a voice from the text's script (kana before
+  Han), fails loudly on empty audio, and `/synthesize` goes through the same
+  code. A first version of this fix never took effect, because `load()` still
+  pinned `af_heart`.
+- **Kokoro could take the server down.** Its one-time spaCy model install
+  used a bare `uv pip install` (wrong venv), and when neither uv nor pip was
+  reachable — a uv venv run from a service or `nohup` — `spacy download`
+  called `sys.exit()`. It now installs into the running interpreter, falls
+  back to unpacking the wheel, and a failed setup is a load error, not an exit.
+- **Isolated environments couldn't find uv** from services and cron jobs;
+  it's also looked for in `~/.local/bin`, `~/.cargo/bin` and Homebrew.
+- **MusicGen clips played at half speed, an octave low** — labelled 16 kHz,
+  decoded at 32 kHz. The test that should have caught it turned every
+  exception, assertion failures included, into a skip.
+- **SpeechT5 changed voice on every request**; the speaker embedding is now
+  drawn once from a fixed seed.
+- Synthesis errors are no longer re-wrapped as "Model loading failed: 500: …".
+- `uv lock` failed building openai-whisper (its sdist imports
+  `pkg_resources`, removed in setuptools 81); build dependencies are capped.
 
-Treat the label as a hint, not a measurement. Flat or synthetic speech is
-mislabelled often enough to matter: a tired-sounding synthetic "今天好累"
-came back `happy`.
+### Changed
 
----
+- The lockfile now resolves transformers 5.17 and numpy 2.2 (was 4.57 and
+  1.22). A fresh `uv sync --frozen` with the `sensevoice`, `vad`, `web` and
+  `dev` extras on Python 3.10 passes the full suite and real Kokoro, SenseVoice
+  and faster-whisper runs. The legacy `tts` extra (Coqui pins numpy 1.22) is
+  declared as conflicting with `mlx`, so it resolves separately.
+- `fun-asr:nano` uses `mlx-community/Fun-ASR-Nano-2512`; the quantised builds
+  predate the tokenizer layout mlx-audio 0.5.5 loads. IndexTTS and CosyVoice
+  are torch-only: no MLX build of them loads in mlx-audio 0.5.5.
+- `kin audio recommend` suggests Qwen3-ASR/TTS on Apple Silicon.
+- The MCP `clone_voice` tool defaults to `cosyvoice3:0.5b` (the 300M SFT
+  build it used can't clone).
+
+### Removed
+
+- `orpheus:1b` (the repo doesn't exist), `orpheus:150m` (pointed at the 3B
+  model), `parler-tts` and `gpt-sovits` (no implementation).
+- `CosyVoiceStrategy`, replaced by the isolated CosyVoice worker.
+
+### Known issues
+
+- **Python 3.10 on macOS 27**: scipy's last 3.10 wheel doesn't load there
+  (`__thread_bss` error). Use Python 3.11+.
+- CUDA hasn't been run by the maintainers yet: the torch path was verified
+  end to end for Qwen3-ASR and Qwen3-TTS (MPS) and CosyVoice3 (CPU) on Apple
+  Silicon. Reports welcome.
+- Nemotron auto-detects language poorly for Chinese (20% CER); it wants an
+  explicit `zh-CN`.
 
 ## [2.0.12] - 2026-05-17
 

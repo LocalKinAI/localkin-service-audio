@@ -6,28 +6,27 @@
 
 **Local Voice AI Platform** - Speech-to-Text and Text-to-Speech with Chinese language support, voice cloning, and Claude integration via MCP.
 
-## What's New in v2.0.12
+## What's New in v2.1.0
 
-- **🎙️ Engine-agnostic VAD** — new `POST /vad` endpoint backed by [TEN-VAD](https://huggingface.co/TEN-framework/ten-vad) (731 KB native macOS arm64 binary, ~0.016 RTF on M1, ~100–300 ms faster speech↔silence transitions than Silero). Install with `pip install 'localkin-service-audio[vad]'`.
-- **🧪 +12 new tests** for the VAD module + `/vad` endpoint integration (187 tests total, all passing).
+- **50 current models, one name each, on any machine.** Qwen3-ASR, Fun-ASR-Nano, FireRedASR2, Parakeet, Nemotron, VibeVoice-ASR; Qwen3-TTS, VoxCPM2, CosyVoice3, IndexTTS-2, Fish Audio S2 Pro, Chatterbox and more — picked by Hugging Face downloads, likes and trending. On a Mac a model runs on [MLX](https://github.com/Blaizzy/mlx-audio) (`[mlx]` extra); on CUDA or CPU it runs in its own environment, built automatically the first time.
+- **Benchmarked on real speech** (FLEURS, Mac Studio M3 Ultra). Qwen3-ASR 1.7B beats SenseVoice-Small in Mandarin (9.4 vs 10.5% CER), Cantonese (6.6 vs 8.7%) and English (3.9 vs 8.2% WER) while running faster; Fun-ASR-Nano has the lowest Mandarin CER (8.6%). Qwen3-TTS 0.6B synthesizes 5× faster than real time and handles Chinese–English code-switching that Kokoro misreads. Full tables in the [changelog](CHANGELOG.md#210---2026-09-23).
+- **Every model in `kin audio models` loads**, and the HTTP server serves all of them. `/synthesize` gains `instruct` for tone and voice design.
+- **Fixes found on a clean machine**: SenseVoice no longer runs `pip install` on load, Kokoro can't take the server down when its spaCy setup fails, CosyVoice works for the first time, MusicGen plays at the right pitch.
 
-## What was added in v2.0.11
+Recommended:
 
-- **Transcription controls on `/transcribe`** (resolves #2): four new query parameters — `enable_vad`, `timestamps`, `response_format` (json/text/markdown/srt/vtt), and `chunk_length_s` for VRAM tuning.
-- **`faster-whisper` engine** wired into the API server — entries like `faster-whisper:base`, `:large-v3`, `:turbo` now load through `FasterWhisperStrategy` (was falling through to the HuggingFace pipeline before).
-- **+15 new endpoint integration tests** using FastAPI `TestClient` + monkeypatched `loaded_models`.
-
-## What was added in v2.0.10
-
-- **12 new models** (29 → 40 total): Whisper large-v3-turbo, Parakeet v3, Canary v2/Qwen, CosyVoice2, Orpheus TTS, Qwen3-TTS, Dia.
-- **Removed** ~2,500 lines of legacy v1.x code — fully migrated to v2.0 `ModelRegistry` and `AudioEngine`.
+```bash
+kin audio serve qwen3-asr:1.7b --port 8000 --emotion sensevoice:small   # STT, with SenseVoice's emotion labels
+kin audio serve qwen3-tts:0.6b --port 8001                              # TTS, accepts Kokoro voice ids
+```
 
 See [CHANGELOG.md](CHANGELOG.md) for full history.
 
 ## Features
 
-- **Multiple STT Engines**: Whisper, faster-whisper, whisper.cpp, SenseVoice, Paraformer, Moonshine, Parakeet (NeMo), Canary, Canary-Qwen
-- **Multiple TTS Engines**: Kokoro, CosyVoice, ChatTTS, F5-TTS, SpeechT5, Bark, native OS (pyttsx3)
+- **STT**: Qwen3-ASR, Fun-ASR-Nano, FireRedASR2, GLM-ASR, Parakeet, Canary, Nemotron, Voxtral Realtime, VibeVoice-ASR, Whisper (openai / faster-whisper / whisper.cpp / MLX), SenseVoice, Paraformer, Moonshine — [full list](#current-models-catalog)
+- **TTS**: Qwen3-TTS, VoxCPM2, CosyVoice3, IndexTTS-2, Fish Audio S2 Pro, Chatterbox, Spark-TTS, OmniVoice, CSM, Dia, Higgs Audio, Kokoro, ChatTTS, F5-TTS and more
+- **Any platform**: one model name everywhere — MLX on Apple Silicon, torch on CUDA/CPU in auto-built isolated environments
 - **Music Generation**: HeartMuLa (multilingual, tag-based), MusicGen
 - **Voice Activity Detection**: Engine-agnostic `/vad` endpoint via TEN-VAD; or built-in Silero VAD inside `faster-whisper`
 - **Chinese Language Support**: Optimized models for Mandarin, Cantonese, and mixed Chinese-English
@@ -141,6 +140,10 @@ uv pip install localkin-service-audio[cloning]
 
 # MCP server for Claude
 uv pip install localkin-service-audio[mcp]
+
+# Apple Silicon: run catalog models on MLX (fastest on a Mac). Optional —
+# without it they run in auto-built torch environments like everywhere else.
+uv pip install "localkin-service-audio[mlx]"
 
 # All features
 uv pip install localkin-service-audio[all-new]
@@ -369,12 +372,79 @@ kin web --port 5000
 
 ## Supported Models
 
-`kin audio models` shows all 40 models with real-time availability status:
+`kin audio models` shows all 76 models with real-time availability status:
 - **✅ Ready** — engine installed, usable now
 - **📦 Not installed** — strategy code exists, just needs `pip install`
-- **🔮 Planned** — future implementation
 
-### STT Models (24)
+### Current models (catalog)
+
+Use the same name on any machine. **Mac (MLX)** needs Apple Silicon and the `[mlx]` extra; **torch** runs on CUDA, CPU or MPS in an environment built on first use (needs [uv](https://docs.astral.sh/uv/); set `LOCALKIN_AUTO_INSTALL=0` to refuse, and `kin audio pull <model>` to build ahead of time). Weights download on first use. Repos and parameters live in [`catalog.py`](localkin_service_audio/core/config/catalog.py).
+
+#### Speech-to-Text
+
+| Model | Languages | Notes | Mac (MLX) | CUDA / CPU (torch) |
+|---|---|---|---|---|
+| `qwen3-asr:0.6b` | zh, en, yue, ja, ko, de … | beats Whisper large-v3 on Chinese, 22 dialects, 30 languages | ✅ | ✅ |
+| `qwen3-asr:1.7b` | zh, en, yue, ja, ko, de … | AISHELL-2 WER 2.71 vs 5.06 for Whisper large-v3 | ✅ | ✅ |
+| `fireredasr2:aed` | zh, en | lowest Mandarin CER published (AISHELL-1 0.57), 20+ dialects | ✅ | ✅ |
+| `fun-asr:nano` | zh, en, ja | Tongyi's ASR, 7 Chinese dialects and 26 accents | ✅ | ✅ |
+| `glm-asr:nano` | zh, en, yue | Zhipu's ASR, strong on Cantonese and quiet speech | ✅ | ✅ |
+| `confucius4:r2t2` | zh, en | NetEase Youdao's Qwen3-ASR-based recognizer | ✅ | — |
+| `moss-transcribe-diarize` | zh, en | speaker labels + timestamps | ✅ | — |
+| `whisper-mlx:large-v3-turbo` | en, zh, de, es, fr, ja … | Whisper large-v3-turbo on MLX (elsewhere use faster-whisper:large-v3-turbo) | ✅ | — |
+| `nemotron-asr:0.6b` | en, zh, es, de, fr, it … | NVIDIA cache-aware streaming ASR, 40 language-locales | ✅ | ✅ |
+| `voxtral-realtime:4b` | en, zh, fr, es, de, it … | Mistral's streaming ASR | ✅ | ✅ |
+| `vibevoice-asr:9b` | en, zh, ja, ko, de, fr … | Microsoft, up to 60 min audio with speakers and hotwords | ✅ | ✅ |
+| `parakeet:0.6b` | en, fr, de, es, pt, it … | NVIDIA, 25 European languages, far faster than Whisper | ✅ | ✅ |
+| `parakeet:0.6b-v2` | en | NVIDIA English ASR (torch: community HF port) | ✅ | ✅ |
+| `parakeet:1.1b` | en | NVIDIA English ASR (torch: community HF port) | ✅ | ✅ |
+| `canary:1b-v2` | en, fr, de, es, pt, it … | NVIDIA transcription + translation, 25 languages (no auto-detect) | ✅ | ✅ |
+| `canary-qwen:2.5b` | en | NVIDIA English ASR leaderboard leader | ✅ | — |
+
+#### Text-to-Speech
+
+| Model | Languages | Notes | Mac (MLX) | CUDA / CPU (torch) |
+|---|---|---|---|---|
+| `qwen3-tts:0.6b` | zh, en, ja, ko, de, fr … | 9 preset voices incl. dialects, emotion via instruct | ✅ | ✅ |
+| `qwen3-tts:1.7b` | zh, en, ja, ko, de, fr … | most-downloaded TTS of 2026, emotion via instruct | ✅ | ✅ |
+| `qwen3-tts:1.7b-voicedesign` | zh, en, ja, ko, de, fr … | describe the voice in words (pass instruct) | ✅ | ✅ |
+| `qwen3-tts:0.6b-base` | zh, en, ja, ko, de, fr … | 3-second zero-shot voice cloning | ✅ | ✅ |
+| `qwen3-tts:1.7b-base` | zh, en, ja, ko, de, fr … | higher-fidelity zero-shot voice cloning | ✅ | ✅ |
+| `voxcpm2` | zh, en, ja, ko, de, fr … | Seed-TTS zh CER 0.97, 48 kHz, voice design and 9 Chinese dialects | ✅ | ✅ |
+| `cosyvoice3:0.5b` | zh, en, ja, ko, yue, de … | Tongyi, zh CER 1.12, 18+ dialects, instruct control | — | ✅ |
+| `cosyvoice2:0.5b` | zh, en, ja, ko, yue, de … | 9 languages + 18 Chinese dialects, voice cloning | — | ✅ |
+| `cosyvoice:300m` | zh, en, ja, ko, yue | original CosyVoice with 7 preset voices | — | ✅ |
+| `indextts:2` | zh, en | bilibili's zero-shot TTS with emotion control | — | ✅ |
+| `indextts:2.5` | zh, en | newer IndexTTS, faster and more stable | — | ✅ |
+| `fish-speech:s2-pro` | zh, en, ja, ko, de, fr … | inline emotion tags, voice cloning | ✅ | — |
+| `spark-tts:0.5b` | zh, en | gender and pitch control, voice cloning | ✅ | — |
+| `longcat-audiodit:1b` | zh, en | Meituan diffusion TTS, zh CER 1.18 | ✅ | — |
+| `breeze-tts:2` | zh, en | Taiwanese Mandarin + English, voice design | ✅ | — |
+| `confucius4-tts` | zh, en, ja, ko, de, fr … | NetEase Youdao, 14 languages | ✅ | — |
+| `moss-tts:nano` | zh, en, ja, ko, de, fr … | tiny multilingual cloning TTS | ✅ | — |
+| `moss-tts:local-v1.5` | zh, en, ja, ko, de, fr … | 31 languages | ✅ | — |
+| `ming-omni-tts:0.5b` | zh, en | Ant Group, style control | ✅ | — |
+| `chatterbox:multilingual` | en, zh, ja, ko, de, fr … | Resemble AI, 23 languages, emotion exaggeration control | ✅ | ✅ |
+| `chatterbox:turbo` | en | Resemble AI's fast English TTS with paralinguistic tags | ✅ | ✅ |
+| `omnivoice` | zh, en, ja, ko, de, fr … | k2-fsa zero-shot TTS for 600+ languages, nonverbal tags | ✅ | ✅ |
+| `higgs-audio:v2` | en, zh, ko, de, es | Boson AI expressive TTS, multi-speaker dialogue | ✅ | ✅ |
+| `outetts:1b` | en, zh, ja, ko, de, fr … | Llama-based multilingual TTS | ✅ | — |
+| `voxtral-tts:4b` | en, fr, es, de, it, pt … | Mistral, 20 preset voices, no Chinese | ✅ | — |
+| `vibevoice:0.5b` | en | Microsoft streaming TTS | ✅ | — |
+| `vibevoice:1.5b` | en, zh | Microsoft long-form multi-speaker TTS | — | ✅ |
+| `csm:1b` | en | conversational speech model with voice cloning | ✅ | ✅ |
+| `dia:1.6b` | en | multi-speaker dialogue in one pass ([S1]/[S2]), laughter and coughs | ✅ | ✅ |
+| `orpheus:3b` | en | Llama-based emotional TTS, <laugh> <sigh> tags | ✅ | — |
+| `kitten-tts:mini` | en | under 100 MB | ✅ | — |
+| `soprano:80m` | en | tiny, very fast English TTS | ✅ | — |
+| `pocket-tts` | en, fr, de, pt, it, es | 100M, real-time on CPU, voice cloning | ✅ | — |
+| `irodori-tts` | ja | Japanese TTS | ✅ | — |
+
+The torch backends follow each project's documented API. Qwen3-ASR, Qwen3-TTS (MPS) and CosyVoice3 (CPU) have run end to end on the torch path; CUDA runs are awaiting reports — issues welcome. [Benchmark results](CHANGELOG.md#210---2026-09-23) cover 8 STT and 9 TTS models.
+
+### Built-in engines
+
+#### Speech-to-Text
 
 > **Tip — Voice Activity Detection has two paths since v2.0.12:**
 >
@@ -391,28 +461,17 @@ kin web --port 5000
 | `moonshine:tiny/base` | Moonshine | English | 5x real-time, ~20MB | Install needed |
 | `sensevoice:small` | FunASR (Alibaba) | zh, en, ja, ko | 15x faster, emotion detection | Install needed |
 | `paraformer:zh` | FunASR (Alibaba) | Chinese | Fast Chinese ASR | Install needed |
-| `parakeet:0.6b` | NVIDIA NeMo | 25 languages | 10x faster than Whisper turbo | Install needed |
-| `parakeet:1.1b` | NVIDIA NeMo | English | >2000x real-time | Install needed |
-| `canary:1b-v2` | NVIDIA NeMo | 25 languages | Transcription + translation | Install needed |
-| `canary-qwen:2.5b` | NVIDIA NeMo | English | #1 HuggingFace ASR leaderboard, STT + understanding | Install needed |
 
-### TTS Models (14)
+#### Text-to-Speech
 
 | Model | Engine | Languages | Features | Status |
 |-------|--------|-----------|----------|--------|
 | `native` | pyttsx3 | System | No download needed | Ready |
 | `kokoro` / `kokoro:82m` | Kokoro | en, es, fr, hi, it, ja, pt, zh | 54 voices, multilingual | Ready |
-| `cosyvoice:300m` | CosyVoice (Alibaba) | zh, en, ja, ko, yue | Voice cloning, streaming | Install needed |
-| `cosyvoice2:0.5b` | CosyVoice2 (Alibaba) | 9 langs + 18 Chinese dialects | 30-50% fewer errors than v1 | Install needed |
-| `qwen3-tts:0.6b/1.7b` | Qwen3-TTS (Alibaba) | 10 langs (zh, en, ja, ko, de, fr...) | 97ms latency, 3s voice cloning, voice design | Install needed |
-| `orpheus:150m/1b/3b` | Orpheus | English | Best emotional expressiveness, GGUF | Install needed |
-| `dia:1.6b` | Dia | English | Multi-speaker dialogue, nonverbal sounds | Install needed |
 | `chattts` | ChatTTS | zh, en | Conversational, emotion | Install needed |
 | `f5-tts` | F5-TTS | en, zh | Zero-shot voice cloning | Install needed |
-| `gpt-sovits` | GPT-SoVITS | zh, en, ja | Voice cloning with 5s audio | Planned |
-| `parler-tts` | Parler | English | Text-described voice | Planned |
 
-### Music Models (2)
+### Music Models
 
 | Model | Engine | Languages | Features | Status |
 |-------|--------|-----------|----------|--------|
@@ -535,11 +594,12 @@ kin audio serve --port 8000
 
 **POST /transcribe** - Transcribe audio
 ```bash
-# Basic
-curl -X POST "http://localhost:8000/transcribe" \
-  -F "file=@audio.wav" \
-  -F "language=en"
+# Basic (language is a query parameter; omit it to auto-detect)
+curl -X POST "http://localhost:8000/transcribe?language=en" \
+  -F "file=@audio.wav"
 ```
+
+With SenseVoice as the model, or any model served with `--emotion sensevoice:small`, the JSON also carries `emotion` (`happy` / `sad` / `angry` / `neutral` / …) and `audio_events` (laughter, applause, …). Treat the label as a hint.
 
 Optional query parameters (added in v2.0.11):
 
@@ -570,13 +630,30 @@ curl -X POST 'http://localhost:8000/transcribe?timestamps=true' \
   -F 'file=@audio.wav'
 ```
 
-**POST /synthesize** - Synthesize speech
+**POST /synthesize** - Synthesize speech (returns `audio/wav`)
 ```bash
-curl -X POST "http://localhost:8000/synthesize" \
+curl -X POST "http://localhost:8001/synthesize" \
   -H "Content-Type: application/json" \
-  -d '{"text": "Hello world", "model": "kokoro", "voice": "af_bella"}' \
+  -d '{"text": "今天天气很好", "speaker": "vivian", "instruct": "用开心的语气"}' \
   --output speech.wav
 ```
+
+| Field | Default | Notes |
+|---|---|---|
+| `text` | — | Required |
+| `speaker` | model default | A voice id from `GET /voices`. Kokoro ids (`zf_xiaoxiao`, `af_heart`…) are mapped to the nearest voice on other models |
+| `language` | from the text | ISO code, e.g. `zh`, `en` |
+| `speed` | `1.0` | 0.5–2.0 |
+| `instruct` | — | Tone on Qwen3-TTS CustomVoice ("用开心的语气"), a voice description on VoiceDesign models; ignored elsewhere |
+
+**GET /voices** - Voices of the TTS model
+```bash
+curl "http://localhost:8001/voices"
+# {"model": "qwen3-tts:0.6b", "multilingual": true, "default_voice": "vivian",
+#  "voices": [{"id": "vivian", "name": "Vivian · 明亮女声", "language": "zh", "gender": "female"}, ...]}
+```
+
+`multilingual: true` means every voice reads every language the model supports, so send mixed-language text in one request rather than splitting it between voices (which single-language Kokoro voices need).
 
 **POST /vad** - Detect speech segments (no transcription)
 
@@ -618,6 +695,8 @@ Tunable parameters (all optional query strings):
 ```bash
 curl "http://localhost:8000/models"
 ```
+
+**GET /health** - Readiness. `503` with the missing package when the model's backend isn't installed; `loaded: true` once the model is in memory (`serve` preloads by default).
 
 **WebSocket /stream** - Real-time transcription
 ```javascript
@@ -753,6 +832,14 @@ python -c "import torch; print(torch.__version__)"
 
 # Upgrade if needed (keep torchvision in sync)
 pip install "torch>=2.6.0" "torchaudio>=2.6.0" "torchvision>=0.21"
+```
+
+### macOS 27: `__thread_bss` / scipy import error
+
+scipy 1.15.3, the last release with Python 3.10 wheels, fails to load on macOS 27. Create the environment with Python 3.11+:
+
+```bash
+uv venv -p 3.11 && uv pip install -e ".[sensevoice]"
 ```
 
 ### numpy/pandas Binary Incompatibility
