@@ -2,6 +2,7 @@
 Music generation command - AI music generation operations.
 """
 import click
+import json
 import os
 import time
 from typing import Optional
@@ -26,6 +27,8 @@ def music():
         kin audio music models
 
         kin audio music generate "ambient" -o music.wav --device mps
+
+        kin audio music generate "lofi, rainy night" --model minimax-music3 --lyrics @song.txt
     """
     pass
 
@@ -35,7 +38,8 @@ def music():
 @click.option(
     "--model", "-m",
     default="musicgen:small",
-    help="Model to use (musicgen:small/medium/large, heartmula:3b/7b)"
+    help="Model to use: musicgen:small/medium/large, heartmula:3b/7b, or a ComfyUI model "
+         "(minimax-music3, ace-step:1.5, yue2, stable-audio3, comfyui:<blueprint name>)"
 )
 @click.option(
     "--tags",
@@ -45,8 +49,31 @@ def music():
 @click.option(
     "--duration", "-d",
     type=int,
-    default=10,
-    help="Duration in seconds (5-30 for MusicGen, up to 240 for HeartMuLa)"
+    default=None,
+    help="Duration in seconds (MusicGen 5-30, default 10; HeartMuLa up to 240; "
+         "ComfyUI models: the blueprint's default)"
+)
+@click.option(
+    "--lyrics", "-l",
+    default=None,
+    help="Lyrics, or @path to read them from a file (MiniMax Music 3, YuE2, ACE-Step)."
+)
+@click.option("--seed", type=int, default=None, help="Seed for reproducible results.")
+@click.option(
+    "--comfyui-url",
+    default=None,
+    help="ComfyUI address for ComfyUI models (default $LOCALKIN_COMFYUI_URL or http://localhost:8188)."
+)
+@click.option(
+    "--backend",
+    type=click.Choice(["auto", "mlx", "comfyui"]),
+    default="auto",
+    help="For models with both: mlx (fast on Apple Silicon) or comfyui. auto picks mlx when available."
+)
+@click.option(
+    "--param", "params",
+    multiple=True,
+    help="Set any blueprint input directly, e.g. --param cfg_scale=2.0 (ComfyUI models)."
 )
 @click.option(
     "--output", "-o",
@@ -79,7 +106,12 @@ def generate(
     prompt: str,
     model: str,
     tags: Optional[str],
-    duration: int,
+    duration: Optional[int],
+    lyrics: Optional[str],
+    seed: Optional[int],
+    comfyui_url: Optional[str],
+    backend: str,
+    params: tuple,
     output: Optional[str],
     device: str,
     temperature: float,
@@ -102,6 +134,9 @@ def generate(
         kin audio music generate "happy wedding" --tags "piano,romantic,wedding" --model heartmula:3b --duration 30
 
         kin audio music generate "ambient" -o output.wav --device mps
+
+        # Through ComfyUI (weights installed there)
+        kin audio music generate "欢快的流行，女声" --model minimax-music3 --lyrics @lyrics.txt -o song.flac
     """
     if verbose:
         print_header("Music Generation")
@@ -115,6 +150,12 @@ def generate(
     try:
         from ...core.types import ModelConfig, ModelType
         from ...music import MusicGenStrategy, HeartMuLaStrategy
+        from ...music.comfyui_strategy import ComfyUIMusicStrategy, is_comfyui_model
+        from ...music.mlx_music_strategy import MLXMusicStrategy, mlx_music_available
+
+        if lyrics and lyrics.startswith("@"):
+            with open(os.path.expanduser(lyrics[1:]), encoding="utf-8") as f:
+                lyrics = f.read()
 
         # Create model config
         config = ModelConfig(
@@ -124,7 +165,16 @@ def generate(
         )
 
         # Select engine based on model name
-        if model.startswith("heartmula") or model.startswith("heart"):
+        use_mlx = backend == "mlx" or (backend == "auto" and mlx_music_available(model))
+        if use_mlx:
+            if verbose:
+                print_info("Using mlx-audio")
+            engine = MLXMusicStrategy()
+        elif is_comfyui_model(model):
+            if verbose:
+                print_info(f"Using ComfyUI at {comfyui_url or 'default address'}")
+            engine = ComfyUIMusicStrategy(comfyui_url)
+        elif model.startswith("heartmula") or model.startswith("heart"):
             if verbose:
                 print_info("Using HeartMuLa engine (multilingual, supports tags)")
             engine = HeartMuLaStrategy()
@@ -139,7 +189,8 @@ def generate(
 
         success = engine.load(config, device=device)
         if not success:
-            print_error(f"Failed to load model: {model}")
+            reason = getattr(engine, "load_error", None)
+            print_error(f"Failed to load model: {model}" + (f" — {reason}" if reason else ""))
             return
 
         if verbose:
@@ -148,17 +199,32 @@ def generate(
         start_time = time.time()
 
         # Generate with appropriate parameters for each engine
-        if isinstance(engine, HeartMuLaStrategy):
+        if isinstance(engine, MLXMusicStrategy):
+            print_info("Generating with mlx-audio; a full song takes a while...")
+            result = engine.generate(prompt, duration=duration, lyrics=lyrics, seed=seed, tags=tags)
+        elif isinstance(engine, ComfyUIMusicStrategy):
+            extra = {}
+            for item in params:
+                key, _, value = item.partition("=")
+                try:
+                    extra[key] = json.loads(value)
+                except ValueError:
+                    extra[key] = value
+            print_info(f"Queued on ComfyUI ({engine.url}); a full song can take a few minutes...")
+            result = engine.generate(
+                prompt, duration=duration, lyrics=lyrics, seed=seed, tags=tags, params=extra
+            )
+        elif isinstance(engine, HeartMuLaStrategy):
             result = engine.generate(
                 prompt,
-                duration=duration,
+                duration=duration or 10,
                 tags=tags,
                 temperature=temperature
             )
         else:
             result = engine.generate(
                 prompt,
-                duration=duration,
+                duration=duration or 10,
                 temperature=temperature
             )
 
@@ -206,73 +272,64 @@ def models_cmd(verbose: bool):
 
     Shows memory requirements and supported durations.
     """
-    print_header("Music Generation Models")
+    import importlib.util
+    from types import SimpleNamespace
+
+    from ..utils.output import print_model_table
+    from ...music import MusicGenStrategy, HeartMuLaStrategy
+    from ...music.comfyui_strategy import MODELS as COMFY_MODELS, comfyui_url, list_audio_blueprints
+    from ...music.mlx_music_strategy import mlx_music_available
+
+    def row(name, engine, status, description):
+        return SimpleNamespace(name=name, type="music", engine=engine, status=status, description=description)
+
+    has = lambda pkg: importlib.util.find_spec(pkg) is not None
+    rows = []
+    for size, req in MusicGenStrategy.get_model_requirements().items():
+        rows.append(row(f"musicgen:{size}", "transformers", "ready" if has("transformers") else "install",
+                        f"MusicGen {size} - instrumental, 5-30s, {req['vram_gb']}GB"))
+    for size, req in HeartMuLaStrategy.get_model_requirements().items():
+        rows.append(row(f"heartmula:{size}", "heartmula", "ready" if has("heartlib") else "install",
+                        f"HeartMuLa {size} - songs with zh/en lyrics, {req['vram_gb']}GB"))
 
     try:
-        from ...music import MusicGenStrategy, HeartMuLaStrategy
+        blueprints = {m["model"]: m for m in list_audio_blueprints()}
+    except Exception:
+        blueprints = None
 
-        print("\n" + "=" * 80)
-        print("🎵 MUSICGEN (Meta) - General Purpose Music Generation")
-        print("=" * 80)
+    mlx_ok = mlx_music_available("minimax-music3")
+    comfy_minimax = (blueprints or {}).get("minimax-music3")
+    status = "ready" if mlx_ok or (comfy_minimax and comfy_minimax["ready"]) else \
+        ("offline" if blueprints is None else "weights")
+    rows.append(row("minimax-music3", "mlx-audio" if mlx_ok else "comfyui", status,
+                    "MiniMax Music 3 - full songs with lyrics"))
 
-        sizes = MusicGenStrategy.get_model_sizes()
-        requirements = MusicGenStrategy.get_model_requirements()
-        durations = MusicGenStrategy.get_supported_durations()
+    if blueprints is None:
+        for name in COMFY_MODELS:
+            if name != "minimax-music3":
+                rows.append(row(name, "comfyui", "offline", COMFY_MODELS[name]))
+    else:
+        for name, m in blueprints.items():
+            if name == "minimax-music3":
+                continue
+            description = m["blueprint"] if m["ready"] else "needs " + ", ".join(m["missing"])
+            rows.append(row(name, "comfyui", "ready" if m["ready"] else "weights", description))
 
-        for size in sizes:
-            model_id = f"facebook/musicgen-{size}"
-            req = requirements[size]
-            print(f"\n  musicgen:{size}")
-            print(f"    Model ID: {model_id}")
-            print(f"    VRAM: {req['vram_gb']}GB | RAM: {req['ram_gb']}GB | Disk: {req['disk_gb']}GB")
+    print("\n🎵 Music Generation Models:")
+    print_model_table(rows, status_of=lambda r: r.status)
+    print(f"\nComfyUI: {comfyui_url()}" + ("  (unreachable — set LOCALKIN_COMFYUI_URL)" if blueprints is None else ""))
 
-        print(f"\n  Supported Durations: {', '.join(map(str, durations))} seconds")
-        print("  Example: kin audio music generate 'calm piano' --model musicgen:small")
-
-        print("\n" + "=" * 80)
-        print("🎼 HEARTMULA (Open Source) - Multilingual, Tag-Based Control")
-        print("=" * 80)
-
-        sizes = HeartMuLaStrategy.get_model_sizes()
-        requirements = HeartMuLaStrategy.get_model_requirements()
-        durations = HeartMuLaStrategy.get_supported_durations()
-        tags = HeartMuLaStrategy.get_available_tags()
-
-        for size in sizes:
-            req = requirements[size]
-            print(f"\n  heartmula:{size}")
-            print(f"    VRAM: {req['vram_gb']}GB | RAM: {req['ram_gb']}GB | Disk: {req['disk_gb']}GB")
-            print(f"    {req['description']}")
-
-        print(f"\n  Supported Durations: {', '.join(map(str, durations))} seconds")
-        print(f"\n  Supported Languages: English, Chinese (中文), Japanese, Korean, Spanish")
-        print(f"\n  Available Tags (examples):")
-        # Print tags in columns
-        tag_cols = 4
-        for i in range(0, len(tags), tag_cols):
-            tag_chunk = tags[i:i+tag_cols]
-            print(f"    {', '.join(tag_chunk)}")
-
-        print("\n  Examples:")
-        print("    # Chinese lyrics")
-        print("    kin audio music generate '在月光下弹钢琴' --model heartmula:3b")
-        print("\n    # With style tags")
-        print("    kin audio music generate 'happy music' --model heartmula:3b \\")
-        print("      --tags 'piano,romantic,wedding' --duration 30")
-        print("\n    # English lyrics")
-        print("    kin audio music generate 'orchestral masterpiece' --model heartmula:3b")
-
-        if verbose:
-            print("\n" + "=" * 80)
-            print("💡 Recommendation")
-            print("=" * 80)
-            print("  • HeartMuLa 3B: Recommended for most users (fast, good quality)")
-            print("  • HeartMuLa 7B: Better quality, requires more VRAM")
-            print("  • MusicGen Small: Quick generation on limited hardware")
-            print("  • MusicGen Medium: Balance of quality and speed")
-
-    except Exception as e:
-        print_error(f"Failed to get models: {e}")
+    if verbose:
+        print("\nExamples:")
+        print("  kin audio music generate 'calm piano melody' --model musicgen:small")
+        print("  kin audio music generate '在月光下弹钢琴' --model heartmula:3b --tags 'piano,romantic'")
+        print("  kin audio music generate '中文流行，女声' --model minimax-music3 --lyrics @song.txt --duration 60")
+        print("  kin audio music generate 'rain ambience' --model stable-audio3")
+        print("\nHeartMuLa tags: " + ", ".join(HeartMuLaStrategy.get_available_tags()))
+        if blueprints:
+            print("\nComfyUI blueprint inputs (set with --param name=value):")
+            for name, m in blueprints.items():
+                print(f"  {name:<22} {', '.join(m['inputs'])}")
 
 
 def _play_audio(audio_path: str):

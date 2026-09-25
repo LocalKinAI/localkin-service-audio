@@ -94,12 +94,18 @@ def _get_engine_status(engine: str) -> str:
 _STATUS_LABELS = {
     "ready": "✅ Ready",
     "install": "📦 Not installed",
+    "weights": "📦 Needs weights",
+    "offline": "⛔ Unreachable",
     "planned": "🔮 Planned",
 }
 
 
-def print_model_table(models: list, show_status: bool = True):
-    """Print a formatted table of models."""
+def print_model_table(models: list, show_status: bool = True, status_of=None):
+    """Print a formatted table of models.
+
+    ``status_of(model)`` overrides the status, for models whose readiness
+    isn't just "is the engine's package installed" (music on ComfyUI).
+    """
     if not models:
         print_warning("No models found.")
         return
@@ -121,7 +127,7 @@ def print_model_table(models: list, show_status: bool = True):
             model_type = model_type.value
         engine = getattr(model, 'engine', 'N/A')
         description = getattr(model, 'description', 'No description')[:40]
-        status = _get_engine_status(engine)
+        status = status_of(model) if status_of else _get_engine_status(engine)
         counts[status] = counts.get(status, 0) + 1
         label = _STATUS_LABELS.get(status, status)
 
@@ -132,6 +138,10 @@ def print_model_table(models: list, show_status: bool = True):
         parts.append(f"{counts['ready']} ready")
     if counts["install"]:
         parts.append(f"{counts['install']} need install")
+    if counts.get("weights"):
+        parts.append(f"{counts['weights']} need weights")
+    if counts.get("offline"):
+        parts.append(f"{counts['offline']} unreachable")
     if counts["planned"]:
         parts.append(f"{counts['planned']} planned")
     print(f"\n📊 Total: {len(models)} models ({', '.join(parts)})")
