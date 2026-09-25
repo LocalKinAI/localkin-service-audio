@@ -6,6 +6,12 @@
 
 **Local Voice AI Platform** - Speech-to-Text and Text-to-Speech with Chinese language support, voice cloning, and Claude integration via MCP.
 
+## What's New in v2.1.1
+
+- **Songs with lyrics**: `kin audio music generate --model minimax-music3 --lyrics @song.txt` — MiniMax Music 3 on MLX (29 s of song in about 3 minutes on an M3 Ultra).
+- **Music from ComfyUI**: ACE-Step 1.5, YuE2, Stable Audio 3 — or any audio blueprint ComfyUI has — run through a local or remote ComfyUI with the weights already installed there.
+- `kin audio music models` shows the same table as `kin audio models`, with whether each model's weights are installed.
+
 ## What's New in v2.1.0
 
 - **50 current models, one name each, on any machine.** Qwen3-ASR, Fun-ASR-Nano, FireRedASR2, Parakeet, Nemotron, VibeVoice-ASR; Qwen3-TTS, VoxCPM2, CosyVoice3, IndexTTS-2, Fish Audio S2 Pro, Chatterbox and more — picked by Hugging Face downloads, likes and trending. On a Mac a model runs on [MLX](https://github.com/Blaizzy/mlx-audio) (`[mlx]` extra); on CUDA or CPU it runs in its own environment, built automatically the first time.
@@ -232,10 +238,19 @@ kin audio music generate "在月光下弹钢琴" --model heartmula:3b
 kin audio music generate "happy wedding day" --tags "piano,romantic,wedding" --model heartmula:3b --duration 30
 kin audio music generate "春天来了，鸟儿在唱歌" --tags "acoustic,happy,upbeat" -o spring.wav
 
-# List music models and requirements
+# MiniMax Music 3 — full songs with lyrics (MLX on Apple Silicon, else ComfyUI)
+kin audio music generate "中文流行抒情，女声，钢琴" --model minimax-music3 --lyrics @song.txt --duration 60 -o song.flac
+
+# Anything ComfyUI has as an audio blueprint: ACE-Step 1.5, YuE2, Stable Audio 3
+kin audio music generate "cinematic rain ambience" --model stable-audio3 --comfyui-url http://box:8188
+kin audio music generate "..." --model "comfyui:Text to Music (YuE2)" --param cfg_scale=2.0
+
+# List music models and requirements (includes ComfyUI's, with whether the weights are installed)
 kin audio music models
 kin audio music models --verbose
 ```
+
+**ComfyUI models** run the blueprint ComfyUI ships for them, on whatever machine runs ComfyUI (`--comfyui-url` or `LOCALKIN_COMFYUI_URL`, default `http://localhost:8188`), using the weights already installed there. `--lyrics` takes text or `@file`; `--param name=value` sets any blueprint input. On Apple Silicon, `minimax-music3` defaults to mlx-audio (`--backend mlx`): through ComfyUI on a Mac its text encoder crawls at several seconds per step.
 
 **HeartMuLa style tags:** `piano`, `acoustic`, `electric`, `synthesizer`, `happy`, `sad`, `romantic`, `calm`, `upbeat`, `wedding`, `ambient`, `orchestral`, `rock`, `pop`, `jazz`, `folk`, `classical`, `cinematic`
 

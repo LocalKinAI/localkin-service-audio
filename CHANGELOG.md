@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-09-24
+
+### Added — music through ComfyUI and MLX
+
+- **`kin audio music generate --model minimax-music3|ace-step:1.5|yue2|stable-audio3`**
+  runs the audio blueprints ComfyUI ships, on a local or remote ComfyUI
+  (`--comfyui-url`, `LOCALKIN_COMFYUI_URL`), reusing the weights installed
+  there. The blueprint — a UI subgraph that only ComfyUI's front end could run
+  — is converted to an API graph using ComfyUI's own `/object_info`, so
+  `comfyui:<any blueprint name>` works too. Missing model files are named
+  before anything is queued; an interrupted run says so.
+- **`minimax-music3` on MLX** (`mlx-community/MiniMax-Music3-mxfp8`),
+  the default on Apple Silicon: 29 s of song in 188 s on a Mac Studio M3
+  Ultra. Through ComfyUI on the same machine, the model's int8 text encoder
+  ran its autoregressive stage at 3–9 s per step — about an hour for 30
+  seconds of music.
+- `--lyrics` (text or `@file`), `--seed`, `--param name=value`,
+  `--backend auto|mlx|comfyui`; `--duration` now defaults to each model's own.
+  `kin audio music models` prints the same table as `kin audio models`,
+  including ComfyUI's audio blueprints and whether their weights are
+  installed. Disabled dead-end nodes in a blueprint (a bypassed preview) are
+  dropped rather than refused.
+
 ## [2.1.0] - 2026-09-23
 
 50 current open models — the ones people actually download and star — under
