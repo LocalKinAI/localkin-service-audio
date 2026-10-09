@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — `/synthesize` clones a voice
+
+- **`reference_audio`** (a few seconds of someone talking, as base64 WAV or a
+  path on the server's machine) and **`reference_text`** (what it says) on
+  `/synthesize`: a voice-cloning model (`kin audio serve qwen3-tts:1.7b-base`)
+  says the text in that voice, in any language it speaks. A model that cannot
+  clone answers 400 instead of ignoring the recording; a base64 recording is
+  written to a temporary file and removed after use. KinClaw's 说话视频 and
+  OpenMontage's `video_translate` use it, served on its own port (8103) beside
+  the voice-design narrator.
+
 ## [2.1.1] - 2026-09-24
 
 ### Added — music through ComfyUI and MLX

@@ -157,6 +157,24 @@ class TTSRequest(BaseModel):
     # Style/emotion instruction ("用开心的语气") or, for voice-design models,
     # a description of the voice. Ignored by models that don't take one.
     instruct: Optional[str] = None
+    # A voice to clone, for the models that can (qwen3-tts:*-base, ...): a
+    # few seconds of it as base64 WAV, or a path on this machine, and what
+    # it says — the models that read it along clone far closer with it.
+    reference_audio: Optional[str] = None
+    reference_text: Optional[str] = None
+
+
+def _reference_file(value: str):
+    """The voice to clone as a file: a path on this machine as it is, or a
+    base64 recording written to a temporary WAV, removed after use (True)."""
+    candidate = os.path.expanduser(value)
+    if len(value) < 4096 and os.path.isfile(candidate):
+        return candidate, False
+    import base64
+    handle = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+    handle.write(base64.b64decode(value))
+    handle.close()
+    return handle.name, True
 
 class TTSResponse(BaseModel):
     audio_path: str
@@ -1042,12 +1060,27 @@ def create_app(model_name: str, emotion_model: Optional[str] = None, preload: bo
                             (("language", request.language), ("instruct", request.instruct))
                             if v
                         }
-                        result = model_data["strategy"].synthesize(
-                            request.text,
-                            voice=request.speaker,
-                            speed=speed,
-                            **extra,
-                        )
+                        strategy = model_data["strategy"]
+                        config = getattr(strategy, "model_config", None)
+                        if request.reference_audio and not (config and config.supports_voice_cloning):
+                            raise HTTPException(status_code=400,
+                                                detail=f"{model_name} does not clone voices; serve a voice-cloning model (qwen3-tts:1.7b-base)")
+                        reference = _reference_file(request.reference_audio) if request.reference_audio else None
+                        try:
+                            if reference:
+                                result = strategy.clone_voice(reference[0], request.text,
+                                                              reference_text=request.reference_text,
+                                                              speed=speed, **extra)
+                            else:
+                                result = strategy.synthesize(
+                                    request.text,
+                                    voice=request.speaker,
+                                    speed=speed,
+                                    **extra,
+                                )
+                        finally:
+                            if reference and reference[1]:
+                                os.unlink(reference[0])
                         sf.write(output_path, result.audio, result.sample_rate)
 
                         # Read the audio file and return it directly
