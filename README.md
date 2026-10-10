@@ -250,7 +250,7 @@ kin audio music models
 kin audio music models --verbose
 ```
 
-**ComfyUI models** run the blueprint ComfyUI ships for them, on whatever machine runs ComfyUI (`--comfyui-url` or `LOCALKIN_COMFYUI_URL`, default `http://localhost:8188`), using the weights already installed there. `--lyrics` takes text or `@file`; `--param name=value` sets any blueprint input. On Apple Silicon, `minimax-music3` defaults to mlx-audio (`--backend mlx`): through ComfyUI on a Mac its text encoder crawls at several seconds per step.
+**ComfyUI models** run the blueprint ComfyUI ships for them, on whatever machine runs ComfyUI (`--comfyui-url` or `LOCALKIN_COMFYUI_URL`, default `http://localhost:8188`), using the weights already installed there. `--lyrics` takes text or `@file`; `--param name=value` sets any blueprint input. On Apple Silicon, `minimax-music3` defaults to mlx-audio (`--backend mlx`): through ComfyUI on a Mac its text encoder runs on the CPU, at several seconds per step.
 
 **HeartMuLa style tags:** `piano`, `acoustic`, `electric`, `synthesizer`, `happy`, `sad`, `romantic`, `calm`, `upbeat`, `wedding`, `ambient`, `orchestral`, `rock`, `pop`, `jazz`, `folk`, `classical`, `cinematic`
 

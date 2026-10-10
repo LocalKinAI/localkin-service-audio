@@ -31,9 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   before anything is queued; an interrupted run says so.
 - **`minimax-music3` on MLX** (`mlx-community/MiniMax-Music3-mxfp8`),
   the default on Apple Silicon: 29 s of song in 188 s on a Mac Studio M3
-  Ultra. Through ComfyUI on the same machine, the model's int8 text encoder
-  ran its autoregressive stage at 3–9 s per step — about an hour for 30
-  seconds of music.
+  Ultra. Through ComfyUI on the same machine, the model's text encoder ran
+  on the CPU — where ComfyUI puts every text encoder on a Mac, and its int8
+  weights can't use the Apple GPU anyway — and its autoregressive stage took
+  3–9 s per step: about an hour for 30 seconds of music.
 - `--lyrics` (text or `@file`), `--seed`, `--param name=value`,
   `--backend auto|mlx|comfyui`; `--duration` now defaults to each model's own.
   `kin audio music models` prints the same table as `kin audio models`,

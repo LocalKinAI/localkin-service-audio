@@ -1,10 +1,11 @@
 """
 Music with mlx-audio on Apple Silicon (MiniMax Music 3).
 
-Much faster on a Mac than the same model through ComfyUI: there the text
-encoder ships int8-"convrot" weights built for CUDA, and on MPS its
-autoregressive stage ran at 3-9 s per step — about an hour for a 30-second
-song. mlx-audio runs it natively.
+Much faster on a Mac than the same model through ComfyUI, which puts every
+text encoder on the CPU on Apple Silicon (this one's int8 "convrot" weights
+couldn't use the Apple GPU anyway: it has no int8 matmul). There the
+encoder's autoregressive stage ran at 3-9 s per step — about an hour for a
+30-second song. mlx-audio runs the whole model on the GPU.
 """
 import time
 from typing import Any, Dict, Optional
