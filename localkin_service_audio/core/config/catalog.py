@@ -92,6 +92,12 @@ STT: List[Dict[str, Any]] = [
            ["chinese", "cantonese"], min_ram_gb=3,
            mlx=mlx("mlx-community/GLM-ASR-Nano-2512-8bit"),
            torch=torch("transformers_asr", "zai-org/GLM-ASR-Nano-2512")),
+    # No mlx backend: mlx-audio doesn't include Audio8 yet, and the community
+    # MLX port runs model code shipped inside its own repo.
+    _entry("audio8-asr:infinite", ["zh", "en"],
+           "Audio8 ASR Infinite 4B - streaming zh/en, AISHELL-1 CER 1.75 at 480 ms delay (CUDA/CPU/MPS)",
+           ["chinese", "streaming", "low-latency"], ["streaming"], min_ram_gb=10,
+           torch=torch("audio8_asr", "Edge0/Audio8-ASR-Infinite")),
     _entry("confucius4:r2t2", ["zh", "en"],
            "Confucius4-R2T2 - NetEase Youdao's Qwen3-ASR-based recognizer (Apple Silicon only)",
            ["chinese", "education"], min_ram_gb=4,
@@ -212,6 +218,14 @@ TTS: List[Dict[str, Any]] = [
            "Fish Audio S2 Pro - inline emotion tags, voice cloning (Apple Silicon only)",
            ["chinese", "multilingual", "voice-cloning", "quality"], ["voice_cloning", "emotion"], min_ram_gb=8,
            mlx=mlx("mlx-community/fish-audio-s2-pro-8bit")),
+    # No preset voices: a plain request gets the bundled reference voice.
+    # max_tokens: 512 frames (~24 s) by default; the model trims it to what
+    # its 2048-position context leaves.
+    _entry("audio8-tts:0.6b", ["zh", "yue", "en", "ja", "ko", "de", "fr", "es", "it", "nl", "pl"],
+           "Audio8 TTS 0.6B - Mandarin and Cantonese, zero-shot cloning, 44.1 kHz (Apple Silicon only)",
+           ["chinese", "cantonese", "multilingual", "voice-cloning"], ["voice_cloning"], min_ram_gb=3,
+           mlx=mlx("mlx-community/Audio8-TTS-Preview-0.6b-bf16", needs_reference=True,
+                   defaults={"max_tokens": 2048})),
     _entry("spark-tts:0.5b", ["zh", "en"],
            "Spark-TTS 0.5B - gender and pitch control, voice cloning (Apple Silicon only)",
            ["chinese", "voice-cloning"], ["voice_cloning"], min_ram_gb=3,
@@ -259,6 +273,15 @@ TTS: List[Dict[str, Any]] = [
            ["multilingual", "voice-cloning"], ["voice_cloning"], min_ram_gb=3,
            mlx=mlx("mlx-community/OmniVoice-bf16", lang_arg="language", lang_map=_QWEN_LANG),
            torch=torch("omnivoice", "k2-fsa/OmniVoice", needs_reference=True)),
+    # Without a reference it improvises a new voice each call, so plain
+    # requests get the bundled one. The repo's old name on purpose (Hugging
+    # Face redirects it): mlx-audio finds the architecture from the name, and
+    # "higgs-tts-3-4b" doesn't spell higgs_audio_v3.
+    _entry("higgs-audio:v3", ["zh", "en", "ja", "ko", "de", "fr", "es", "it", "pt", "ru", "ar", "hi"],
+           "Higgs TTS 3 4B - Boson AI voice-chat TTS, inline emotion/pause/sound tags, 100+ languages (Apple Silicon only)",
+           ["multilingual", "expressive", "conversational", "voice-cloning"], ["voice_cloning", "emotion"],
+           min_ram_gb=12,
+           mlx=mlx("bosonai/higgs-audio-v3-tts-4b", needs_reference=True)),
     _entry("higgs-audio:v2", ["en", "zh", "ko", "de", "es"],
            "Higgs Audio v2 3B - Boson AI expressive TTS, multi-speaker dialogue",
            ["multilingual", "expressive", "voice-cloning"], ["voice_cloning", "emotion"], min_ram_gb=8,

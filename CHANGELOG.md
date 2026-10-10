@@ -18,6 +18,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   OpenMontage's `video_translate` use it, served on its own port (8103) beside
   the voice-design narrator.
 
+### Added — three models
+
+- **`higgs-audio:v3`**: Higgs TTS 3 (Boson AI, 4B), made for voice chat.
+  Inline tags control emotion, pauses and sounds; it covers 100+ languages
+  and clones voices. Apple Silicon (mlx-audio).
+- **`audio8-tts:0.6b`**: Audio8 TTS Preview 0.6B. It speaks Mandarin,
+  Cantonese and nine more languages, clones voices, and outputs 44.1 kHz.
+  Apple Silicon (mlx-audio). Neither TTS model has preset voices, so a plain
+  request gets the bundled reference voice.
+- **`audio8-asr:infinite`**: Audio8 ASR Infinite (Edge0, 4B), streaming
+  Chinese/English recognition.
+  - It runs through its official package in its own environment (torch 2.13,
+    transformers 5.13) on CUDA, CPU or MPS.
+  - Without a language it transcribes as Chinese.
+  - No MLX backend yet: mlx-audio doesn't include the model, and the
+    community MLX port loads model code shipped inside its own repo.
+
+Measured on the Mac Studio with the 2.1.0 benchmark (the same FLEURS
+slices and five Chinese sentences). Speed is processing time divided by
+audio length.
+
+| Model | Result | Speed |
+|---|---|---|
+| `higgs-audio:v3` | all five sentences word-perfect | 0.39 |
+| `audio8-tts:0.6b` | all five sentences word-perfect, 44.1 kHz | 0.43 |
+| `audio8-asr:infinite` (torch on MPS) | Mandarin CER 10.9, English WER 15.3 when told `en`, no Cantonese | 0.69 |
+
+On the same run `qwen3-tts:0.6b` scored word-perfect at 0.19, and
+`qwen3-asr:1.7b` scored 9.4 Mandarin and 3.9 English. Both stay the
+recommendations. Audio8 ASR's strength is streaming with end-of-turn
+detection, which needs a streaming interface the server doesn't have yet.
+
 ## [2.1.1] - 2026-09-24
 
 ### Added — music through ComfyUI and MLX

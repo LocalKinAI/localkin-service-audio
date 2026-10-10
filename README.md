@@ -30,8 +30,8 @@ See [CHANGELOG.md](CHANGELOG.md) for full history.
 
 ## Features
 
-- **STT**: Qwen3-ASR, Fun-ASR-Nano, FireRedASR2, GLM-ASR, Parakeet, Canary, Nemotron, Voxtral Realtime, VibeVoice-ASR, Whisper (openai / faster-whisper / whisper.cpp / MLX), SenseVoice, Paraformer, Moonshine — [full list](#current-models-catalog)
-- **TTS**: Qwen3-TTS, VoxCPM2, CosyVoice3, IndexTTS-2, Fish Audio S2 Pro, Chatterbox, Spark-TTS, OmniVoice, CSM, Dia, Higgs Audio, Kokoro, ChatTTS, F5-TTS and more
+- **STT**: Qwen3-ASR, Fun-ASR-Nano, FireRedASR2, GLM-ASR, Audio8 ASR, Parakeet, Canary, Nemotron, Voxtral Realtime, VibeVoice-ASR, Whisper (openai / faster-whisper / whisper.cpp / MLX), SenseVoice, Paraformer, Moonshine — [full list](#current-models-catalog)
+- **TTS**: Qwen3-TTS, VoxCPM2, CosyVoice3, IndexTTS-2, Fish Audio S2 Pro, Audio8 TTS, Chatterbox, Spark-TTS, OmniVoice, CSM, Dia, Higgs Audio, Kokoro, ChatTTS, F5-TTS and more
 - **Any platform**: one model name everywhere — MLX on Apple Silicon, torch on CUDA/CPU in auto-built isolated environments
 - **Music Generation**: HeartMuLa (multilingual, tag-based), MusicGen
 - **Voice Activity Detection**: Engine-agnostic `/vad` endpoint via TEN-VAD; or built-in Silero VAD inside `faster-whisper`
@@ -387,7 +387,7 @@ kin web --port 5000
 
 ## Supported Models
 
-`kin audio models` shows all 76 models with real-time availability status:
+`kin audio models` shows all 79 models with real-time availability status:
 - **✅ Ready** — engine installed, usable now
 - **📦 Not installed** — strategy code exists, just needs `pip install`
 
@@ -404,6 +404,7 @@ Use the same name on any machine. **Mac (MLX)** needs Apple Silicon and the `[ml
 | `fireredasr2:aed` | zh, en | lowest Mandarin CER published (AISHELL-1 0.57), 20+ dialects | ✅ | ✅ |
 | `fun-asr:nano` | zh, en, ja | Tongyi's ASR, 7 Chinese dialects and 26 accents | ✅ | ✅ |
 | `glm-asr:nano` | zh, en, yue | Zhipu's ASR, strong on Cantonese and quiet speech | ✅ | ✅ |
+| `audio8-asr:infinite` | zh, en | streaming zh/en, AISHELL-1 CER 1.75 at 480 ms delay | — | ✅ |
 | `confucius4:r2t2` | zh, en | NetEase Youdao's Qwen3-ASR-based recognizer | ✅ | — |
 | `moss-transcribe-diarize` | zh, en | speaker labels + timestamps | ✅ | — |
 | `whisper-mlx:large-v3-turbo` | en, zh, de, es, fr, ja … | Whisper large-v3-turbo on MLX (elsewhere use faster-whisper:large-v3-turbo) | ✅ | — |
@@ -432,6 +433,7 @@ Use the same name on any machine. **Mac (MLX)** needs Apple Silicon and the `[ml
 | `indextts:2` | zh, en | bilibili's zero-shot TTS with emotion control | — | ✅ |
 | `indextts:2.5` | zh, en | newer IndexTTS, faster and more stable | — | ✅ |
 | `fish-speech:s2-pro` | zh, en, ja, ko, de, fr … | inline emotion tags, voice cloning | ✅ | — |
+| `audio8-tts:0.6b` | zh, yue, en, ja, ko, de … | Mandarin and Cantonese, zero-shot cloning, 44.1 kHz | ✅ | — |
 | `spark-tts:0.5b` | zh, en | gender and pitch control, voice cloning | ✅ | — |
 | `longcat-audiodit:1b` | zh, en | Meituan diffusion TTS, zh CER 1.18 | ✅ | — |
 | `breeze-tts:2` | zh, en | Taiwanese Mandarin + English, voice design | ✅ | — |
@@ -442,6 +444,7 @@ Use the same name on any machine. **Mac (MLX)** needs Apple Silicon and the `[ml
 | `chatterbox:multilingual` | en, zh, ja, ko, de, fr … | Resemble AI, 23 languages, emotion exaggeration control | ✅ | ✅ |
 | `chatterbox:turbo` | en | Resemble AI's fast English TTS with paralinguistic tags | ✅ | ✅ |
 | `omnivoice` | zh, en, ja, ko, de, fr … | k2-fsa zero-shot TTS for 600+ languages, nonverbal tags | ✅ | ✅ |
+| `higgs-audio:v3` | zh, en, ja, ko, de, fr … | Boson AI voice-chat TTS, inline emotion/pause/sound tags, 100+ languages | ✅ | — |
 | `higgs-audio:v2` | en, zh, ko, de, es | Boson AI expressive TTS, multi-speaker dialogue | ✅ | ✅ |
 | `outetts:1b` | en, zh, ja, ko, de, fr … | Llama-based multilingual TTS | ✅ | — |
 | `voxtral-tts:4b` | en, fr, es, de, it, pt … | Mistral, 20 preset voices, no Chinese | ✅ | — |
@@ -455,7 +458,7 @@ Use the same name on any machine. **Mac (MLX)** needs Apple Silicon and the `[ml
 | `pocket-tts` | en, fr, de, pt, it, es | 100M, real-time on CPU, voice cloning | ✅ | — |
 | `irodori-tts` | ja | Japanese TTS | ✅ | — |
 
-The torch backends follow each project's documented API. Qwen3-ASR, Qwen3-TTS (MPS) and CosyVoice3 (CPU) have run end to end on the torch path; CUDA runs are awaiting reports — issues welcome. [Benchmark results](CHANGELOG.md#210---2026-09-23) cover 8 STT and 9 TTS models.
+The torch backends follow each project's documented API. Qwen3-ASR, Qwen3-TTS, Audio8 ASR (MPS) and CosyVoice3 (CPU) have run end to end on the torch path; CUDA runs are awaiting reports — issues welcome. [Benchmark results](CHANGELOG.md#210---2026-09-23) cover 8 STT and 9 TTS models.
 
 ### Built-in engines
 

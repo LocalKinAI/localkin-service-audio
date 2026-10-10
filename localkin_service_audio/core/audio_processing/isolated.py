@@ -2,12 +2,13 @@
 Isolated environments for models whose packages can't share one.
 
 qwen-tts pins transformers 4.57, chatterbox-tts pins torch 2.6 and numpy<2,
-IndexTTS pins torch 2.8, CosyVoice has no package at all and FireRedASR2
-needs Python 3.11 — no single environment satisfies them, and the
-transformers-native ASR families need transformers 5.x while the default
-install stays on 4.x. So each family runs in its own virtualenv, built with
-uv on first use under ~/.localkin-service-audio/envs/<env>, as a worker
-process speaking the JSON-lines protocol in workers/_protocol.py.
+IndexTTS pins torch 2.8, Audio8 ASR pins transformers 5.13, CosyVoice has no
+package at all and FireRedASR2 needs Python 3.11 — no single environment
+satisfies them, and the transformers-native ASR families need transformers
+5.x while the default install stays on 4.x. So each family runs in its own
+virtualenv, built with uv on first use under
+~/.localkin-service-audio/envs/<env>, as a worker process speaking the
+JSON-lines protocol in workers/_protocol.py.
 
 For the user it's still one model name: the first load builds the
 environment (minutes, once), later loads reuse it. Set
@@ -73,6 +74,11 @@ ENVS: Dict[str, Dict[str, Any]] = {
         "packages": ["fireredasr2s @ git+https://github.com/FireRedTeam/FireRedASR2S",
                      "soundfile", "librosa", "huggingface_hub"],
     },
+    "audio8": {
+        "python": "3.11",
+        "packages": ["audio8-asr-infinite @ git+https://github.com/Edge0-AI/Audio8-ASR-Infinite",
+                     "soundfile", "librosa"],
+    },
 }
 
 # worker script -> the environment it runs in
@@ -86,6 +92,7 @@ WORKER_ENVS = {
     "indextts": "indextts",
     "cosyvoice": "cosyvoice",
     "fireredasr2": "fireredasr2",
+    "audio8_asr": "audio8",
 }
 
 _build_lock = threading.Lock()

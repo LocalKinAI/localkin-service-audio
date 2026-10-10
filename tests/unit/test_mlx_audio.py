@@ -289,8 +289,9 @@ def test_tts_caller_language_and_voice_win(fake_mlx):
     assert (call["voice"], call["lang_code"]) == ("uncle_fu", "english")
 
 
-def test_tts_clone_only_model_gets_bundled_reference(fake_mlx):
-    s = _tts("moss-tts:nano", fake_mlx)
+@pytest.mark.parametrize("name", ["moss-tts:nano", "higgs-audio:v3", "audio8-tts:0.6b"])
+def test_tts_clone_only_model_gets_bundled_reference(fake_mlx, name):
+    s = _tts(name, fake_mlx)
     s.synthesize("你好")
     call = fake_mlx["tts"].calls[-1]
     assert "default_zh.wav" in call["ref_audio"]
