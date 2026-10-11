@@ -55,7 +55,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full history.
 - **Voice Activity Detection**: Engine-agnostic `/vad` endpoint via TEN-VAD; or built-in Silero VAD inside `faster-whisper`
 - **Chinese Language Support**: Optimized models for Mandarin, Cantonese, and mixed Chinese-English
 - **Voice Cloning**: Zero-shot voice cloning with F5-TTS and CosyVoice
-- **Agents**: an MCP server (`kin mcp`) for Claude Code, Claude Desktop, Cursor and Codex; an OpenAI-compatible API on one port for agent frameworks; a skill (`kin skill`) for agents that run commands — [setup](#use-with-ai-agents)
+- **Agents**: an MCP server (`kin mcp`) for Claude Code, Claude Desktop, Cursor, Codex, VS Code and other MCP clients, on this machine or over HTTP for remote ones; an OpenAI-compatible API on one port, with streaming speech and an optional API key; a skill (`kin skill`) for agents that run commands — [setup](#use-with-ai-agents)
 - **WebSocket Streaming**: Real-time transcription and synthesis
 - **REST API**: FastAPI-based server with OpenAPI docs; OpenAI-compatible `/v1/audio/transcriptions` and `/v1/audio/speech`
 - **Subtitle Output**: Direct SRT / WebVTT generation from `/transcribe?response_format=srt|vtt`
@@ -635,6 +635,16 @@ command = "kin"
 args = ["mcp"]
 ```
 
+**Windsurf** (`~/.codeium/windsurf/mcp_config.json`) and **Gemini CLI** (`~/.gemini/settings.json`) take the same `mcpServers` block as Claude Desktop above. **VS Code** (`.vscode/mcp.json`, or *MCP: Open User Configuration*) names it `servers`:
+
+```json
+{
+  "servers": {
+    "localkin-audio": { "type": "stdio", "command": "kin", "args": ["mcp"] }
+  }
+}
+```
+
 To skip installing, let [uv](https://docs.astral.sh/uv/) fetch it: use the command `uvx` with the arguments `["--from", "localkin-service-audio[mcp]", "kin", "mcp"]` (`[mcp,mlx]` on Apple Silicon).
 
 | Tool | What it does |
@@ -659,6 +669,30 @@ Default models:
 - **First use:** a model downloads the first time it's used. Run `kin audio pull qwen3-tts:0.6b` (and the others) beforehand if your client times out on that first call.
 - **Output files:** these go to `~/.localkin-service-audio/outputs/` unless the agent passes `output_path`.
 
+### Remote MCP (agents on other machines or in the cloud)
+
+Run the MCP server over HTTP on the machine with the models:
+
+```bash
+kin mcp --http --host 0.0.0.0 --api-key "$(openssl rand -hex 16)"     # MCP at http://<host>:8765/mcp
+```
+
+Then give your client the URL and the key:
+
+```bash
+claude mcp add --transport http localkin-audio http://192.168.0.21:8765/mcp \
+  --header "Authorization: Bearer YOUR_KEY"
+```
+
+Other clients that support remote MCP take the same URL plus an `Authorization: Bearer YOUR_KEY` header. For example, Cursor uses `{"url": "...", "headers": {...}}` and VS Code uses `"type": "http"`.
+
+How remote mode differs:
+
+- **Audio in:** the server can't see the client's files, so audio comes in as `audio_url` / `reference_url` (http or https) or `audio_base64` / `reference_base64`. Paths only reach files the server produced itself.
+- **Results out:** each result comes back as a `url` to download. Pass `return_base64: true` to get the audio in the reply as well. `output_path` isn't accepted.
+- **Access:** downloads and `/mcp` need the key; `/health` doesn't.
+- **Advertised address:** the server announces its LAN address. Behind a reverse proxy or tunnel, set the address clients actually use with `--public-url https://audio.example.com`.
+
 ### OpenAI-compatible HTTP API (LangChain, LiveKit Agents, Pipecat, Open WebUI, …)
 
 Serve a speech-to-text and a text-to-speech model on one port:
@@ -672,7 +706,7 @@ and point any OpenAI client at it:
 ```python
 from openai import OpenAI
 
-client = OpenAI(base_url="http://localhost:8000/v1", api_key="local")   # any key works
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="local")   # any key, unless the server has --api-key
 with open("question.mp3", "rb") as f:
     text = client.audio.transcriptions.create(model="whisper-1", file=f, language="zh").text
 client.audio.speech.create(model="tts-1", voice="vivian", input="你好！", instructions="用开心的语气",
@@ -690,9 +724,20 @@ client.audio.speech.create(model="tts-1", voice="vivian", input="你好！", ins
 - `speed`.
 - `response_format`: `wav` (the default here), `mp3`, `opus`, `flac` or `pcm`.
 
+**Streaming speech**
+
+`stream_format: "audio"` sends the speech while it's being made, and `"sse"` sends OpenAI's `speech.audio.delta` events. Either works with `response_format` `pcm`, `wav` or `mp3`; `pcm` streams by default, as OpenAI's does. Models that can stream within a sentence (Qwen3-TTS) send audio every 0.6 s of speech; the rest go one sentence at a time. Measured on a Mac Studio, a 23-second reply began after 0.17 s instead of 4.8 s.
+
+```python
+with client.audio.speech.with_streaming_response.create(
+        model="tts-1", voice="vivian", input=long_text, response_format="pcm") as response:
+    for chunk in response.iter_bytes():
+        player.write(chunk)          # 16-bit mono, 24 kHz
+```
+
 **Both endpoints**
 - `/v1/models` lists the two models. The `model` field in a request is ignored; the server's own models always answer.
-- The server listens on 127.0.0.1. To reach it from other machines, add `--host 0.0.0.0`. There is no authentication.
+- The server listens on 127.0.0.1. To reach it from other machines, add `--host 0.0.0.0` together with `--api-key KEY` (or set `LOCALKIN_API_KEY`). Requests then need `Authorization: Bearer KEY`, which is what an OpenAI SDK sends as its `api_key`. `/health` and the docs stay open.
 
 ### Agent skill (Claude Code, OpenClaw, …)
 

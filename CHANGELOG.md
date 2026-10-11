@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — agents on other machines, streaming, access keys
+
+- **Remote MCP.** `kin mcp --http` serves MCP over streamable HTTP (at `/mcp`) for agents on other machines or in the cloud.
+  - Audio comes in as a URL or base64. Results go back as a download URL (`/files/...`) and, on request, as base64.
+  - Paths only reach the server's own results, and `output_path` isn't accepted.
+  - `--public-url` sets the address used in links, for use behind proxies and tunnels.
+  - Tested from another machine with the MCP SDK's client against real models.
+- **Access keys.** `--api-key` (or `LOCALKIN_API_KEY`) on `kin audio serve` and `kin mcp --http` requires the key.
+  - Clients send it as `Authorization: Bearer <key>`, which is what an OpenAI SDK sends as its `api_key`, or as `X-API-Key`.
+  - `/health` and the docs stay open. WebSocket routes are covered too.
+- **Streaming speech.** `/v1/audio/speech` takes OpenAI's `stream_format` (`audio` or `sse`) with pcm, wav or mp3.
+  - pcm streams by default, as OpenAI's does.
+  - Qwen3-TTS on MLX streams within a sentence, a piece every 0.6 s of speech. Other models go one sentence at a time.
+  - On a Mac Studio, a 23-second reply started after 0.17 s instead of 4.8 s.
+- **MCP tool inputs and outputs.** Over stdio as well as HTTP, the tools now also take audio as `audio_url`/`audio_base64` (`reference_url`/`reference_base64` for cloning), and results take `return_base64`.
+- **README** setup for VS Code, Windsurf and Gemini CLI.
+
+### Changed
+
+- **One synthesis at a time per model** in the HTTP server, because streams run in their own thread. Waiting requests wait off the event loop, so the server stays responsive.
+
 ## [2.1.3] - 2026-10-10
 
 Connecting it to an agent now works from a plain `pip install`.

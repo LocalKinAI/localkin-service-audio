@@ -2,7 +2,7 @@
 Base class for Text-to-Speech strategies.
 """
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any, List, Union
+from typing import Optional, Dict, Any, Iterator, List, Union
 import numpy as np
 import time
 
@@ -91,27 +91,20 @@ class TTSStrategy(ABC):
         self,
         text: str,
         voice: Optional[str] = None,
-        chunk_size: int = 4096,
+        speed: float = 1.0,
         **kwargs
-    ):
+    ) -> Iterator[AudioResult]:
         """
-        Synthesize speech as a stream (generator).
+        Speech as it is made, one AudioResult per piece.
 
-        Args:
-            text: Text to synthesize
-            voice: Voice ID to use
-            chunk_size: Size of each audio chunk
-            **kwargs: Additional arguments
-
-        Yields:
-            Audio chunks as numpy arrays
+        This default makes one sentence at a time, so the first piece comes
+        after one sentence's work rather than the whole text's. Strategies
+        whose model streams within a sentence override it.
         """
-        # Default implementation: synthesize all and chunk
-        result = self.synthesize(text, voice=voice, **kwargs)
-        audio = result.audio
+        from ..shared import speech_chunks
 
-        for i in range(0, len(audio), chunk_size):
-            yield audio[i:i + chunk_size]
+        for piece in speech_chunks(text):
+            yield self.synthesize(piece, voice=voice, speed=speed, **kwargs)
 
     def clone_voice(
         self,

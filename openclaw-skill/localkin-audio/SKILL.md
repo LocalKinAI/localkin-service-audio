@@ -82,8 +82,10 @@ curl http://127.0.0.1:8000/v1/audio/speech -H 'Content-Type: application/json' \
 ```
 
 - The API is OpenAI-compatible, with `/synthesize` (`instruct`, `reference_audio`) and `/voices` alongside.
+- Speech can stream: add `"stream_format": "audio"`; `pcm` streams by default.
+- To reach it from other machines, add `--host 0.0.0.0 --api-key KEY`. Clients then send `Authorization: Bearer KEY`.
 - Stop the server when you're done.
-- MCP clients can use `kin mcp` instead, which offers the same tools.
+- MCP clients can use `kin mcp` instead, which offers the same tools. `kin mcp --http` serves them to remote agents.
 
 ## When something fails
 

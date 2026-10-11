@@ -2,16 +2,20 @@
 LocalKin Service Audio API Server for Hugging Face models
 """
 
+import asyncio
+import base64
 import io
 import os
 import tempfile
+import threading
 import logging
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 import json
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Request
-from fastapi.responses import Response, JSONResponse, FileResponse, PlainTextResponse
+from fastapi.responses import Response, JSONResponse, FileResponse, PlainTextResponse, StreamingResponse
+from starlette.concurrency import run_in_threadpool
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -199,13 +203,143 @@ def _encode_speech(wav: bytes, response_format: str) -> Response:
         audio = audio.mean(axis=1)
     fmt, subtype, media = _SPEECH_FORMATS[response_format]
     if response_format == "pcm":
-        pcm = np.clip(_resample(audio, sr, 24000), -1.0, 1.0)
-        return Response(content=(pcm * 32767).astype("<i2").tobytes(), media_type=media)
+        return Response(content=_pcm16(_resample(audio, sr, 24000)), media_type=media)
     if response_format == "opus" and sr not in (8000, 12000, 16000, 24000, 48000):
         audio, sr = _resample(audio, sr, 48000), 48000
     buf = io.BytesIO()
     sf.write(buf, audio, sr, format=fmt, subtype=subtype)
     return Response(content=buf.getvalue(), media_type=media)
+
+
+def _pcm16(audio) -> bytes:
+    import numpy as np
+
+    return (np.clip(audio, -1.0, 1.0) * 32767).astype("<i2").tobytes()
+
+
+def _wav_stream_header(sample_rate: int) -> bytes:
+    """A WAV header for audio of unknown length, as streamed WAV uses."""
+    import struct
+
+    return (b"RIFF" + struct.pack("<I", 0xFFFFFFFF) + b"WAVEfmt "
+            + struct.pack("<IHHIIHH", 16, 1, 1, sample_rate, sample_rate * 2, 2, 16)
+            + b"data" + struct.pack("<I", 0xFFFFFFFF))
+
+
+# Layer III bitrates (kbps) by MPEG-1 / MPEG-2 and 2.5, and sample rates by
+# the header's version bits (3 = MPEG-1, 2 = MPEG-2, 0 = MPEG-2.5).
+_MP3_BITRATES = {1: (0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320),
+                 2: (0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160)}
+_MP3_RATES = {3: (44100, 48000, 32000), 2: (22050, 24000, 16000), 0: (11025, 12000, 8000)}
+
+
+def _mp3_frame_length(header: bytes) -> int:
+    """Bytes in the Layer III frame starting with ``header`` (0 if it isn't one)."""
+    if len(header) < 4 or header[0] != 0xFF or header[1] & 0xE0 != 0xE0 or (header[1] >> 1) & 3 != 1:
+        return 0
+    version, bitrate_i = (header[1] >> 3) & 3, header[2] >> 4
+    rate_i, padding = (header[2] >> 2) & 3, (header[2] >> 1) & 1
+    if version == 1 or bitrate_i in (0, 15) or rate_i == 3:
+        return 0
+    bitrate = _MP3_BITRATES[1 if version == 3 else 2][bitrate_i] * 1000
+    return (144 if version == 3 else 72) * bitrate // _MP3_RATES[version][rate_i] + padding
+
+
+def _mp3_frames(data: bytes) -> bytes:
+    """An encoded MP3 without its ID3 tag and Xing/Info frame. Those give the
+    length of one piece, so decoders stop there; bare frames from pieces
+    encoded one by one join into a single stream."""
+    start = 0
+    if data[:3] == b"ID3":
+        start = 10 + ((data[6] << 21) | (data[7] << 14) | (data[8] << 7) | data[9])
+    length = _mp3_frame_length(data[start:start + 4])
+    if length and (b"Xing" in data[start:start + length] or b"Info" in data[start:start + length]):
+        start += length
+    return data[start:]
+
+
+def _encode_piece(piece: "AudioResult", response_format: str, first: bool) -> bytes:
+    """One streamed piece of speech: pcm as OpenAI sends it (16-bit, 24 kHz),
+    wav as a header then PCM, mp3 as frames that play back to back."""
+    import numpy as np
+    import soundfile as sf
+
+    audio = np.asarray(piece.audio, dtype=np.float32).reshape(-1)
+    sr = int(piece.sample_rate)
+    if response_format == "pcm":
+        return _pcm16(_resample(audio, sr, 24000))
+    if response_format == "wav":
+        return (_wav_stream_header(sr) if first else b"") + _pcm16(audio)
+    buf = io.BytesIO()
+    sf.write(buf, audio, sr, format="MP3")
+    return _mp3_frames(buf.getvalue())
+
+
+_model_locks: Dict[str, threading.Lock] = {}
+_model_locks_guard = threading.Lock()
+
+
+def _model_lock(model_name: str) -> threading.Lock:
+    """One synthesis at a time per model: streams run in their own thread,
+    and models aren't safe to drive from two threads at once."""
+    with _model_locks_guard:
+        return _model_locks.setdefault(model_name, threading.Lock())
+
+
+async def _stream_speech(model_name: str, req: "TTSRequest", response_format: str, stream_format: str):
+    """Speech sent while it's made. ``stream_format`` "audio" sends the bytes
+    as they come; "sse" sends OpenAI's speech.audio.delta events. The first
+    piece is awaited before answering, so a failure is still an HTTP error."""
+    if model_name not in loaded_models:
+        load_tts_model(model_name)
+    strategy = loaded_models[model_name].get("strategy")
+    if strategy is None:
+        raise HTTPException(status_code=400, detail=f"{model_name} can't stream; leave out stream_format")
+    speed = max(0.5, min(2.0, float(req.speed or 1.0)))
+    extra = {k: v for k, v in (("language", req.language), ("instruct", req.instruct)) if v}
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue = asyncio.Queue()
+    stop = threading.Event()
+
+    def produce():
+        try:
+            with _model_lock(model_name):
+                pieces = strategy.synthesize_stream(req.text, voice=req.speaker, speed=speed, **extra)
+                for i, piece in enumerate(pieces):
+                    if stop.is_set():
+                        break
+                    loop.call_soon_threadsafe(queue.put_nowait, _encode_piece(piece, response_format, i == 0))
+        except Exception as e:
+            loop.call_soon_threadsafe(queue.put_nowait, e)
+        finally:
+            loop.call_soon_threadsafe(queue.put_nowait, None)
+
+    loop.run_in_executor(None, produce)
+    first = await queue.get()
+    if first is None or isinstance(first, Exception):
+        stop.set()
+        raise HTTPException(status_code=500, detail=f"Synthesis failed: {first or 'no audio'}")
+
+    async def body():
+        item = first
+        try:
+            while item is not None:
+                if isinstance(item, Exception):
+                    logger.error(f"Streaming synthesis failed midway: {item}")
+                    return
+                if stream_format == "sse":
+                    event = {"type": "speech.audio.delta", "audio": base64.b64encode(item).decode()}
+                    yield f"data: {json.dumps(event)}\n\n".encode()
+                else:
+                    yield item
+                item = await queue.get()
+            if stream_format == "sse":
+                yield b'data: {"type": "speech.audio.done"}\n\n'
+        finally:
+            stop.set()
+
+    media = "text/event-stream" if stream_format == "sse" else _SPEECH_FORMATS[response_format][2]
+    return StreamingResponse(body(), media_type=media)
 
 
 def _as_wav(path: str, background_tasks: BackgroundTasks) -> str:
@@ -1142,6 +1276,10 @@ def create_app(model_name: str, emotion_model: Optional[str] = None, preload: bo
                             raise HTTPException(status_code=400,
                                                 detail=f"{model_name} does not clone voices; serve a voice-cloning model (qwen3-tts:1.7b-base)")
                         reference = _reference_file(request.reference_audio) if request.reference_audio else None
+                        # Waited for off the event loop, so a stream holding
+                        # the model doesn't stall the server meanwhile.
+                        lock = _model_lock(model_name)
+                        await run_in_threadpool(lock.acquire)
                         try:
                             if reference:
                                 result = strategy.clone_voice(reference[0], request.text,
@@ -1155,6 +1293,7 @@ def create_app(model_name: str, emotion_model: Optional[str] = None, preload: bo
                                     **extra,
                                 )
                         finally:
+                            lock.release()
                             if reference and reference[1]:
                                 os.unlink(reference[0])
                         sf.write(output_path, result.audio, result.sample_rate)
@@ -1344,7 +1483,9 @@ def create_app(model_name: str, emotion_model: Optional[str] = None, preload: bo
             model's default voice); ``instructions`` for tone; ``speed``;
             ``response_format``: wav, mp3, opus, flac or pcm. Without one
             the answer is WAV, not OpenAI's mp3, as clients of this endpoint
-            have always received. ``model`` is ignored.
+            have always received. ``stream_format`` "audio" or "sse" sends
+            the speech while it's made (pcm, wav or mp3); pcm streams by
+            default. ``model`` is ignored.
             """
             response_format = str(request.get("response_format") or "wav").lower()
             if response_format not in _SPEECH_FORMATS:
@@ -1358,6 +1499,15 @@ def create_app(model_name: str, emotion_model: Optional[str] = None, preload: bo
                 speed=request.get("speed") or 1.0,
                 instruct=request.get("instructions"),
             )
+            # pcm streams unless told otherwise, as OpenAI's does: it's the
+            # format real-time clients ask for, and has no header to settle.
+            stream_format = request.get("stream_format") or ("audio" if response_format == "pcm" else None)
+            if stream_format:
+                if stream_format not in ("audio", "sse"):
+                    raise HTTPException(status_code=400, detail="stream_format must be audio or sse")
+                if response_format not in ("pcm", "wav", "mp3"):
+                    raise HTTPException(status_code=400, detail="Streaming sends pcm, wav or mp3")
+                return await _stream_speech(model_name, tts_req, response_format, stream_format)
             wav = await synthesize_speech(background_tasks, tts_req)
             return _encode_speech(wav.body, response_format)
 

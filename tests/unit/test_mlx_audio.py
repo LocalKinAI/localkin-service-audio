@@ -478,3 +478,38 @@ def test_voices_endpoint_marks_kokoro_single_language(monkeypatch):
     assert body["multilingual"] is False
     langs = {v["id"]: v["language"] for v in body["voices"]}
     assert langs["zf_xiaoxiao"] == "zh" and langs["af_heart"] == "en"
+
+
+def test_speech_chunks_split_at_sentences():
+    chunks = shared.speech_chunks("你好，欢迎回家。今天外面有点冷，记得多穿一件衣服。好。")
+    assert chunks == ["你好，欢迎回家。", "今天外面有点冷，记得多穿一件衣服。好。"]  # a short end joins the sentence before
+    assert shared.speech_chunks("Hi. Hello there. How are you?") == ["Hi. Hello there.", "How are you?"]
+    long = "很长很长很长很长很长很长很长很长，" * 10
+    assert all(len(c) <= 40 for c in shared.speech_chunks(long, max_chars=40))
+
+
+class FakeStreamingTTSModel(FakeTTSModel):
+    def generate(self, text, voice=None, lang_code=None, ref_audio=None, ref_text=None, verbose=True,
+                 stream=False, streaming_interval=2.0):
+        self.calls.append(dict(text=text, stream=stream, interval=streaming_interval))
+        for _ in range(3 if stream else 1):
+            yield FakeGenResult(audio=np.ones(self.n_samples, dtype=np.float32))
+
+
+def test_stream_uses_the_models_own_streaming(fake_mlx):
+    fake_mlx["tts"] = FakeStreamingTTSModel()
+    s = _tts("qwen3-tts:0.6b", fake_mlx)
+    pieces = list(s.synthesize_stream("你好。今天天气不错。"))
+    assert len(pieces) == 3 and fake_mlx["tts"].calls[-1]["stream"] is True
+    assert fake_mlx["tts"].calls[-1]["interval"] < 2.0
+
+
+def test_stream_goes_sentence_by_sentence_otherwise(fake_mlx):
+    s = _tts("qwen3-tts:0.6b", fake_mlx)  # FakeTTSModel.generate has no `stream`
+    pieces = list(s.synthesize_stream("你好，欢迎回家。今天外面有点冷，记得多穿一件衣服。"))
+    assert [c["text"] for c in fake_mlx["tts"].calls] == ["你好，欢迎回家。", "今天外面有点冷，记得多穿一件衣服。"]
+    assert len(pieces) == 2
+    fake_mlx["tts"] = FakeStreamingTTSModel()
+    s = _tts("qwen3-tts:0.6b", fake_mlx)
+    list(s.synthesize_stream("你好，欢迎回家。今天外面有点冷。", speed=1.5))
+    assert all(c["stream"] is False for c in fake_mlx["tts"].calls)

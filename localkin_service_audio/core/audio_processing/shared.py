@@ -6,6 +6,7 @@ arguments they accept.
 """
 import inspect
 import os
+import re
 import tempfile
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -255,3 +256,36 @@ def readable_wav(path: str) -> Tuple[str, bool]:
     os.close(fd)
     sf.write(out, audio, int(sr))
     return out, True
+
+
+_SENTENCE_END = re.compile(r"(?<=[。！？；!?;…\n])|(?<=\.)(?=\s)")
+_CLAUSE_END = re.compile(r"(?<=[，、,：:])")
+
+
+def _join(a: str, b: str) -> str:
+    return f"{a} {b}" if a[-1:].isascii() else a + b
+
+
+def speech_chunks(text: str, max_chars: int = 120, min_chars: int = 8) -> List[str]:
+    """``text`` cut into sentences for speaking one at a time: fragments
+    shorter than ``min_chars`` join their neighbour, and sentences longer than
+    ``max_chars`` break at commas (or, failing that, anywhere)."""
+    pieces: List[str] = []
+    for sentence in (p.strip() for p in _SENTENCE_END.split(text)):
+        if not sentence:
+            continue
+        if pieces and len(pieces[-1]) < min_chars:
+            pieces[-1] = _join(pieces[-1], sentence)
+        else:
+            pieces.append(sentence)
+    if len(pieces) > 1 and len(pieces[-1]) < min_chars:
+        pieces[-2:] = [_join(pieces[-2], pieces[-1])]
+    out: List[str] = []
+    for piece in pieces:
+        while len(piece) > max_chars:
+            cut = max((m.end() for m in _CLAUSE_END.finditer(piece, 0, max_chars)), default=max_chars)
+            out.append(piece[:cut].strip())
+            piece = piece[cut:].strip()
+        if piece:
+            out.append(piece)
+    return out

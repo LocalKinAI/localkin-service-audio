@@ -45,6 +45,11 @@ def models(monkeypatch):
     return stt, tts
 
 
+def _pieces(tts, n=2, sr=16000):
+    tts.synthesize_stream.side_effect = lambda text, **kw: iter(
+        [AudioResult(audio=np.full(sr // 2, 0.1, dtype=np.float32), sample_rate=sr) for _ in range(n)])
+
+
 def _transcribe(client, **form):
     return client.post("/v1/audio/transcriptions", data=form,
                        files={"file": ("a.wav", _wav(), "audio/wav")})
@@ -82,10 +87,12 @@ def test_speech_encodes_the_requested_format(models, fmt, media):
     assert abs(len(audio) / sr - 1.0) < 0.1
 
 
-def test_speech_pcm_is_16_bit_24_khz(models):
+def test_speech_pcm_is_16_bit_24_khz_and_streams_by_default(models):
+    _, tts = models
+    _pieces(tts)
     client = TestClient(srv.create_app(TTS))
     r = client.post("/v1/audio/speech", json={"input": "hi", "response_format": "pcm"})
-    assert r.headers["content-type"] == "audio/pcm"
+    assert r.headers["content-type"] == "audio/pcm" and tts.synthesize_stream.called
     assert len(r.content) == 24000 * 2  # 1 s of 16 kHz audio, resampled to 24 kHz, 2 bytes a sample
 
 
@@ -155,3 +162,90 @@ def test_undecodable_upload_is_a_400(models, monkeypatch):
     client = TestClient(srv.create_app(STT))
     r = client.post("/v1/audio/transcriptions", files={"file": ("a.m4a", b"not audio", "audio/mp4")})
     assert r.status_code == 400 and "ffmpeg" in r.json()["detail"]
+
+
+@pytest.fixture
+def keyed(models):
+    from localkin_service_audio.api.auth import BearerAuth
+
+    app = srv.create_combined_app(STT, TTS)
+    app.add_middleware(BearerAuth, api_key="s3cret")
+    return TestClient(app)
+
+
+def test_api_key_is_required_except_for_health(keyed):
+    assert keyed.get("/health").status_code == 200
+    assert keyed.get("/v1/models").status_code == 401
+    assert keyed.get("/v1/models", headers={"Authorization": "Bearer wrong"}).status_code == 401
+    assert keyed.get("/v1/models", headers={"Authorization": "Bearer s3cret"}).status_code == 200
+    assert keyed.get("/v1/models", headers={"X-API-Key": "s3cret"}).status_code == 200
+
+
+def test_openai_sdk_api_key_is_the_access_key(keyed):
+    r = keyed.post("/v1/audio/speech", json={"input": "hi"}, headers={"Authorization": "Bearer s3cret"})
+    assert r.status_code == 200 and r.headers["content-type"] == "audio/wav"
+    assert keyed.post("/v1/audio/speech", json={"input": "hi"}).status_code == 401
+
+
+def test_speech_streams_pcm_as_it_is_made(models):
+    _, tts = models
+    _pieces(tts)
+    client = TestClient(srv.create_app(TTS))
+    r = client.post("/v1/audio/speech", json={"input": "一句。两句。", "response_format": "pcm",
+                                              "stream_format": "audio", "instructions": "温柔"})
+    assert r.status_code == 200 and r.headers["content-type"] == "audio/pcm"
+    assert len(r.content) == 2 * 12000 * 2  # two 0.5 s pieces at 24 kHz, 16-bit
+    assert tts.synthesize_stream.call_args.kwargs["instruct"] == "温柔"
+
+
+def test_speech_streams_wav_with_an_open_ended_header(models):
+    _, tts = models
+    _pieces(tts)
+    client = TestClient(srv.create_app(TTS))
+    body = client.post("/v1/audio/speech", json={"input": "x", "response_format": "wav",
+                                                 "stream_format": "audio"}).content
+    assert body[:4] == b"RIFF" and body[40:44] == b"\xff\xff\xff\xff" and len(body) == 44 + 2 * 8000 * 2
+
+
+def test_speech_streams_mp3_pieces_that_play_back_to_back(models):
+    """One stream of bare frames: no piece's Xing/Info header to stop a decoder halfway."""
+    _, tts = models
+    _pieces(tts)
+    client = TestClient(srv.create_app(TTS))
+    body = client.post("/v1/audio/speech", json={"input": "x", "response_format": "mp3",
+                                                 "stream_format": "audio"}).content
+    offset, frames = 0, 0
+    while offset < len(body):
+        length = srv._mp3_frame_length(body[offset:offset + 4])
+        assert length, f"no frame header at byte {offset}"
+        offset, frames = offset + length, frames + 1
+    assert offset == len(body) and b"Xing" not in body and b"Info" not in body
+    assert frames * 576 >= 2 * 8000  # MPEG-2 Layer III: 576 samples a frame; two 0.5 s pieces at 16 kHz
+
+
+def test_speech_streams_sse_events(models):
+    import base64
+    import json
+
+    _, tts = models
+    _pieces(tts)
+    client = TestClient(srv.create_app(TTS))
+    r = client.post("/v1/audio/speech", json={"input": "x", "response_format": "pcm", "stream_format": "sse"})
+    events = [json.loads(line[6:]) for line in r.text.splitlines() if line.startswith("data: ")]
+    assert r.headers["content-type"].startswith("text/event-stream")
+    assert [e["type"] for e in events] == ["speech.audio.delta", "speech.audio.delta", "speech.audio.done"]
+    assert len(base64.b64decode(events[0]["audio"])) == 12000 * 2
+
+
+def test_stream_that_fails_at_once_is_a_500(models):
+    _, tts = models
+    tts.synthesize_stream.side_effect = RuntimeError("out of memory")
+    client = TestClient(srv.create_app(TTS))
+    r = client.post("/v1/audio/speech", json={"input": "x", "response_format": "pcm", "stream_format": "audio"})
+    assert r.status_code == 500 and "out of memory" in r.json()["detail"]
+
+
+@pytest.mark.parametrize("body", [{"stream_format": "chunks"}, {"stream_format": "audio", "response_format": "flac"}])
+def test_stream_rejects_what_it_cannot_send(models, body):
+    client = TestClient(srv.create_app(TTS))
+    assert client.post("/v1/audio/speech", json={"input": "x", **body}).status_code == 400

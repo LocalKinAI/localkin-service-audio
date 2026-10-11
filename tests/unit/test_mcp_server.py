@@ -7,6 +7,8 @@ it runs where the `mcp` package is installed (the [mcp] extra).
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import json
 import os
 import subprocess
 import sys
@@ -222,3 +224,134 @@ def test_transcribe_converts_mp3_and_removes_the_copy(tools, tmp_path):
     run(tools.call("transcribe_audio", {"audio_path": str(mp3)}))
     passed = FakeEngine.instances[0].calls[-1][1]
     assert passed.endswith(".wav") and passed != str(mp3) and not os.path.exists(passed)
+
+
+def _b64_wav():
+    import base64
+    import io
+
+    buf = io.BytesIO()
+    sf.write(buf, np.zeros(8000, dtype=np.float32), 16000, format="WAV")
+    return base64.b64encode(buf.getvalue()).decode()
+
+
+@pytest.mark.parametrize("prefix", ["", "data:audio/wav;base64,"])
+def test_transcribe_takes_base64_and_removes_the_copy(tools, prefix):
+    out = run(tools.call("transcribe_audio", {"audio_base64": prefix + _b64_wav()}))
+    passed = FakeEngine.instances[0].calls[-1][1]
+    assert out["text"] == "你好世界" and passed.endswith(".wav") and not os.path.exists(passed)
+
+
+def test_transcribe_downloads_a_url(tools, wav):
+    import functools
+    import http.server
+    import threading
+
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=os.path.dirname(wav))
+    handler.log_message = lambda *a: None
+    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        url = f"http://127.0.0.1:{httpd.server_port}/{os.path.basename(wav)}"
+        assert run(tools.call("transcribe_audio", {"audio_url": url}))["text"] == "你好世界"
+    finally:
+        httpd.shutdown()
+    with pytest.raises(ValueError, match="http"):
+        run(tools.call("transcribe_audio", {"audio_url": "file:///etc/passwd"}))
+
+
+def test_audio_must_come_one_way(tools, wav):
+    with pytest.raises(ValueError, match="one of"):
+        run(tools.call("transcribe_audio", {}))
+    with pytest.raises(ValueError, match="one of"):
+        run(tools.call("transcribe_audio", {"audio_path": wav, "audio_base64": _b64_wav()}))
+
+
+@pytest.fixture
+def remote(tools):
+    tools.remote, tools.public_url = True, "http://box:8765"
+    return tools
+
+
+def test_remote_mode_returns_a_url_and_base64(remote):
+    import base64
+    import io
+
+    out = run(remote.call("synthesize_speech", {"text": "你好", "return_base64": True}))
+    assert out["url"] == "http://box:8765/files/" + os.path.basename(out["output_path"])
+    assert sf.info(io.BytesIO(base64.b64decode(out["audio_base64"]))).samplerate == 24000
+
+
+def test_remote_mode_keeps_paths_to_its_own_outputs(remote, wav):
+    with pytest.raises(PermissionError, match="remote"):
+        run(remote.call("transcribe_audio", {"audio_path": wav}))
+    with pytest.raises(PermissionError, match="remote"):
+        run(remote.call("synthesize_speech", {"text": "x", "output_path": "/tmp/anywhere.wav"}))
+    made = run(remote.call("synthesize_speech", {"text": "你好"}))["output_path"]
+    assert run(remote.call("transcribe_audio", {"audio_path": made}))["text"] == "你好世界"
+
+
+def test_http_mcp_round_trip_with_api_key(tools):
+    pytest.importorskip("mcp")
+    import socket
+    import threading
+    import time
+    import urllib.error
+    import urllib.request
+
+    import anyio
+    import uvicorn
+    from mcp import ClientSession
+
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    tools.remote, tools.public_url = True, f"http://127.0.0.1:{port}"
+    server = uvicorn.Server(uvicorn.Config(mcp_server.create_http_app(tools, api_key="s3cret"),
+                                           host="127.0.0.1", port=port, log_level="warning"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    while not server.started:
+        time.sleep(0.05)
+    headers = {"Authorization": "Bearer s3cret"}
+
+    @contextlib.asynccontextmanager
+    async def connect():
+        try:  # SDK 1.x
+            from mcp.client.streamable_http import streamablehttp_client
+            async with streamablehttp_client(f"{tools.public_url}/mcp", headers=headers) as streams:
+                yield streams
+        except ImportError:  # SDK 2.x
+            import httpx2
+            from mcp.client.streamable_http import streamable_http_client
+            async with httpx2.AsyncClient(headers=headers) as http:
+                async with streamable_http_client(f"{tools.public_url}/mcp", http_client=http) as streams:
+                    yield streams
+
+    async def calls():
+        async with connect() as streams:
+            async with ClientSession(streams[0], streams[1]) as session:
+                await session.initialize()
+                names = [t.name for t in (await session.list_tools()).tools]
+                result = await session.call_tool("synthesize_speech", {"text": "你好"})
+                return names, json.loads(result.content[0].text)
+
+    try:
+        names, out = anyio.run(calls)
+        assert "transcribe_audio" in names and out["url"].startswith(tools.public_url + "/files/")
+        with urllib.request.urlopen(urllib.request.Request(out["url"], headers=headers)) as r:
+            assert r.read(4) == b"RIFF"
+        with pytest.raises(urllib.error.HTTPError) as denied:
+            urllib.request.urlopen(out["url"])
+        assert denied.value.code == 401
+        with urllib.request.urlopen(f"{tools.public_url}/health") as r:
+            assert json.loads(r.read())["status"] == "healthy"
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)
+
+
+def test_remote_reads_its_own_result_urls_from_disk(remote, monkeypatch):
+    monkeypatch.setattr(mcp_server, "_download", lambda url: pytest.fail("fetched its own file over HTTP"))
+    url = run(remote.call("synthesize_speech", {"text": "你好"}))["url"]
+    assert run(remote.call("transcribe_audio", {"audio_url": url}))["text"] == "你好世界"

@@ -90,17 +90,37 @@ cli.add_command(web)
 @click.option("--tts", help="Default text-to-speech model (qwen3-tts:0.6b)")
 @click.option("--clone", "clone_model", help="Default voice-cloning model (qwen3-tts base)")
 @click.option("--music", "music_model", help="Default music model (musicgen:small)")
-def mcp(stt, tts, clone_model, music_model):
+@click.option("--http", "http", is_flag=True,
+              help="Serve over HTTP (at /mcp) for clients on other machines, instead of stdio")
+@click.option("--host", default="127.0.0.1", show_default=True, help="With --http: address to listen on")
+@click.option("--port", default=8765, show_default=True, help="With --http: port")
+@click.option("--api-key", envvar="LOCALKIN_API_KEY", default=None,
+              help="With --http: require this key (Authorization: Bearer). Env: LOCALKIN_API_KEY")
+@click.option("--public-url", default=None,
+              help="With --http: the address clients use, for download links (default: from --host/--port)")
+def mcp(stt, tts, clone_model, music_model, http, host, port, api_key, public_url):
     """
-    MCP server on stdio, for Claude Code, Claude Desktop, Cursor, Codex and
-    other MCP clients. The client starts it; add it with e.g.:
+    MCP server for Claude Code, Claude Desktop, Cursor, Codex and other MCP
+    clients. On this machine the client starts it over stdio:
 
     \b
         claude mcp add localkin-audio -- kin mcp
 
+    For clients elsewhere (another computer, a cloud agent), run it over HTTP
+    and point them at http://<this machine>:8765/mcp:
+
+    \b
+        kin mcp --http --host 0.0.0.0 --api-key SECRET
+
     Tools: transcribe_audio, synthesize_speech, clone_voice, generate_music,
     list_models, list_voices, get_audio_info.
     """
+    if http:
+        from ..mcp.server import run_http_server
+
+        run_http_server(host=host, port=port, api_key=api_key, public_url=public_url,
+                        stt=stt, tts=tts, clone=clone_model, music=music_model)
+        return
     # Nothing may be printed here: stdout belongs to the protocol.
     from ..mcp.server import run_server
 

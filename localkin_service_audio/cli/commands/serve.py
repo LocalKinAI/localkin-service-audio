@@ -39,6 +39,8 @@ from ..utils import print_success, print_error, print_info, print_header
 @click.option("--stt", "stt_model", default=None,
               help="Speech-to-text model; with --tts, both are served on one port.")
 @click.option("--tts", "tts_model", default=None, help="Text-to-speech model; see --stt.")
+@click.option("--api-key", envvar="LOCALKIN_API_KEY", default=None,
+              help="Require this key (Authorization: Bearer, as OpenAI SDKs send it). Env: LOCALKIN_API_KEY")
 def serve(
     model_name: Optional[str],
     host: str,
@@ -48,6 +50,7 @@ def serve(
     preload: bool,
     stt_model: Optional[str],
     tts_model: Optional[str],
+    api_key: Optional[str],
 ):
     """
     Start the API server.
@@ -64,6 +67,9 @@ def serve(
 
         # Both on one port: one base URL for OpenAI clients and agents
         kin audio serve --stt qwen3-asr:1.7b --tts qwen3-tts:0.6b
+
+        # Reachable from other machines, behind a key
+        kin audio serve --stt qwen3-asr:1.7b --tts qwen3-tts:0.6b --host 0.0.0.0 --api-key SECRET
     """
     print_header("API Server")
     print_info(f"Starting server on http://{host}:{port}")
@@ -95,6 +101,12 @@ def serve(
             app = create_combined_app(stt_model, tts_model, emotion_model=emotion_model, preload=preload)
         if preload:
             print_success(f"Loaded {', '.join(names)}")
+        if api_key:
+            from ...api.auth import BearerAuth
+            app.add_middleware(BearerAuth, api_key=api_key)
+            print_info("Requests need the API key (Authorization: Bearer ...); /health and /docs don't")
+        elif host not in ("127.0.0.1", "localhost", "::1"):
+            print_info(f"Listening on {host} without an API key: anyone who can reach it can use it")
 
         uvicorn.run(
             app,
