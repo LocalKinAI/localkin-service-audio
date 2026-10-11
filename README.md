@@ -6,6 +6,13 @@
 
 **Local Voice AI Platform** - Speech-to-Text and Text-to-Speech with Chinese language support, voice cloning, and Claude integration via MCP.
 
+## What's New in v2.1.4
+
+- **Agents anywhere**: `kin mcp --http` serves the MCP tools to agents on other machines or in the cloud. Audio goes in as a URL or base64, and results come back as download links ([setup](#remote-mcp-agents-on-other-machines-or-in-the-cloud)).
+- **Streaming speech**: `/v1/audio/speech` sends audio while it's made. On a Mac Studio with Qwen3-TTS, a 23-second reply starts after 0.17 s instead of 4.8 s.
+- **Access keys**: `--api-key` on `kin audio serve` and `kin mcp --http`. An OpenAI SDK's `api_key` is the key.
+- Setup for VS Code, Windsurf and Gemini CLI.
+
 ## What's New in v2.1.3
 
 - **Works with your agents.** Set up for each in [Use with AI agents](#use-with-ai-agents):

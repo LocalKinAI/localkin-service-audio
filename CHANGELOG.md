@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.4] - 2026-10-10
+
+Agents on other machines, and speech that starts before it's finished.
+
 ### Added — agents on other machines, streaming, access keys
 
 - **Remote MCP.** `kin mcp --http` serves MCP over streamable HTTP (at `/mcp`) for agents on other machines or in the cloud.
