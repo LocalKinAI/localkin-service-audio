@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.3] - 2026-10-10
+
+Connecting it to an agent now works from a plain `pip install`.
+
 ### Added — agents
 
 - **The MCP server (`kin mcp`) works.** It didn't before, for three reasons:

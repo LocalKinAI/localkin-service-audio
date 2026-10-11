@@ -6,6 +6,15 @@
 
 **Local Voice AI Platform** - Speech-to-Text and Text-to-Speech with Chinese language support, voice cloning, and Claude integration via MCP.
 
+## What's New in v2.1.3
+
+- **Works with your agents.** Set up for each in [Use with AI agents](#use-with-ai-agents):
+  - `kin mcp` gives Claude Code, Claude Desktop, Cursor, Codex and other MCP clients tools to transcribe, speak, clone voices and make music. Setup is one line.
+  - `kin audio serve --stt … --tts …` puts both on one OpenAI-compatible port for agent frameworks.
+  - `kin skill` installs a skill for agents that run commands.
+- `kin audio tts` takes `--instruct` for tone and `--ref-audio` to clone a voice.
+- Fixes: mp3 uploads to the transcription endpoints, MusicGen on Apple Silicon, and scipy on macOS 27.
+
 ## What's New in v2.1.2
 
 - **Voice cloning over HTTP**: `/synthesize` takes `reference_audio` (a few seconds of someone talking, as base64 WAV or a path on the server) and `reference_text`, and a voice-cloning model (`kin audio serve qwen3-tts:1.7b-base`) says the text in that voice.
