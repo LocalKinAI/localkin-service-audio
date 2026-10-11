@@ -6,6 +6,15 @@
 
 **Local Voice AI Platform** - Speech-to-Text and Text-to-Speech with Chinese language support, voice cloning, and Claude integration via MCP.
 
+## What's New in v2.1.2
+
+- **Voice cloning over HTTP**: `/synthesize` takes `reference_audio` (a few seconds of someone talking, as base64 WAV or a path on the server) and `reference_text`, and a voice-cloning model (`kin audio serve qwen3-tts:1.7b-base`) says the text in that voice.
+- **Three new models**:
+  - `higgs-audio:v3` (Higgs TTS 3): made for voice chat, with inline emotion and sound tags and 100+ languages.
+  - `audio8-tts:0.6b`: Mandarin and Cantonese, 44.1 kHz.
+  - `audio8-asr:infinite`: streaming Chinese/English recognition.
+- [Benchmarked](CHANGELOG.md#212---2026-10-10) against the defaults, which stay `qwen3-asr:1.7b` and `qwen3-tts:0.6b`.
+
 ## What's New in v2.1.1
 
 - **Songs with lyrics**: `kin audio music generate --model minimax-music3 --lyrics @song.txt` — MiniMax Music 3 on MLX (29 s of song in about 3 minutes on an M3 Ultra).
@@ -663,6 +672,8 @@ curl -X POST "http://localhost:8001/synthesize" \
 | `language` | from the text | ISO code, e.g. `zh`, `en` |
 | `speed` | `1.0` | 0.5–2.0 |
 | `instruct` | — | Tone on Qwen3-TTS CustomVoice ("用开心的语气"), a voice description on VoiceDesign models; ignored elsewhere |
+| `reference_audio` | — | A voice to clone: a few seconds of it as base64 WAV, or a path on the server's machine. Only voice-cloning models take it (`qwen3-tts:1.7b-base`, `higgs-audio:v3`, …); others answer 400 |
+| `reference_text` | — | What `reference_audio` says; models that read it along clone more closely |
 
 **GET /voices** - Voices of the TTS model
 ```bash
