@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — agents
+
+- **The MCP server (`kin mcp`) works.** It didn't before, for three reasons:
+  - the `[mcp]` extra didn't install the MCP SDK;
+  - `kin mcp` printed a banner to stdout, the protocol's channel, which breaks clients;
+  - the 2.x SDK, now the default, dropped the API it was written against.
+
+  What it does now:
+  - It runs on the SDK's 1.x and 2.x. stdout carries only the protocol: model libraries' output, Python or native, goes to stderr.
+  - Default models are `qwen3-asr` (1.7B, or 0.6B under 16 GB of RAM), `qwen3-tts:0.6b`, a `qwen3-tts` base model for cloning, and `musicgen:small`. Change them with `--stt`, `--tts`, `--clone` and `--music`, or with `LOCALKIN_*_MODEL`. Speech, cloning and transcription each keep their own model loaded.
+  - Tools: `transcribe_audio`, `synthesize_speech` (voice, `instruct` for tone, language, speed), `clone_voice`, `generate_music` (new), `list_models`, `list_voices`, `get_audio_info`.
+  - The README covers setup for Claude Code, Claude Desktop, Cursor and Codex.
+  - Tested with the SDK's own client against real models.
+- **`kin audio serve --stt MODEL --tts MODEL`** serves both on one port, so an OpenAI client or agent framework needs a single base URL.
+- **OpenAI compatibility.**
+  - `/v1/audio/transcriptions` reads the form fields OpenAI SDKs send (`language`, `response_format`); query parameters still work. It can also return `verbose_json`.
+  - `/v1/audio/speech` takes `instructions`, and `response_format` `mp3`, `opus`, `flac` or `pcm`. `wav` stays the default.
+  - `/v1/models` lists the models.
+  - Checked with the official OpenAI Python SDK.
+- **Agent skill.** `kin skill` installs a skill that teaches Claude Code (or, with `--dir`, another agent) which model fits which job and the commands for it. The OpenClaw skill is the same text, and a test keeps every option it uses real.
+- **New `kin audio tts` options:** `--instruct` for tone, `--language`, and `--ref-audio`/`--ref-text` for cloning. `--list-voices` no longer needs a text.
+
+### Fixed
+
+- **Uploads to `/transcribe` and `/v1/audio/transcriptions` keep their format.** An mp3 used to be saved as `.wav` and failed to decode. Audio that isn't WAV is now converted: mp3, flac and ogg directly, m4a and webm through ffmpeg. The same applies to files given to `kin audio transcribe` and to the MCP tools.
+- **Load failures exit non-zero.** `kin audio transcribe` and `kin audio tts` now print the reason a model failed to load and exit with an error. Transcription's stdout carries only the transcript, with loading messages on stderr, so `-f json` parses.
+- **MusicGen runs on the CPU on Apple Silicon.** On MPS its sampling produced NaN and failed.
+- **The lockfile pins scipy 1.17 on Python 3.11+.** The 1.15.3 it had doesn't load on macOS 27, so `uv sync` installs broke there.
+
 ## [2.1.2] - 2026-10-10
 
 ### Added — `/synthesize` clones a voice

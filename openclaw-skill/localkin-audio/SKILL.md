@@ -1,191 +1,93 @@
 ---
 name: localkin-audio
-description: "Local Speech-to-Text and Text-to-Speech via LocalKin Audio. Transcribe audio files, synthesize speech, manage models, and run real-time voice conversations — all locally, no API keys needed."
-homepage: https://github.com/localkin/localkin-service-audio
+description: "Local speech-to-text, text-to-speech, voice cloning and music with the `kin` CLI (LocalKin Audio). No API keys; everything runs on this machine. Use it to transcribe audio or video, read text aloud or make a voiceover, clone a voice from a recording, design a voice from a description, generate music, or run a local STT/TTS server. Strong on Chinese, Cantonese and mixed Chinese-English."
+homepage: https://github.com/LocalKinAI/localkin-service-audio
 user-invocable: true
 metadata: {"openclaw":{"emoji":"🎵","os":["darwin","linux"],"requires":{"bins":["kin"]},"install":[{"id":"uv","kind":"uv","package":"localkin-service-audio","bins":["kin"],"label":"Install via uv"},{"id":"pip","kind":"pip","package":"localkin-service-audio","bins":["kin"],"label":"Install via pip"}]}}
 ---
 
 # LocalKin Audio
 
-Local voice AI platform for Speech-to-Text (STT) and Text-to-Speech (TTS). All processing runs locally on the user's machine — no cloud API keys required.
+The `kin` command does speech-to-text, text-to-speech, voice cloning and music locally. A model
+downloads the first time it's used. Fetch big ones ahead with `kin audio pull MODEL`.
 
-## When to use this skill
+## Pick a model
 
-Use this skill when the user wants to:
+| Task | Model |
+|---|---|
+| Transcribe Chinese, Cantonese or mixed zh/en | `qwen3-asr:1.7b` (`qwen3-asr:0.6b` under 16 GB RAM) |
+| Transcribe English or other languages fast on a CPU | `faster-whisper:large-v3-turbo` |
+| Speak Chinese and English, mixed in one sentence | `qwen3-tts:0.6b`: 9 preset voices, tone with `--instruct` |
+| Small, fast English speech (the default) | `kokoro` |
+| Clone a voice from a 3-10 s recording | `qwen3-tts:1.7b-base` |
+| Design a voice from a description | `qwen3-tts:1.7b-voicedesign` |
+| Music: short instrumental, quick | `musicgen:small` |
+| Music: a full song with lyrics (Apple Silicon) | `minimax-music3` |
 
-- **Transcribe** an audio file to text (speech-to-text)
-- **Synthesize** speech from text (text-to-speech)
-- **Listen** in real-time from a microphone with optional LLM conversation
-- **Manage models** — list, download, remove, or benchmark STT/TTS models
-- **Check system status** — hardware detection, installed engines, cache info
+On Apple Silicon these run on the GPU when the package has the `[mlx]` extra.
+Elsewhere the `qwen3-*` models build their own environment on first use, once and in a few
+minutes. That needs `uv` installed.
 
-## Quick reference
-
-### Transcribe audio to text
-
-```bash
-kin audio transcribe <audio_file>
-kin audio transcribe recording.wav --model whisper-cpp:base --language en
-kin audio transcribe interview.mp3 --format srt --timestamps --output subtitles.srt
-kin audio transcribe meeting.wav --format json --output transcript.json
-```
-
-**Options:**
-
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--model, -m` | STT model (engine:variant) | `whisper-cpp:base` |
-| `--language, -l` | Language code (auto-detect if omitted) | auto |
-| `--output, -o` | Output file (stdout if omitted) | stdout |
-| `--format, -f` | Output format: `text`, `json`, `srt`, `vtt` | `text` |
-| `--timestamps` | Include timestamps | off |
-| `--device` | `auto`, `cpu`, `cuda`, `mps` | `auto` |
-| `--verbose, -v` | Verbose output | off |
-
-### Synthesize speech (TTS)
+## Transcribe
 
 ```bash
-kin audio tts "Hello, world!"
-kin audio tts "Welcome to LocalKin" --voice af_heart --output welcome.wav
-kin audio tts "你好世界" --model kokoro --voice zf_xiaobei
-kin audio tts "Bonjour" --speed 0.8 --no-play --output bonjour.wav
+kin audio transcribe recording.m4a -m qwen3-asr:1.7b
+kin audio transcribe talk.mp3 -m qwen3-asr:1.7b -f json --timestamps
+kin audio transcribe video.mp4 -m qwen3-asr:1.7b -f srt -o subtitles.srt
 ```
 
-**Options:**
+- Use `-l zh` (or `en`, ...) to fix the language. Without it the model detects the language.
+- stdout carries only the transcript. Progress goes to stderr, so `-f json` can be parsed.
+- m4a, mp4 and webm need ffmpeg; wav, flac, mp3 and ogg don't.
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--model, -m` | TTS model | `kokoro` |
-| `--voice, -v` | Voice ID | model default |
-| `--output, -o` | Output file (plays directly if omitted) | play |
-| `--speed, -s` | Speed multiplier | `1.0` |
-| `--play/--no-play` | Play audio after synthesis | `--play` |
-| `--list-voices` | List available voices and exit | — |
-| `--device` | `auto`, `cpu`, `cuda`, `mps` | `auto` |
+## Speak
 
-**Kokoro voice IDs follow a pattern:** first letter = language (a/b=English, e=Spanish, f=French, h=Hindi, i=Italian, j=Japanese, p=Portuguese, z=Chinese), second letter = gender (f=female, m=male). Examples: `af_heart` (English female), `zm_yunyang` (Chinese male), `jf_alpha` (Japanese female).
-
-To list all available voices: `kin audio tts --list-voices`
-
-### Real-time listening
+Always pass `-o FILE --no-play`. Without `-o` the audio is played instead of saved.
 
 ```bash
-kin audio listen
-kin audio listen --tts --tts-voice af_heart
-kin audio listen --llm ollama --llm-model qwen3:14b --tts --stream
+kin audio tts "你好，欢迎回来。" -m qwen3-tts:0.6b -o hello.wav --no-play
+kin audio tts "今天真不错！" -m qwen3-tts:0.6b --instruct "用开心的语气" -o happy.wav --no-play
+kin audio tts "Hello there." -m qwen3-tts:0.6b --voice ryan --speed 1.1 -o hi.wav --no-play
+kin audio tts -m qwen3-tts:0.6b --list-voices
 ```
 
-**Options:**
-
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--model, -m` | STT model | `whisper-cpp:base` |
-| `--tts/--no-tts` | Enable TTS responses | off |
-| `--tts-model` | TTS model for responses | `native` |
-| `--tts-voice` | Voice for TTS | — |
-| `--llm` | LLM backend (e.g. `ollama`) | off |
-| `--llm-model` | LLM model name | `qwen3:14b` |
-| `--stream/--no-stream` | Stream LLM responses | off |
-| `--language, -l` | Language code | auto |
-| `--silence-threshold` | Silence threshold 0.0–1.0 | `0.01` |
-| `--silence-duration` | Seconds of silence before processing | `1.5` |
-
-### Model management
+## Clone or design a voice
 
 ```bash
-# List all available models
-kin audio models
-
-# Filter models
-kin audio models --type stt
-kin audio models --type tts --language zh
-kin audio models --engine kokoro
-kin audio models --search "chinese"
-
-# Download a model
-kin audio pull whisper-cpp:base
-kin audio pull kokoro
-
-# Remove a model
-kin audio rm whisper-cpp:base
-
-# Get hardware-based recommendations
-kin audio recommend
-kin audio recommend --verbose
+kin audio tts "这句话用我的声音说。" -m qwen3-tts:1.7b-base --ref-audio me.wav --ref-text "录音里说的话" -o mine.wav --no-play
+kin audio tts "欢迎收听本期节目。" -m qwen3-tts:1.7b-voicedesign --instruct "沉稳的中年男声，播音腔" -o host.wav --no-play
 ```
 
-### Benchmark models
+`--ref-text` is optional; giving the recording's transcript makes the clone closer.
+
+## Music
 
 ```bash
-kin audio benchmark test.wav
-kin audio benchmark test.wav --models whisper-cpp:tiny whisper-cpp:base faster-whisper:base
-kin audio benchmark test.wav --iterations 3 --output results.json
+kin audio music generate "calm lofi piano" -m musicgen:small -d 10 -o lofi.wav --no-play
+kin audio music generate "欢快的流行，女声" -m minimax-music3 -l @lyrics.txt -o song.wav --no-play
 ```
 
-### System and configuration
+Lyrics use `[verse]` / `[chorus]` tags. A full song takes minutes.
+
+## Many requests: run a server
+
+Every `kin audio` command loads its model again. For repeated calls, or for an app, keep the
+models loaded:
 
 ```bash
-# Check system status (installed engines, libraries, cache)
-kin audio status
-
-# View configuration
-kin audio config
-kin audio config --path
-kin audio config --models
-
-# Set configuration
-kin audio config set default_stt_model whisper-cpp:base
-kin audio config set default_tts_model kokoro
-kin audio config set default_device mps
-
-# Cache management
-kin audio cache info
-kin audio cache clear
-kin audio cache clear whisper-cpp:base
-
-# Show running servers
-kin audio ps
+kin audio serve --stt qwen3-asr:1.7b --tts qwen3-tts:0.6b --port 8000 &
+curl -F file=@question.wav http://127.0.0.1:8000/v1/audio/transcriptions
+curl http://127.0.0.1:8000/v1/audio/speech -H 'Content-Type: application/json' \
+  -d '{"input": "你好", "instructions": "用开心的语气", "response_format": "mp3"}' -o answer.mp3
 ```
 
-### API server
+- The API is OpenAI-compatible, with `/synthesize` (`instruct`, `reference_audio`) and `/voices` alongside.
+- Stop the server when you're done.
+- MCP clients can use `kin mcp` instead, which offers the same tools.
 
-```bash
-# Start the API server
-kin audio serve
-kin audio serve --host 0.0.0.0 --port 8000
-kin audio serve whisper-cpp:base  # pre-load a model
+## When something fails
 
-# Start web UI
-kin web
-kin web --port 8080
-```
-
-### Add custom models
-
-```bash
-# List available templates
-kin audio list-templates
-
-# Add from template
-kin audio add-model --template whisper-gguf --name my-whisper --repo user/model
-
-# Add from Hugging Face
-kin audio add-model --name my-tts --repo user/tts-model --type tts --size-mb 200
-```
-
-## Important notes
-
-- **Model format:** Models are specified as `engine:variant` (e.g., `whisper-cpp:base`, `faster-whisper:large-v3`). Some models like `kokoro` have no variant.
-- **First run:** Models are downloaded on first use. Use `kin audio pull <model>` to pre-download.
-- **Device selection:** Use `--device mps` on Apple Silicon Macs for GPU acceleration. The default `auto` usually picks the best option.
-- **Output files:** When `--output` is omitted, transcriptions print to stdout and TTS plays audio directly.
-- **Supported audio formats:** WAV, MP3, FLAC, OGG, M4A, and other formats supported by ffmpeg.
-
-## Scripted usage
-
-For scripted/automated use, helper scripts are available at `{baseDir}/scripts/`:
-
-- `{baseDir}/scripts/transcribe.sh <audio_file> [options]` — transcribe wrapper
-- `{baseDir}/scripts/tts.sh "<text>" [options]` — TTS wrapper
-- `{baseDir}/scripts/status.sh` — quick status check
+- `kin audio models` lists every model; `kin audio models -t tts -l zh` filters them.
+- A failed load prints the reason (a missing `uv`, the `[mlx]` extra not installed, ...) and exits
+  non-zero.
+- On macOS 27, Python 3.10 can't load scipy; use Python 3.11 or newer.

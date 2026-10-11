@@ -149,9 +149,10 @@ def generate(
 
     try:
         from ...core.types import ModelConfig, ModelType
-        from ...music import MusicGenStrategy, HeartMuLaStrategy
-        from ...music.comfyui_strategy import ComfyUIMusicStrategy, is_comfyui_model
-        from ...music.mlx_music_strategy import MLXMusicStrategy, mlx_music_available
+        from ...music import HeartMuLaStrategy
+        from ...music.comfyui_strategy import ComfyUIMusicStrategy
+        from ...music.generate import generate_music, music_engine
+        from ...music.mlx_music_strategy import MLXMusicStrategy
 
         if lyrics and lyrics.startswith("@"):
             with open(os.path.expanduser(lyrics[1:]), encoding="utf-8") as f:
@@ -164,24 +165,16 @@ def generate(
             engine="music"
         )
 
-        # Select engine based on model name
-        use_mlx = backend == "mlx" or (backend == "auto" and mlx_music_available(model))
-        if use_mlx:
-            if verbose:
+        engine = music_engine(model, backend, comfyui_url)
+        if verbose:
+            if isinstance(engine, MLXMusicStrategy):
                 print_info("Using mlx-audio")
-            engine = MLXMusicStrategy()
-        elif is_comfyui_model(model):
-            if verbose:
+            elif isinstance(engine, ComfyUIMusicStrategy):
                 print_info(f"Using ComfyUI at {comfyui_url or 'default address'}")
-            engine = ComfyUIMusicStrategy(comfyui_url)
-        elif model.startswith("heartmula") or model.startswith("heart"):
-            if verbose:
+            elif isinstance(engine, HeartMuLaStrategy):
                 print_info("Using HeartMuLa engine (multilingual, supports tags)")
-            engine = HeartMuLaStrategy()
-        else:
-            if verbose:
+            else:
                 print_info("Using MusicGen engine")
-            engine = MusicGenStrategy()
 
         # Load model
         if verbose:
@@ -198,35 +191,19 @@ def generate(
 
         start_time = time.time()
 
-        # Generate with appropriate parameters for each engine
         if isinstance(engine, MLXMusicStrategy):
             print_info("Generating with mlx-audio; a full song takes a while...")
-            result = engine.generate(prompt, duration=duration, lyrics=lyrics, seed=seed, tags=tags)
         elif isinstance(engine, ComfyUIMusicStrategy):
-            extra = {}
-            for item in params:
-                key, _, value = item.partition("=")
-                try:
-                    extra[key] = json.loads(value)
-                except ValueError:
-                    extra[key] = value
             print_info(f"Queued on ComfyUI ({engine.url}); a full song can take a few minutes...")
-            result = engine.generate(
-                prompt, duration=duration, lyrics=lyrics, seed=seed, tags=tags, params=extra
-            )
-        elif isinstance(engine, HeartMuLaStrategy):
-            result = engine.generate(
-                prompt,
-                duration=duration or 10,
-                tags=tags,
-                temperature=temperature
-            )
-        else:
-            result = engine.generate(
-                prompt,
-                duration=duration or 10,
-                temperature=temperature
-            )
+        extra = {}
+        for item in params:
+            key, _, value = item.partition("=")
+            try:
+                extra[key] = json.loads(value)
+            except ValueError:
+                extra[key] = value
+        result = generate_music(engine, prompt, duration=duration, lyrics=lyrics, seed=seed,
+                                tags=tags, params=extra, temperature=temperature)
 
         elapsed = time.time() - start_time
 

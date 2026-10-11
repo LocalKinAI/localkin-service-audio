@@ -29,7 +29,7 @@ def detect_hardware() -> HardwareProfile:
         elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
             device = DeviceType.MPS
             # MPS uses unified memory, estimate ~70% available for GPU
-            ram_gb = _get_ram_gb()
+            ram_gb = get_ram_gb()
             vram_gb = ram_gb * 0.7
             gpu_name = "Apple Silicon (MPS)"
     except ImportError:
@@ -38,28 +38,35 @@ def detect_hardware() -> HardwareProfile:
     return HardwareProfile(
         device=device,
         vram_gb=vram_gb,
-        ram_gb=_get_ram_gb(),
+        ram_gb=get_ram_gb(),
         cpu_cores=os.cpu_count() or 1,
         gpu_name=gpu_name,
     )
 
 
-def _get_ram_gb() -> float:
-    """Get system RAM in GB."""
+def get_ram_gb() -> float:
+    """System RAM in GB (8 when it can't be read)."""
     try:
         import psutil
         return psutil.virtual_memory().total / (1024**3)
     except ImportError:
-        # Fallback for systems without psutil
+        pass
+    try:
         if platform.system() == "Darwin":
-            # macOS
             import subprocess
             result = subprocess.run(
                 ["sysctl", "-n", "hw.memsize"],
                 capture_output=True, text=True
             )
             return int(result.stdout.strip()) / (1024**3)
-        return 8.0  # Default assumption
+        if platform.system() == "Linux":
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    if line.startswith("MemTotal:"):
+                        return int(line.split()[1]) / (1024**2)
+    except (OSError, ValueError):
+        pass
+    return 8.0
 
 
 def recommend_models(hardware: Optional[HardwareProfile] = None) -> Dict[str, List[str]]:

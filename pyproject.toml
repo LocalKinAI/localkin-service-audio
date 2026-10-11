@@ -55,6 +55,9 @@ dependencies = [
     "soundfile>=0.12.0",
     "librosa>=0.10.0",
     "scipy>=1.7.0",
+    # Older scipy wheels don't load on macOS 27 (dyld rejects their
+    # __thread_bss section); 1.17 is the first that does. Python 3.10 has none.
+    "scipy>=1.17; python_version >= '3.11'",
     "numpy>=1.21.0",
     # STT - Whisper family
     "faster-whisper>=1.0.0",
@@ -159,8 +162,9 @@ cloning = [
     "onnxruntime>=1.15.0",
 ]
 
-# MCP server for Claude integration
+# MCP server for any MCP client (`kin mcp`); works with the SDK's 1.x and 2.x
 mcp = [
+    "mcp>=1.10",
     "websockets>=10.0",
 ]
 
@@ -198,6 +202,7 @@ localkin_service_audio = [
     "ui/static/*",
     "samples/*",
     "assets/voices/*",
+    "skills/*/SKILL.md",
     "README.md"
 ]
 

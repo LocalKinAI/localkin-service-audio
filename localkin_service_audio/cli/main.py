@@ -86,24 +86,58 @@ cli.add_command(web)
 
 
 @cli.command()
-def mcp():
+@click.option("--stt", help="Default speech-to-text model (qwen3-asr, sized to this machine)")
+@click.option("--tts", help="Default text-to-speech model (qwen3-tts:0.6b)")
+@click.option("--clone", "clone_model", help="Default voice-cloning model (qwen3-tts base)")
+@click.option("--music", "music_model", help="Default music model (musicgen:small)")
+def mcp(stt, tts, clone_model, music_model):
     """
-    Start MCP server for Claude integration.
+    MCP server on stdio, for Claude Code, Claude Desktop, Cursor, Codex and
+    other MCP clients. The client starts it; add it with e.g.:
 
-    Enables Claude Code/Desktop to use audio transcription and synthesis.
+    \b
+        claude mcp add localkin-audio -- kin mcp
+
+    Tools: transcribe_audio, synthesize_speech, clone_voice, generate_music,
+    list_models, list_voices, get_audio_info.
     """
-    from .utils import print_header, print_info, print_error
+    # Nothing may be printed here: stdout belongs to the protocol.
+    from ..mcp.server import run_server
 
-    print_header("MCP Server")
-    print_info("Starting Model Context Protocol server...")
+    run_server(stt=stt, tts=tts, clone=clone_model, music=music_model)
 
-    try:
-        from ..mcp.server import run_server
-        run_server()
-    except ImportError:
-        print_error("MCP server not available. Install with: pip install mcp")
-    except Exception as e:
-        print_error(f"MCP server failed: {e}")
+
+@cli.command()
+@click.option("--dir", "target", default=None,
+              help="Skills directory to install into (default: ~/.claude/skills)")
+@click.option("--print", "show", is_flag=True, help="Print the skill instead of installing it")
+def skill(target, show):
+    """
+    Install the agent skill that teaches an agent to use kin: which model
+    for which job, and the commands for transcribing, speaking, cloning,
+    music and serving.
+
+    \b
+        kin skill                               # Claude Code, every project
+        kin skill --dir .claude/skills          # Claude Code, this project only
+        kin skill --dir ~/.openclaw/skills      # another agent's skills folder
+        kin skill --print                       # the text, to paste anywhere
+    """
+    from importlib import resources
+    from pathlib import Path
+
+    from .utils import print_success
+
+    text = (resources.files("localkin_service_audio") / "skills" / "localkin-audio" / "SKILL.md").read_text(
+        encoding="utf-8")
+    if show:
+        click.echo(text, nl=False)
+        return
+    dest = Path(target).expanduser() if target else Path.home() / ".claude" / "skills"
+    path = dest / "localkin-audio" / "SKILL.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    print_success(f"Installed {path}")
 
 
 @cli.command()

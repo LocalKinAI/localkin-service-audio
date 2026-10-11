@@ -55,6 +55,11 @@ class MusicGenStrategy(MusicEngine):
             from transformers import MusicgenForConditionalGeneration, AutoProcessor
 
             self.device = self._detect_device(device)
+            if self.device == "mps":
+                # On MPS its sampling step gets NaN probabilities and fails;
+                # the CPU makes 5 s of the small model in about half a minute.
+                logger.info("MusicGen fails on MPS; using the CPU")
+                self.device = "cpu"
             self.model_config = model_config
 
             # Extract model size from config (e.g., "musicgen-small" -> "small")

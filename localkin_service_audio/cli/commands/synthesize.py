@@ -10,11 +10,11 @@ from ..utils import print_success, print_error, print_info, print_header
 
 
 @click.command("tts")
-@click.argument("text")
+@click.argument("text", required=False)
 @click.option(
     "--model", "-m",
     default="kokoro",
-    help="Model to use (e.g., kokoro, cosyvoice:300m, chattts, native)"
+    help="Model to use (e.g., kokoro, qwen3-tts:0.6b, qwen3-tts:1.7b-base for cloning); see kin audio models"
 )
 @click.option(
     "--voice", "-v",
@@ -31,6 +31,26 @@ from ..utils import print_success, print_error, print_info, print_header
     type=float,
     default=1.0,
     help="Speech speed multiplier (0.5 = half speed, 2.0 = double speed)"
+)
+@click.option(
+    "--instruct",
+    default=None,
+    help="Tone (\"用开心的语气\", \"whisper\"), or the voice to create on voice-design models."
+)
+@click.option(
+    "--language", "-l",
+    default=None,
+    help="Language code (zh, en, ...); detected from the text if not given."
+)
+@click.option(
+    "--ref-audio",
+    default=None,
+    help="Clone the voice of this recording (3-10 s of one speaker); needs a voice-cloning model."
+)
+@click.option(
+    "--ref-text",
+    default=None,
+    help="What --ref-audio says; makes the cloned voice closer."
 )
 @click.option(
     "--device",
@@ -54,11 +74,15 @@ from ..utils import print_success, print_error, print_info, print_header
     help="Verbose output."
 )
 def tts(
-    text: str,
+    text: Optional[str],
     model: str,
     voice: Optional[str],
     output: Optional[str],
     speed: float,
+    instruct: Optional[str],
+    language: Optional[str],
+    ref_audio: Optional[str],
+    ref_text: Optional[str],
     device: str,
     list_voices: bool,
     play: bool,
@@ -76,7 +100,14 @@ def tts(
         kin audio tts "Hello" --output hello.wav --model kokoro --voice af_bella
 
         kin audio tts --model kokoro --list-voices
+
+        kin audio tts "今天真不错" -m qwen3-tts:0.6b --instruct "用开心的语气" -o happy.wav
+
+        kin audio tts "Hello" -m qwen3-tts:1.7b-base --ref-audio me.wav --ref-text "..." -o me2.wav
     """
+    if not text and not list_voices:
+        print_error("Text required, e.g. kin audio tts \"Hello\" -o hello.wav --no-play")
+        raise click.Abort()
     if verbose:
         print_header("Text-to-Speech")
 
@@ -90,10 +121,10 @@ def tts(
             print_info(f"Loading model: {model}")
 
         if not engine._tts_strategy or engine._tts_model_name != model:
-            success = engine.load_tts(model, device=device)
-            if not success:
-                print_error(f"Failed to load model: {model}")
-                return
+            if not engine.load_tts(model, device=device):
+                reason = getattr(engine._tts_strategy, "load_error", None)
+                print_error(f"Failed to load model: {model}" + (f": {reason}" if reason else ""))
+                raise click.Abort()
 
         # List voices if requested
         if list_voices:
@@ -112,8 +143,16 @@ def tts(
         if verbose:
             print_info("Synthesizing...")
 
+        extra = {k: v for k, v in (("instruct", instruct), ("language", language)) if v}
         start_time = time.time()
-        result = engine.synthesize(text, voice=voice, speed=speed)
+        if ref_audio:
+            config = getattr(engine._tts_strategy, "model_config", None)
+            if config is not None and not config.supports_voice_cloning:
+                print_error(f"{model} doesn't clone voices; use e.g. qwen3-tts:1.7b-base")
+                raise click.Abort()
+            result = engine.clone_voice(ref_audio, text, ref_text, speed=speed, **extra)
+        else:
+            result = engine.synthesize(text, voice=voice, speed=speed, **extra)
         elapsed = time.time() - start_time
 
         # Output
@@ -136,6 +175,8 @@ def tts(
             print_info(f"Synthesis completed in {elapsed:.2f}s")
             print_info(f"Duration: {result.duration:.2f}s")
 
+    except click.Abort:
+        raise
     except Exception as e:
         print_error(f"Synthesis failed: {e}")
         raise click.Abort()

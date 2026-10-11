@@ -46,9 +46,9 @@ See [CHANGELOG.md](CHANGELOG.md) for full history.
 - **Voice Activity Detection**: Engine-agnostic `/vad` endpoint via TEN-VAD; or built-in Silero VAD inside `faster-whisper`
 - **Chinese Language Support**: Optimized models for Mandarin, Cantonese, and mixed Chinese-English
 - **Voice Cloning**: Zero-shot voice cloning with F5-TTS and CosyVoice
-- **MCP Integration**: Use with Claude Code and Claude Desktop
+- **Agents**: an MCP server (`kin mcp`) for Claude Code, Claude Desktop, Cursor and Codex; an OpenAI-compatible API on one port for agent frameworks; a skill (`kin skill`) for agents that run commands — [setup](#use-with-ai-agents)
 - **WebSocket Streaming**: Real-time transcription and synthesis
-- **REST API**: FastAPI-based server with OpenAPI docs; OpenAI-compatible `/v1/audio/transcriptions`
+- **REST API**: FastAPI-based server with OpenAPI docs; OpenAI-compatible `/v1/audio/transcriptions` and `/v1/audio/speech`
 - **Subtitle Output**: Direct SRT / WebVTT generation from `/transcribe?response_format=srt|vtt`
 
 ## Quick Start
@@ -82,8 +82,8 @@ kin audio listen --llm ollama --tts --stream
 # List available models
 kin audio models
 
-# Start API server
-kin audio serve --port 8000
+# Start API server (speech to text and text to speech on one port)
+kin audio serve --stt qwen3-asr:1.7b --tts qwen3-tts:0.6b --port 8000
 
 # Start web interface
 kin web
@@ -153,8 +153,8 @@ uv pip install localkin-service-audio[chinese]
 # Voice cloning models
 uv pip install localkin-service-audio[cloning]
 
-# MCP server for Claude
-uv pip install localkin-service-audio[mcp]
+# MCP server for agents (Claude Code, Cursor, Codex, ...)
+uv pip install "localkin-service-audio[mcp]"
 
 # Apple Silicon: run catalog models on MLX (fastest on a Mac). Optional —
 # without it they run in auto-built torch environments like everywhere else.
@@ -194,7 +194,7 @@ kin audio transcribe audio.wav --format srt --timestamps
 kin audio tts "Hello world"
 
 # List all available voices
-kin audio tts "" --model kokoro --list-voices
+kin audio tts --model kokoro --list-voices
 
 # American English voices
 kin audio tts "Hello world" --voice af_bella       # Bella (Female)
@@ -232,6 +232,15 @@ kin audio tts "Hello world" --output speech.wav --no-play
 
 # CosyVoice for Chinese (voice cloning capable)
 kin audio tts "你好世界" --model cosyvoice:300m --voice 中文女
+
+# Qwen3-TTS: Chinese and English mixed in one sentence, tone in words
+kin audio tts "今天真不错！" --model qwen3-tts:0.6b --instruct "用开心的语气" -o happy.wav --no-play
+
+# Clone a voice from a 3-10 s recording
+kin audio tts "用我的声音说" --model qwen3-tts:1.7b-base --ref-audio me.wav --ref-text "录音里说的话" -o mine.wav --no-play
+
+# Design a voice from a description
+kin audio tts "欢迎收听" --model qwen3-tts:1.7b-voicedesign --instruct "沉稳的中年男声，播音腔" -o host.wav --no-play
 ```
 
 ### Music Generation
@@ -387,8 +396,9 @@ kin audio ps
 ### API Server
 
 ```bash
-# Start REST API server
-kin audio serve --port 8000
+# Start REST API server: one model, or --stt and --tts together
+kin audio serve qwen3-tts:0.6b --port 8001
+kin audio serve --stt qwen3-asr:1.7b --tts qwen3-tts:0.6b --port 8000
 
 # Start web interface
 kin web --port 5000
@@ -580,41 +590,122 @@ audio = engine.clone_voice(
 )
 ```
 
-## MCP Integration
+## Use with AI agents
 
-Use LocalKin Audio with Claude Code or Claude Desktop:
+### MCP (Claude Code, Claude Desktop, Cursor, Codex, …)
+
+Install with the `mcp` extra (on Apple Silicon add `mlx`, so the models run on the GPU):
 
 ```bash
-# Start MCP server
-kin mcp
+pip install "localkin-service-audio[mcp]"        # Apple Silicon: "localkin-service-audio[mcp,mlx]"
 ```
 
-Add to Claude Desktop config (`~/.config/claude/claude_desktop_config.json`):
+Then register `kin mcp` with your client; it starts the server itself.
+
+**Claude Code**
+
+```bash
+claude mcp add localkin-audio -- kin mcp
+```
+
+**Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows) and **Cursor** (`~/.cursor/mcp.json`):
 
 ```json
 {
   "mcpServers": {
-    "localkin-audio": {
-      "command": "kin",
-      "args": ["mcp"]
-    }
+    "localkin-audio": { "command": "kin", "args": ["mcp"] }
   }
 }
 ```
 
-Available MCP tools:
-- `transcribe_audio` - Transcribe audio files
-- `synthesize_speech` - Generate speech from text
-- `clone_voice` - Clone voice from reference audio
-- `list_models` - List available models
-- `list_voices` - List available voices
+**Codex** (`~/.codex/config.toml`):
+
+```toml
+[mcp_servers.localkin-audio]
+command = "kin"
+args = ["mcp"]
+```
+
+To skip installing, let [uv](https://docs.astral.sh/uv/) fetch it: use the command `uvx` with the arguments `["--from", "localkin-service-audio[mcp]", "kin", "mcp"]` (`[mcp,mlx]` on Apple Silicon).
+
+| Tool | What it does |
+|---|---|
+| `transcribe_audio` | Audio file → text, with timestamps; detects the language |
+| `synthesize_speech` | Text → audio file. `voice`, `instruct` for tone ("用开心的语气"), `language`, `speed` |
+| `clone_voice` | Text in the voice of a 3–10 s recording (`reference_text` makes it closer) |
+| `generate_music` | Description (and lyrics, for song models) → music file |
+| `list_models`, `list_voices`, `get_audio_info` | What can run, which voices a model has, a file's duration and format |
+
+Default models:
+
+| Kind | Default model |
+|---|---|
+| Transcription | `qwen3-asr:1.7b`, or `qwen3-asr:0.6b` under 16 GB of RAM |
+| Speech | `qwen3-tts:0.6b` |
+| Cloning | `qwen3-tts:1.7b-base`, or `qwen3-tts:0.6b-base` under 16 GB of RAM |
+| Music | `musicgen:small` |
+
+- **Where the models run:** with the `mlx` extra on Apple Silicon they run on MLX. Elsewhere they run in an environment built on first use, which needs uv.
+- **Choosing other models:** pass `--stt`, `--tts`, `--clone` or `--music` (e.g. `"args": ["mcp", "--tts", "kokoro"]`), or set `LOCALKIN_STT_MODEL`, `LOCALKIN_TTS_MODEL`, `LOCALKIN_CLONE_MODEL` or `LOCALKIN_MUSIC_MODEL`. On a CPU-only machine, `--stt faster-whisper:large-v3-turbo --tts kokoro` is much faster.
+- **First use:** a model downloads the first time it's used. Run `kin audio pull qwen3-tts:0.6b` (and the others) beforehand if your client times out on that first call.
+- **Output files:** these go to `~/.localkin-service-audio/outputs/` unless the agent passes `output_path`.
+
+### OpenAI-compatible HTTP API (LangChain, LiveKit Agents, Pipecat, Open WebUI, …)
+
+Serve a speech-to-text and a text-to-speech model on one port:
+
+```bash
+kin audio serve --stt qwen3-asr:1.7b --tts qwen3-tts:0.6b --port 8000
+```
+
+and point any OpenAI client at it:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="local")   # any key works
+with open("question.mp3", "rb") as f:
+    text = client.audio.transcriptions.create(model="whisper-1", file=f, language="zh").text
+client.audio.speech.create(model="tts-1", voice="vivian", input="你好！", instructions="用开心的语气",
+                           response_format="mp3").write_to_file("answer.mp3")
+```
+
+**`/v1/audio/transcriptions`**
+- `language`.
+- `response_format`: `json`, `text`, `srt`, `vtt` or `verbose_json`.
+- Uploads can be wav, flac, mp3 or ogg; m4a and webm work once ffmpeg is installed.
+
+**`/v1/audio/speech`**
+- `voice`: a voice from `GET /voices`. OpenAI's own voice names fall back to the model's default voice.
+- `instructions`: the tone to use.
+- `speed`.
+- `response_format`: `wav` (the default here), `mp3`, `opus`, `flac` or `pcm`.
+
+**Both endpoints**
+- `/v1/models` lists the two models. The `model` field in a request is ignored; the server's own models always answer.
+- The server listens on 127.0.0.1. To reach it from other machines, add `--host 0.0.0.0`. There is no authentication.
+
+### Agent skill (Claude Code, OpenClaw, …)
+
+For agents that can run commands, a skill teaches them to use `kin`:
+- which model fits which job
+- the commands for transcribing, speaking, cloning, designing a voice, music and running a server
+
+```bash
+kin skill                            # into ~/.claude/skills, for Claude Code in every project
+kin skill --dir .claude/skills       # only this project
+kin skill --dir ~/.openclaw/skills   # another agent's skills folder
+kin skill --print                    # the text itself, to paste into AGENTS.md or a prompt
+```
+
+The same skill is in [`openclaw-skill/`](openclaw-skill/localkin-audio/SKILL.md) with OpenClaw's metadata.
 
 ## REST API
 
 Start the server:
 
 ```bash
-kin audio serve --port 8000
+kin audio serve --stt qwen3-asr:1.7b --tts qwen3-tts:0.6b --port 8000
 ```
 
 ### Endpoints

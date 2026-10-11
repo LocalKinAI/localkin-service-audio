@@ -2,7 +2,9 @@
 Transcribe command - Speech-to-Text operations.
 """
 import click
+import contextlib
 import os
+import sys
 import time
 from typing import Optional
 
@@ -14,7 +16,7 @@ from ..utils import print_success, print_error, print_info, print_header
 @click.option(
     "--model", "-m",
     default="whisper-cpp:base",
-    help="Model to use (e.g., whisper-cpp:base, faster-whisper:large-v3, sensevoice:small)"
+    help="Model to use (e.g., whisper-cpp:base, qwen3-asr:1.7b for Chinese, faster-whisper:large-v3); see kin audio models"
 )
 @click.option(
     "--language", "-l",
@@ -86,19 +88,29 @@ def transcribe(
         if verbose:
             print_info("Loading model...")
 
-        if not engine._stt_strategy or engine._stt_model_name != model:
-            success = engine.load_stt(model, device=device)
-            if not success:
-                print_error(f"Failed to load model: {model}")
-                return
+        # Model libraries print while loading; send that to stderr so stdout
+        # carries only the transcript (and --format json stays parseable).
+        with contextlib.redirect_stdout(sys.stderr):
+            if not engine._stt_strategy or engine._stt_model_name != model:
+                if not engine.load_stt(model, device=device):
+                    reason = getattr(engine._stt_strategy, "load_error", None)
+                    print_error(f"Failed to load model: {model}" + (f": {reason}" if reason else ""))
+                    raise click.Abort()
 
-        # Transcribe
-        if verbose:
-            print_info("Transcribing...")
+            if verbose:
+                print_info("Transcribing...")
 
-        start_time = time.time()
-        result = engine.transcribe(audio_file, language=language)
-        elapsed = time.time() - start_time
+            start_time = time.time()
+            from ...core.audio_processing.shared import readable_wav
+
+            # mp3, m4a, video, ... become a temporary WAV every engine reads.
+            wav, temporary = readable_wav(audio_file)
+            try:
+                result = engine.transcribe(wav, language=language)
+            finally:
+                if temporary:
+                    os.unlink(wav)
+            elapsed = time.time() - start_time
 
         # Format output
         if format == "text":
@@ -135,6 +147,8 @@ def transcribe(
             if result.language:
                 print_info(f"Detected language: {result.language}")
 
+    except click.Abort:
+        raise
     except Exception as e:
         print_error(f"Transcription failed: {e}")
         raise click.Abort()

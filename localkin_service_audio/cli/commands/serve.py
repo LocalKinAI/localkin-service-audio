@@ -36,6 +36,9 @@ from ..utils import print_success, print_error, print_info, print_header
     default=True,
     help="Load the model before accepting requests (default) or on the first request."
 )
+@click.option("--stt", "stt_model", default=None,
+              help="Speech-to-text model; with --tts, both are served on one port.")
+@click.option("--tts", "tts_model", default=None, help="Text-to-speech model; see --stt.")
 def serve(
     model_name: Optional[str],
     host: str,
@@ -43,6 +46,8 @@ def serve(
     reload: bool,
     emotion_model: Optional[str],
     preload: bool,
+    stt_model: Optional[str],
+    tts_model: Optional[str],
 ):
     """
     Start the API server.
@@ -56,12 +61,19 @@ def serve(
         kin audio serve kokoro --port 8001
 
         kin audio serve qwen3-asr:1.7b --emotion sensevoice:small
+
+        # Both on one port: one base URL for OpenAI clients and agents
+        kin audio serve --stt qwen3-asr:1.7b --tts qwen3-tts:0.6b
     """
     print_header("API Server")
     print_info(f"Starting server on http://{host}:{port}")
 
-    if model_name and preload:
-        print_info(f"Pre-loading model: {model_name}")
+    if model_name and (stt_model or tts_model):
+        print_error("Give a model name, or --stt/--tts, not both")
+        raise click.Abort()
+    names = [n for n in (model_name, stt_model, tts_model) if n]
+    if names and preload:
+        print_info(f"Pre-loading: {', '.join(names)}")
 
     try:
         import uvicorn
@@ -70,15 +82,19 @@ def serve(
         raise click.Abort()
 
     try:
-        from ...api.server import create_app
+        from ...api.server import create_app, create_combined_app
 
-        if not model_name:
-            print_error("Model name required. Example: kin audio serve kokoro")
+        if not names:
+            print_error("Model name required. Example: kin audio serve qwen3-tts:0.6b, "
+                        "or kin audio serve --stt qwen3-asr:1.7b --tts qwen3-tts:0.6b")
             raise click.Abort()
 
-        app = create_app(model_name, emotion_model=emotion_model, preload=preload)
+        if model_name:
+            app = create_app(model_name, emotion_model=emotion_model, preload=preload)
+        else:
+            app = create_combined_app(stt_model, tts_model, emotion_model=emotion_model, preload=preload)
         if preload:
-            print_success(f"Loaded {model_name}")
+            print_success(f"Loaded {', '.join(names)}")
 
         uvicorn.run(
             app,

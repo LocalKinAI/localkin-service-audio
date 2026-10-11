@@ -5,6 +5,8 @@ reference voices, and calling ``generate`` functions with only the keyword
 arguments they accept.
 """
 import inspect
+import os
+import tempfile
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -229,3 +231,27 @@ def segments_from(out: Any) -> Optional[List[Segment]]:
             continue
         segments.append(Segment(text=str(text).strip(), start=float(start), end=float(end)))
     return segments or None
+
+
+def readable_wav(path: str) -> Tuple[str, bool]:
+    """``path`` as a WAV every engine can open, and whether that is a new
+    temporary file the caller should remove. libsndfile decodes wav, flac,
+    mp3 and ogg; anything else (m4a, webm, ...) goes through librosa, which
+    needs ffmpeg for those."""
+    import soundfile as sf
+
+    try:
+        if sf.info(path).format == "WAV":
+            return path, False
+        audio, sr = sf.read(path, dtype="float32")
+    except Exception:
+        try:
+            import librosa
+            audio, sr = librosa.load(path, sr=None, mono=True)
+        except Exception as e:
+            raise ValueError(f"Can't decode {os.path.basename(path)} ({e}). wav, flac, mp3 and ogg "
+                             "work as they are; m4a and webm need ffmpeg installed.") from e
+    fd, out = tempfile.mkstemp(suffix=".wav")
+    os.close(fd)
+    sf.write(out, audio, int(sr))
+    return out, True

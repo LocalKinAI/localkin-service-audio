@@ -2,6 +2,7 @@
 LocalKin Service Audio API Server for Hugging Face models
 """
 
+import io
 import os
 import tempfile
 import logging
@@ -9,7 +10,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 import json
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Request
 from fastapi.responses import Response, JSONResponse, FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -162,6 +163,62 @@ class TTSRequest(BaseModel):
     # it says — the models that read it along clone far closer with it.
     reference_audio: Optional[str] = None
     reference_text: Optional[str] = None
+
+
+# OpenAI's response_format for /v1/audio/speech -> (soundfile format,
+# subtype, media type). aac has no encoder in libsndfile.
+_SPEECH_FORMATS = {
+    "wav": ("WAV", "PCM_16", "audio/wav"),
+    "mp3": ("MP3", None, "audio/mpeg"),
+    "opus": ("OGG", "OPUS", "audio/ogg"),
+    "flac": ("FLAC", None, "audio/flac"),
+    "pcm": (None, None, "audio/pcm"),
+}
+
+
+def _resample(audio, sr: int, target: int):
+    if sr == target:
+        return audio
+    from math import gcd
+    from scipy.signal import resample_poly
+
+    g = gcd(sr, target)
+    return resample_poly(audio, target // g, sr // g).astype("float32")
+
+
+def _encode_speech(wav: bytes, response_format: str) -> Response:
+    """A WAV from /synthesize in the format an OpenAI client asked for. pcm
+    is OpenAI's: raw 16-bit little-endian mono at 24 kHz."""
+    if response_format == "wav":
+        return Response(content=wav, media_type="audio/wav")
+    import numpy as np
+    import soundfile as sf
+
+    audio, sr = sf.read(io.BytesIO(wav), dtype="float32")
+    if audio.ndim > 1:
+        audio = audio.mean(axis=1)
+    fmt, subtype, media = _SPEECH_FORMATS[response_format]
+    if response_format == "pcm":
+        pcm = np.clip(_resample(audio, sr, 24000), -1.0, 1.0)
+        return Response(content=(pcm * 32767).astype("<i2").tobytes(), media_type=media)
+    if response_format == "opus" and sr not in (8000, 12000, 16000, 24000, 48000):
+        audio, sr = _resample(audio, sr, 48000), 48000
+    buf = io.BytesIO()
+    sf.write(buf, audio, sr, format=fmt, subtype=subtype)
+    return Response(content=buf.getvalue(), media_type=media)
+
+
+def _as_wav(path: str, background_tasks: BackgroundTasks) -> str:
+    """An uploaded recording as a WAV every engine can open (400 if it can't be decoded)."""
+    from ..core.audio_processing.shared import readable_wav
+
+    try:
+        out, temporary = readable_wav(path)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if temporary:
+        background_tasks.add_task(os.unlink, out)
+    return out
 
 
 def _reference_file(value: str):
@@ -924,15 +981,17 @@ def create_app(model_name: str, emotion_model: Optional[str] = None, preload: bo
 
                 model_data = loaded_models[model_name]
 
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
+                suffix = Path(file.filename or "").suffix or ".wav"
+                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
                     content = await file.read()
                     temp_file.write(content)
                     temp_path = temp_file.name
 
                 try:
+                    audio_path = _as_wav(temp_path, background_tasks)
                     text, detected_lang, fmt_segments, duration, extras = _run_stt(
                         model_data,
-                        temp_path,
+                        audio_path,
                         language=language,
                         enable_vad=enable_vad,
                         chunk_length_s=chunk_length_s,
@@ -940,7 +999,7 @@ def create_app(model_name: str, emotion_model: Optional[str] = None, preload: bo
                         background_tasks=background_tasks,
                     )
                     if emotion_model and not (extras or {}).get("emotion"):
-                        extras = {**(extras or {}), **_emotion_extras(emotion_model, temp_path)}
+                        extras = {**(extras or {}), **_emotion_extras(emotion_model, audio_path)}
                     # Refresh path in case _run_stt resampled it (whisper-cpp).
                     background_tasks.add_task(os.unlink, temp_path)
 
@@ -965,9 +1024,9 @@ def create_app(model_name: str, emotion_model: Optional[str] = None, preload: bo
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Model loading failed: {e}")
 
-        # OpenAI-compatible STT endpoint for backward compatibility with kin_listen
         @app.post("/v1/audio/transcriptions")
         async def openai_stt_compat(
+            request: Request,
             background_tasks: BackgroundTasks,
             file: UploadFile = File(...),
             language: Optional[str] = None,
@@ -977,16 +1036,33 @@ def create_app(model_name: str, emotion_model: Optional[str] = None, preload: bo
             response_format: str = "json",
             chunk_length_s: Optional[int] = None,
         ):
-            """OpenAI-compatible STT endpoint. Maps to /transcribe."""
-            return await transcribe_audio(
+            """OpenAI-compatible speech to text, as /transcribe.
+
+            OpenAI SDKs send ``language`` and ``response_format`` as form
+            fields; the query parameters /transcribe takes work too.
+            ``response_format`` also accepts OpenAI's ``verbose_json``.
+            ``model``, ``prompt`` and ``temperature`` are ignored: the
+            server's own model answers.
+            """
+            form = await request.form()
+            language = form.get("language") or language
+            response_format = form.get("response_format") or response_format
+            verbose = response_format == "verbose_json"
+            response = await transcribe_audio(
                 background_tasks,
                 file,
                 language=language,
                 enable_vad=enable_vad,
-                timestamps=timestamps,
-                response_format=response_format,
+                timestamps=timestamps or verbose,
+                response_format="json" if verbose else response_format,
                 chunk_length_s=chunk_length_s,
             )
+            if not verbose:
+                return response
+            body = json.loads(response.body)
+            for i, segment in enumerate(body.get("segments") or []):
+                segment["id"] = i
+            return JSONResponse({"task": "transcribe", **body})
 
     elif model_type == "tts":
         @app.post("/synthesize", response_model=TTSResponse)
@@ -1256,20 +1332,40 @@ def create_app(model_name: str, emotion_model: Optional[str] = None, preload: bo
                 ],
             }
 
-    # OpenAI-compatible TTS endpoint for backward compatibility with kin_speak
     if model_type == "tts":
         @app.post("/v1/audio/speech")
         async def openai_tts_compat(
             background_tasks: BackgroundTasks,
             request: Dict[str, Any],
         ):
-            """OpenAI-compatible TTS endpoint. Maps to /synthesize."""
+            """OpenAI-compatible text to speech, as /synthesize.
+
+            ``input``; ``voice`` (OpenAI's own names fall back to the
+            model's default voice); ``instructions`` for tone; ``speed``;
+            ``response_format``: wav, mp3, opus, flac or pcm. Without one
+            the answer is WAV, not OpenAI's mp3, as clients of this endpoint
+            have always received. ``model`` is ignored.
+            """
+            response_format = str(request.get("response_format") or "wav").lower()
+            if response_format not in _SPEECH_FORMATS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"response_format must be one of {sorted(_SPEECH_FORMATS)}, got {response_format!r}",
+                )
             tts_req = TTSRequest(
                 text=request.get("input", ""),
                 speaker=request.get("voice"),
                 speed=request.get("speed") or 1.0,
+                instruct=request.get("instructions"),
             )
-            return await synthesize_speech(background_tasks, tts_req)
+            wav = await synthesize_speech(background_tasks, tts_req)
+            return _encode_speech(wav.body, response_format)
+
+    @app.get("/v1/models")
+    async def openai_models():
+        """The model this server runs, as OpenAI's model list."""
+        return {"object": "list",
+                "data": [{"id": model_name, "object": "model", "owned_by": "localkin"}]}
 
     @app.post("/chat")
     async def chat(request: Dict[str, Any]):
@@ -1306,6 +1402,78 @@ def create_app(model_name: str, emotion_model: Optional[str] = None, preload: bo
         _warm_up(model_name, model_type, emotion_model)
 
     return app
+
+def create_combined_app(stt_model: Optional[str] = None, tts_model: Optional[str] = None,
+                        emotion_model: Optional[str] = None, preload: bool = False) -> FastAPI:
+    """One server for a speech-to-text and a text-to-speech model, so a
+    client (an OpenAI SDK, an agent framework) needs a single base URL.
+
+    Each model's endpoints are the ones its own create_app makes; this app
+    adds /, /health, /models and /v1/models covering both.
+    """
+    for name, kind, flag in ((stt_model, "stt", "--stt"), (tts_model, "tts", "--tts")):
+        info = _find_model_dict(name) if name else None
+        if name and not info:
+            raise ValueError(f"Model {name} not found")
+        if info and info.get("type") != kind:
+            other = "--tts" if flag == "--stt" else "--stt"
+            raise ValueError(f"{name} is a {info.get('type')} model; pass it as {other}")
+    if not (stt_model and tts_model):
+        if not (stt_model or tts_model):
+            raise ValueError("Give a speech-to-text model, a text-to-speech model, or both")
+        return create_app(stt_model or tts_model, emotion_model=emotion_model, preload=preload)
+
+    from .. import __version__
+
+    app = FastAPI(
+        title="LocalKin Service Audio API",
+        description=f"{stt_model} (speech to text) and {tts_model} (text to speech)",
+        version=__version__,
+    )
+    names = (stt_model, tts_model)
+
+    @app.get("/")
+    async def root():
+        return {"name": "LocalKin Service Audio API Server", "stt_model": stt_model,
+                "tts_model": tts_model, "status": "running", "docs": "/docs"}
+
+    @app.get("/health")
+    async def health():
+        """503 when either model's backend isn't installed."""
+        models, unhealthy = {}, False
+        for name in names:
+            missing = None if name in loaded_models else _missing_backend(_find_model_dict(name))
+            models[name] = {"loaded": name in loaded_models}
+            if missing:
+                models[name]["error"] = f"backend module not installed: {missing}"
+                unhealthy = True
+        body = {"status": "unhealthy" if unhealthy else "healthy",
+                "stt_model": stt_model, "tts_model": tts_model, "models": models}
+        if emotion_model:
+            body["emotion_model"] = emotion_model
+        return JSONResponse(status_code=503 if unhealthy else 200, content=body)
+
+    @app.get("/models")
+    async def models():
+        return {"loaded_models": list(loaded_models), "stt_model": stt_model, "tts_model": tts_model}
+
+    @app.get("/v1/models")
+    async def openai_models():
+        return {"object": "list",
+                "data": [{"id": name, "object": "model", "owned_by": "localkin"} for name in names]}
+
+    def key(route):
+        return getattr(route, "path", None), frozenset(getattr(route, "methods", None) or ())
+
+    taken = {key(route) for route in app.router.routes}
+    for part in (create_app(stt_model, emotion_model=emotion_model, preload=preload),
+                 create_app(tts_model, preload=preload)):
+        for route in part.router.routes:
+            if key(route) not in taken:
+                taken.add(key(route))
+                app.router.routes.append(route)
+    return app
+
 
 def run_server(model_name: str, host: str = "0.0.0.0", port: int = 8000):
     """Run the API server for the specified model."""
