@@ -142,7 +142,7 @@ def ensure_env(name: str) -> Dict[str, str]:
     extra_env = {k: v.format(src=root / "src") for k, v in spec.get("env", {}).items()}
 
     with _build_lock:
-        if stamp.exists() and json.loads(stamp.read_text()).get("hash") == _spec_hash(spec) \
+        if stamp.exists() and json.loads(stamp.read_text(encoding="utf-8")).get("hash") == _spec_hash(spec) \
                 and _python(root).exists():
             return extra_env
 
@@ -174,14 +174,15 @@ def ensure_env(name: str) -> Dict[str, str]:
                 shutil.rmtree(src, ignore_errors=True)
                 _run(["git", "clone", "--depth", "1", "--recursive", spec["git"], str(partial)])
                 partial.rename(src)
-            lines = (src / spec["requirements"]).read_text().splitlines()
+            # A repo's comments may be Chinese; only the package names matter.
+            lines = (src / spec["requirements"]).read_text(encoding="utf-8", errors="replace").splitlines()
             requirements += [
                 ln.strip() for ln in lines
                 if ln.strip() and not ln.startswith("#")
                 and not any(x in ln for x in spec.get("exclude", []))
             ]
         _run([uv, "pip", "install", "--python", str(_python(root)), *requirements])
-        stamp.write_text(json.dumps({"hash": _spec_hash(spec), "built": time.time()}))
+        stamp.write_text(json.dumps({"hash": _spec_hash(spec), "built": time.time()}), encoding="utf-8")
         return extra_env
 
 

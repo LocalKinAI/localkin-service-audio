@@ -270,7 +270,7 @@ def _init_config(s):
   }
 }
 '''
-        sample_config.write_text(sample_content)
+        sample_config.write_text(sample_content, encoding="utf-8")
         print_success(f"Created sample config: {sample_config}")
         print_info("Edit this file to add custom models.")
     else:

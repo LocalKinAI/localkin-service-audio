@@ -56,8 +56,9 @@ def fake_env(monkeypatch, tmp_path):
     """Point the 'fake' worker at this interpreter and a temp workers dir."""
     workers = tmp_path / "workers"
     workers.mkdir()
-    (workers / "_protocol.py").write_text((isolated.WORKERS_DIR / "_protocol.py").read_text())
-    (workers / "fake.py").write_text(FAKE_WORKER)
+    (workers / "_protocol.py").write_text((isolated.WORKERS_DIR / "_protocol.py").read_text(encoding="utf-8"),
+                                          encoding="utf-8")
+    (workers / "fake.py").write_text(FAKE_WORKER, encoding="utf-8")  # has Chinese; Windows defaults to cp1252
     monkeypatch.setattr(isolated, "WORKERS_DIR", workers)
     monkeypatch.setitem(isolated.WORKER_ENVS, "fake", "fake")
     monkeypatch.setattr(isolated, "ensure_env", lambda name: {})

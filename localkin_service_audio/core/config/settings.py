@@ -49,7 +49,7 @@ class Settings:
 
         if config_path.exists():
             try:
-                with open(config_path, "r") as f:
+                with open(config_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
 
                 for key, value in data.items():
@@ -101,7 +101,7 @@ class Settings:
             "default_device": self.default_device,
         }
 
-        with open(config_path, "w") as f:
+        with open(config_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
     def get_model_path(self, model_name: str) -> Path:

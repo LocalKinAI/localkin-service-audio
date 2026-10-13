@@ -60,7 +60,7 @@ def get_ram_gb() -> float:
             )
             return int(result.stdout.strip()) / (1024**3)
         if platform.system() == "Linux":
-            with open("/proc/meminfo") as f:
+            with open("/proc/meminfo", encoding="utf-8") as f:
                 for line in f:
                     if line.startswith("MemTotal:"):
                         return int(line.split()[1]) / (1024**2)

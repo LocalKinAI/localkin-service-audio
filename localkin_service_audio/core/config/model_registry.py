@@ -349,13 +349,13 @@ class ModelRegistry:
         if path.suffix == ".yaml" or path.suffix == ".yml":
             try:
                 import yaml
-                with open(path, "r") as f:
+                with open(path, "r", encoding="utf-8") as f:
                     data = yaml.safe_load(f)
             except ImportError:
                 print("Warning: PyYAML not installed. Skipping YAML config.")
                 return
         else:
-            with open(path, "r") as f:
+            with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
         # Process models

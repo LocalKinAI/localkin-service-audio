@@ -130,7 +130,7 @@ def benchmark(
     # Save results
     if output:
         import json
-        with open(output, "w") as f:
+        with open(output, "w", encoding="utf-8") as f:
             json.dump({
                 "audio_file": audio_file,
                 "audio_duration": audio_duration,
