@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.6] - 2026-10-12
+
+Windows reads and writes its text files as UTF-8.
+
 ### Fixed
 
 - **Text files are UTF-8 on Windows.** The custom models config, the settings file and an isolated environment's requirements were read in the locale's encoding, which is cp1252 on Windows. Chinese in them came out garbled or stopped the read.

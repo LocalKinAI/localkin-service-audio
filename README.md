@@ -6,6 +6,10 @@
 
 **Local Voice AI Platform** - Speech-to-Text and Text-to-Speech with Chinese language support, voice cloning, and Claude integration via MCP.
 
+## What's New in v2.1.6
+
+- **Windows**: config and settings files with Chinese in them now read correctly, because every text file the package reads or writes is UTF-8.
+
 ## What's New in v2.1.5
 
 - **Emotion without the wait**: with `--emotion`, SenseVoice listens while the main model transcribes. On a Mac Studio, 18 s of audio took 0.72 s instead of 1.08 s.
