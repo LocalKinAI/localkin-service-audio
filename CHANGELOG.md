@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Emotion runs alongside transcription.** With `--emotion`, SenseVoice now listens while the main model transcribes, instead of afterwards.
+  - On a Mac Studio with Qwen3-ASR 1.7B, a 2 s clip took 0.55 s instead of 0.66 s, 8 s took 0.61 s instead of 0.82 s, and 18 s took 0.72 s instead of 1.08 s.
+  - Transcription no longer blocks the server while it runs. Each model still takes one request at a time.
+- **Logs say why.** Every 500 from the server now logs its traceback; three transcription failures on a box had left no cause. Each transcription, synthesis and stream logs one line with how long it took.
+- **`kin audio recommend` on NVIDIA and CPU** suggests current models: Qwen3-ASR, Qwen3-TTS, CosyVoice3, Parakeet and SenseVoice.
+  - It used to suggest Whisper large-v3, CosyVoice 1, F5-TTS and ChatTTS.
+  - A test keeps Apple-only models off those lists.
+- **Dependencies.** The lockfile takes the fixed releases for 143 of 146 Dependabot alerts: aiohttp, anyio, cryptography, nltk, pillow, starlette and fastapi, torch, urllib3 and others.
+  - The other three are nltk advisories with no fixed release yet. nltk only comes with the `tts` extra (Coqui TTS).
+
+### Added
+
+- **CI.** GitHub Actions runs the unit tests from the lockfile on Linux, macOS and Windows with Python 3.11, and on Linux with Python 3.10.
+
 ## [2.1.4] - 2026-10-10
 
 Agents on other machines, and speech that starts before it's finished.

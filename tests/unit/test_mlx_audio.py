@@ -379,6 +379,13 @@ def test_recommendations_name_loadable_models(device, ram, vram):
             cfg = engine._resolve_config(name, model_type)
             assert get(cfg.engine) is not None, f"{name} ({cfg.engine})"
 
+    # Off Apple Silicon, nothing that needs MLX.
+    from localkin_service_audio.core.config import catalog
+    backends = {e["name"]: e["backends"] for e in catalog.STT + catalog.TTS}
+    if device != "mps":
+        for name in rec["stt"] + rec["tts"]:
+            assert "torch" in backends.get(name, {"torch": None}), name
+
 
 @pytest.mark.parametrize("requested,expected", [
     (None, "vivian"), ("uncle_fu", "uncle_fu"), ("Ryan", "ryan"),
@@ -420,6 +427,75 @@ def test_transcribe_adds_emotion_from_sidecar(monkeypatch):
     assert body["emotion"] == "sad"                 # from the sidecar
     assert body["audio_events"] == ["Laughter"]
     assert client.get("/health").json()["emotion_model"] == "sensevoice:small"
+
+
+def test_emotion_sidecar_runs_alongside_the_main_model(monkeypatch):
+    """Neither model gets past the barrier until the other has started, so
+    run one after the other the request would fail."""
+    import threading
+    from localkin_service_audio.api import server as srv
+
+    both_started = threading.Barrier(2, timeout=5)
+
+    class Main:
+        def transcribe(self, path, language=None):
+            both_started.wait()
+            return TranscriptionResult(text="今天好累", language="zh", duration=1.0)
+
+    class SenseVoice:
+        def transcribe(self, path, language=None):
+            both_started.wait()
+            return TranscriptionResult(text="今天好累", emotion="sad")
+
+    monkeypatch.setattr(srv, "loaded_models", {
+        "qwen3-asr:1.7b": {"type": "mlx-audio", "strategy": Main()},
+        "sensevoice:small": {"type": "sensevoice", "strategy": SenseVoice()},
+    })
+    client = TestClient(srv.create_app("qwen3-asr:1.7b", emotion_model="sensevoice:small"))
+    buf = io.BytesIO()
+    sf.write(buf, np.zeros(16000, dtype=np.float32), 16000, format="WAV")
+    r = client.post("/transcribe", files={"file": ("a.wav", buf.getvalue(), "audio/wav")})
+    assert r.status_code == 200
+    assert r.json()["text"] == "今天好累" and r.json()["emotion"] == "sad"
+
+
+def test_one_model_transcribes_one_request_at_a_time(monkeypatch):
+    """Requests no longer block the event loop, so the model lock is what
+    keeps two of them from driving one model at once."""
+    import asyncio
+    import threading
+    import time
+
+    import httpx
+    from localkin_service_audio.api import server as srv
+
+    guard = threading.Lock()
+    active = []
+    overlap = []
+
+    class Main:
+        def transcribe(self, path, language=None):
+            with guard:
+                active.append(1)
+                overlap.append(len(active))
+            time.sleep(0.05)
+            with guard:
+                active.pop()
+            return TranscriptionResult(text="hi", language="en", duration=1.0)
+
+    monkeypatch.setattr(srv, "loaded_models", {"qwen3-asr:1.7b": {"type": "mlx-audio", "strategy": Main()}})
+    app = srv.create_app("qwen3-asr:1.7b")
+    buf = io.BytesIO()
+    sf.write(buf, np.zeros(1600, dtype=np.float32), 16000, format="WAV")
+
+    async def three_at_once():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+            return await asyncio.gather(*(
+                c.post("/transcribe", files={"file": ("a.wav", buf.getvalue(), "audio/wav")}) for _ in range(3)))
+
+    responses = asyncio.run(three_at_once())
+    assert [r.status_code for r in responses] == [200, 200, 200]
+    assert overlap == [1, 1, 1]
 
 
 def test_emotion_sidecar_failure_does_not_fail_transcription(monkeypatch):

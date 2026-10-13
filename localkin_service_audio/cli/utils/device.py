@@ -93,37 +93,37 @@ def recommend_models(hardware: Optional[HardwareProfile] = None) -> Dict[str, Li
         if hardware.vram_gb >= 10:
             # High-end GPU
             recommendations["stt"] = [
-                "whisper:large-v3",
-                "faster-whisper:large-v3",
-                "sensevoice:small",
+                "qwen3-asr:1.7b",
                 "faster-whisper:large-v3-turbo",
+                "parakeet:0.6b",
+                "sensevoice:small",
             ]
             recommendations["tts"] = [
-                "cosyvoice:300m",
-                "f5-tts",
-                "cosyvoice2:0.5b",
+                "qwen3-tts:1.7b",
+                "cosyvoice3:0.5b",
+                "voxcpm2",
                 "kokoro",
             ]
             recommendations["reason"] = f"High-end GPU detected ({hardware.gpu_name}, {hardware.vram_gb:.1f}GB VRAM)"
         elif hardware.vram_gb >= 6:
             # Mid-range GPU
             recommendations["stt"] = [
-                "faster-whisper:medium",
-                "faster-whisper:distil-large-v3",
+                "qwen3-asr:0.6b",
+                "faster-whisper:large-v3-turbo",
                 "sensevoice:small",
             ]
             recommendations["tts"] = [
+                "qwen3-tts:0.6b",
+                "cosyvoice3:0.5b",
                 "kokoro",
-                "chattts",
-                "cosyvoice:300m",
             ]
             recommendations["reason"] = f"Mid-range GPU detected ({hardware.gpu_name}, {hardware.vram_gb:.1f}GB VRAM)"
         else:
             # Low-end GPU
             recommendations["stt"] = [
+                "faster-whisper:large-v3-turbo",
+                "sensevoice:small",
                 "faster-whisper:small",
-                "faster-whisper:base",
-                "whisper-cpp:small",
             ]
             recommendations["tts"] = [
                 "kokoro",
@@ -173,12 +173,14 @@ def recommend_models(hardware: Optional[HardwareProfile] = None) -> Dict[str, Li
             recommendations["reason"] = f"Apple Silicon with limited memory ({hardware.ram_gb:.0f}GB)"
 
     else:
-        # CPU only
+        # CPU only. SenseVoice isn't autoregressive, so it stays fast on a
+        # CPU (Chinese, English, Cantonese, Japanese, Korean); Whisper
+        # covers the other languages.
         if hardware.ram_gb >= 16:
             recommendations["stt"] = [
+                "sensevoice:small",
+                "faster-whisper:large-v3-turbo",
                 "whisper-cpp:small",
-                "whisper-cpp:base",
-                "faster-whisper:base",
             ]
             recommendations["tts"] = [
                 "kokoro",
@@ -187,10 +189,11 @@ def recommend_models(hardware: Optional[HardwareProfile] = None) -> Dict[str, Li
             recommendations["reason"] = f"CPU with {hardware.ram_gb:.0f}GB RAM ({hardware.cpu_cores} cores)"
         else:
             recommendations["stt"] = [
-                "whisper-cpp:tiny",
+                "sensevoice:small",
                 "whisper-cpp:base",
             ]
             recommendations["tts"] = [
+                "kokoro",
                 "native",
             ]
             recommendations["reason"] = f"CPU with limited resources ({hardware.ram_gb:.0f}GB RAM)"

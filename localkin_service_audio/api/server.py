@@ -8,6 +8,7 @@ import io
 import os
 import tempfile
 import threading
+import time
 import logging
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -286,6 +287,12 @@ def _model_lock(model_name: str) -> threading.Lock:
         return _model_locks.setdefault(model_name, threading.Lock())
 
 
+def _locked(model_name: str, fn, *args, **kwargs):
+    """``fn`` run while holding ``model_name``'s lock (for a worker thread)."""
+    with _model_lock(model_name):
+        return fn(*args, **kwargs)
+
+
 async def _stream_speech(model_name: str, req: "TTSRequest", response_format: str, stream_format: str):
     """Speech sent while it's made. ``stream_format`` "audio" sends the bytes
     as they come; "sse" sends OpenAI's speech.audio.delta events. The first
@@ -310,23 +317,25 @@ async def _stream_speech(model_name: str, req: "TTSRequest", response_format: st
                         break
                     loop.call_soon_threadsafe(queue.put_nowait, _encode_piece(piece, response_format, i == 0))
         except Exception as e:
+            logger.exception(f"streaming {model_name} failed")
             loop.call_soon_threadsafe(queue.put_nowait, e)
         finally:
             loop.call_soon_threadsafe(queue.put_nowait, None)
 
+    started = time.perf_counter()
     loop.run_in_executor(None, produce)
     first = await queue.get()
     if first is None or isinstance(first, Exception):
         stop.set()
         raise HTTPException(status_code=500, detail=f"Synthesis failed: {first or 'no audio'}")
+    first_at = time.perf_counter() - started
 
     async def body():
         item = first
         try:
             while item is not None:
                 if isinstance(item, Exception):
-                    logger.error(f"Streaming synthesis failed midway: {item}")
-                    return
+                    return  # logged where it was raised
                 if stream_format == "sse":
                     event = {"type": "speech.audio.delta", "audio": base64.b64encode(item).decode()}
                     yield f"data: {json.dumps(event)}\n\n".encode()
@@ -335,6 +344,8 @@ async def _stream_speech(model_name: str, req: "TTSRequest", response_format: st
                 item = await queue.get()
             if stream_format == "sse":
                 yield b'data: {"type": "speech.audio.done"}\n\n'
+            logger.info(f"stream {model_name}: {len(req.text)} chars, first audio in {first_at:.2f}s, "
+                        f"all in {time.perf_counter() - started:.2f}s")
         finally:
             stop.set()
 
@@ -1123,7 +1134,9 @@ def create_app(model_name: str, emotion_model: Optional[str] = None, preload: bo
 
                 try:
                     audio_path = _as_wav(temp_path, background_tasks)
-                    text, detected_lang, fmt_segments, duration, extras = _run_stt(
+                    started = time.perf_counter()
+                    stt = asyncio.to_thread(
+                        _locked, model_name, _run_stt,
                         model_data,
                         audio_path,
                         language=language,
@@ -1132,8 +1145,16 @@ def create_app(model_name: str, emotion_model: Optional[str] = None, preload: bo
                         want_segments=want_segments,
                         background_tasks=background_tasks,
                     )
-                    if emotion_model and not (extras or {}).get("emotion"):
-                        extras = {**(extras or {}), **_emotion_extras(emotion_model, audio_path)}
+                    if emotion_model and emotion_model != model_name:
+                        # The sidecar listens while the main model transcribes.
+                        emotion = asyncio.to_thread(_locked, emotion_model, _emotion_extras, emotion_model, audio_path)
+                        (text, detected_lang, fmt_segments, duration, extras), sidecar = await asyncio.gather(stt, emotion)
+                        if not (extras or {}).get("emotion"):
+                            extras = {**(extras or {}), **sidecar}
+                    else:
+                        text, detected_lang, fmt_segments, duration, extras = await stt
+                    logger.info(f"transcribe {model_name}: {duration or 0:.1f}s of audio in "
+                                f"{time.perf_counter() - started:.2f}s")
                     # Refresh path in case _run_stt resampled it (whisper-cpp).
                     background_tasks.add_task(os.unlink, temp_path)
 
@@ -1151,11 +1172,13 @@ def create_app(model_name: str, emotion_model: Optional[str] = None, preload: bo
                     background_tasks.add_task(os.unlink, temp_path)
                     raise
                 except Exception as e:
+                    logger.exception(f"transcribe {model_name} failed")
                     background_tasks.add_task(os.unlink, temp_path)
                     raise HTTPException(status_code=500, detail=f"Transcription failed: {e}")
             except HTTPException:
                 raise
             except Exception as e:
+                logger.exception(f"loading {model_name} failed")
                 raise HTTPException(status_code=500, detail=f"Model loading failed: {e}")
 
         @app.post("/v1/audio/transcriptions")
@@ -1280,6 +1303,7 @@ def create_app(model_name: str, emotion_model: Optional[str] = None, preload: bo
                         # the model doesn't stall the server meanwhile.
                         lock = _model_lock(model_name)
                         await run_in_threadpool(lock.acquire)
+                        started = time.perf_counter()
                         try:
                             if reference:
                                 result = strategy.clone_voice(reference[0], request.text,
@@ -1296,6 +1320,9 @@ def create_app(model_name: str, emotion_model: Optional[str] = None, preload: bo
                             lock.release()
                             if reference and reference[1]:
                                 os.unlink(reference[0])
+                        logger.info(f"synthesize {model_name}: {len(request.text)} chars, "
+                                    f"{len(result.audio) / result.sample_rate:.1f}s of audio in "
+                                    f"{time.perf_counter() - started:.2f}s" + (" (cloned)" if reference else ""))
                         sf.write(output_path, result.audio, result.sample_rate)
 
                         # Read the audio file and return it directly
@@ -1434,6 +1461,7 @@ def create_app(model_name: str, emotion_model: Optional[str] = None, preload: bo
                         background_tasks.add_task(os.unlink, output_path)
                     raise
                 except Exception as e:
+                    logger.exception(f"synthesize {model_name} failed")
                     # Clean up temp file on error
                     if os.path.exists(output_path):
                         background_tasks.add_task(os.unlink, output_path)
@@ -1442,6 +1470,7 @@ def create_app(model_name: str, emotion_model: Optional[str] = None, preload: bo
             except HTTPException:
                 raise
             except Exception as e:
+                logger.exception(f"loading {model_name} failed")
                 raise HTTPException(status_code=500, detail=f"Model loading failed: {str(e)}")
 
     if model_type == "tts":

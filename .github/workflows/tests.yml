@@ -1,0 +1,43 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.11"]
+        include:
+          # The oldest Python the package supports.
+          - os: ubuntu-latest
+            python: "3.10"
+    env:
+      # Overrides .python-version (3.10, the local default) for every uv call.
+      UV_PYTHON: ${{ matrix.python }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      # The unit tests stub every model, so no weights download and the
+      # mlx/sensevoice extras aren't needed.
+      - run: uv sync --frozen --extra mcp --extra dev
+      # --no-sync: test exactly what was installed. A plain `uv run` syncs
+      # again without the extras, which drops mcp and skips its tests.
+      - run: uv run --frozen --no-sync pytest tests/unit
