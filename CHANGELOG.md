@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.5] - 2026-10-12
+
+Emotion at no extra wait, failures that say why, and tests on every push.
+
 ### Changed
 
 - **Emotion runs alongside transcription.** With `--emotion`, SenseVoice now listens while the main model transcribes, instead of afterwards.

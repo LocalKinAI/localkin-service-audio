@@ -6,6 +6,13 @@
 
 **Local Voice AI Platform** - Speech-to-Text and Text-to-Speech with Chinese language support, voice cloning, and Claude integration via MCP.
 
+## What's New in v2.1.5
+
+- **Emotion without the wait**: with `--emotion`, SenseVoice listens while the main model transcribes. On a Mac Studio, 18 s of audio took 0.72 s instead of 1.08 s.
+- **Failures say why**: every server error logs its traceback, and each request logs how long it took.
+- **Current recommendations**: on NVIDIA and CPU machines, `kin audio recommend` suggests Qwen3-ASR, Qwen3-TTS, CosyVoice3, Parakeet and SenseVoice.
+- Dependencies updated for 143 security advisories. Tests run on Linux, macOS and Windows on every push.
+
 ## What's New in v2.1.4
 
 - **Agents anywhere**: `kin mcp --http` serves the MCP tools to agents on other machines or in the cloud. Audio goes in as a URL or base64, and results come back as download links ([setup](#remote-mcp-agents-on-other-machines-or-in-the-cloud)).
